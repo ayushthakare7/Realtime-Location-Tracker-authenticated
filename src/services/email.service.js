@@ -7,7 +7,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 async function sendRegistrationEmail(userEmail, name) {
   try {
     const data = await resend.emails.send({
-      from: 'onboarding@resend.dev', // Default free testing email
+      from: '"Real-Time Location Tracker"<onboarding@resend.dev>', 
       to: userEmail,
       subject: 'Welcome to Real-Time Location Tracker!',
       html: `<p>Hello <strong>${name}</strong>,</p>
