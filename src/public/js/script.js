@@ -5,38 +5,56 @@ if (!token) {
 }
 
 const socket = io();
+
 const markers = {};
+
+let isFirstLocation = true;
 
 // Socket Connection
 socket.on("connect", () => {
+
     console.log("Connected:", socket.id);
 
     socket.emit("join", token);
+
 });
 
-// Geolocation Tracking
+// Get User Location
 if (navigator.geolocation) {
+
     navigator.geolocation.watchPosition(
+
         (position) => {
-            const { latitude, longitude } = position.coords;
+
+            const {
+                latitude,
+                longitude
+            } = position.coords;
 
             socket.emit("send-location", {
                 latitude,
                 longitude
             });
+
         },
+
         (error) => {
+
             console.error("Location Error:", error);
+
         },
+
         {
             enableHighAccuracy: true,
             timeout: 5000,
             maximumAge: 0
         }
+
     );
+
 }
 
-// Leaflet Map
+// Initialize Map
 const map = L.map("map").setView([0, 0], 15);
 
 L.tileLayer(
@@ -57,7 +75,14 @@ socket.on("receive-location", (data) => {
         longitude
     } = data;
 
-    map.setView([latitude, longitude], 15);
+    // Center map only once
+    if (isFirstLocation) {
+
+        map.setView([latitude, longitude], 15);
+
+        isFirstLocation = false;
+
+    }
 
     if (markers[username]) {
 
@@ -80,6 +105,7 @@ socket.on("receive-location", (data) => {
         });
 
     }
+
 });
 
 // User Disconnect
@@ -90,5 +116,7 @@ socket.on("user-disconnected", (username) => {
         map.removeLayer(markers[username]);
 
         delete markers[username];
+
     }
+
 });
