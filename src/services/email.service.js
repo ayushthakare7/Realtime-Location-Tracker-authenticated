@@ -21,7 +21,7 @@ transporter.verify((error, success) => {
   }
 });
 
-module.exports = transporter;
+
 
 
 
@@ -53,4 +53,4 @@ async function sendRegistrationEmail(userEmail, name){
 
   await sendEmail(userEmail, subject, text, html)
 }
-module.exports = {sendRegistrationEmail};
+module.exports = {transporter, sendRegistrationEmail};
