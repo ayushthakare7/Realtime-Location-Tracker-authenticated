@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const emailService = require("../services/email.service")
 
 // Register User
 exports.register = async (req, res) => {
@@ -44,9 +45,14 @@ exports.register = async (req, res) => {
 
         res.status(201).json({
             success: true,
+            
             message: "User registered successfully",
-            userId: user._id
+            userId: user._id,
+            email : user.email,
+            name : user.username
         });
+
+        await emailService.sendRegistrationEmail(user.email, user.username) 
 
     } catch (error) {
 
@@ -58,7 +64,9 @@ exports.register = async (req, res) => {
     }
 };
 
-// Login User
+   
+
+
 exports.login = async (req, res) => {
     try {
 
