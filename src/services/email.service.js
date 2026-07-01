@@ -1,59 +1,27 @@
 require('dotenv').config();
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-// FIX: Added explicit host and toggled security settings to bypass Render's firewall blocks
-const transporter = nodemailer.createTransport({
-  host: '://gmail.com',
-  port: 465,
-  secure: true, // Upgrades the connection to TLS immediately
-  service: 'gmail',
-  auth: {
-    type: 'OAuth2',
-    user: process.env.EMAIL_USER,
-    clientId: process.env.CLIENT_ID,
-    clientSecret: process.env.CLIENT_SECRET,
-    refreshToken: process.env.REFRESH_TOKEN,
-  },
-  tls: {
-    rejectUnauthorized: false // Prevents cloud firewalls from abruptly terminating the handshake
-  }
-});
+// Initialize Resend with your API key
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Verify connection configuration
-transporter.verify((error, success) => {
-  if (error) {
-    console.error('Error connecting to email server:', error);
-  } else {
-    console.log('Email server is ready to send messages');
-  }
-});
-
-const sendEmail = async (to, subject, text, html) => {
+async function sendRegistrationEmail(userEmail, name) {
   try {
-    const info = await transporter.sendMail({
-      from: `Real-Time Location Tracker <${process.env.EMAIL_USER}>`, 
-      to, 
-      subject, 
-      text, 
-      html, 
+    const data = await resend.emails.send({
+      from: 'onboarding@resend.dev', // Default free testing email
+      to: userEmail,
+      subject: 'Welcome to Real-Time Location Tracker!',
+      html: `<p>Hello <strong>${name}</strong>,</p>
+             <p>Thank you for registering at Real-Time Location Tracker. We are excited to have you on board!</p>
+             <p>Best regards,<br>RT Location Tracker Team</p>`,
     });
 
-    console.log('Message sent: %s', info.messageId);
-    } catch(error) {
-    console.error('Detailed Error inside sendEmail function:', error);
+    console.log('EMAIL SUCCESS:', data);
+  } catch (error) {
+    console.error('CRITICAL RESEND EMAIL ERROR:', error);
   }
-};
-
-async function sendRegistrationEmail(userEmail, name){
-  const subject = 'Welcome to Real-Time Location Tracker !';
-  const text = `Hello ${name}, \n\n Thank you for registering at Real-Time Location Tracker, We are excited to have you on board!\n\n Best regards, \n\n RT Location Tracker Team`;
-  const html = `<p>Hello ${name}, </p><p>Thank you for registering at Real-Time Location Tracker, We are excited to have you on board!</p><p>Best regards,</p><p>RT Location Tracker Team</p>`;
-
-  await sendEmail(userEmail, subject, text, html);
 }
 
-
+// Export the object for the controller to read
 module.exports = {
-  transporter,
   sendRegistrationEmail
 };
