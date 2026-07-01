@@ -1,7 +1,7 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const emailService = require("../services/email.service")
+const {sendRegistrationEmail} = require("../services/email.service")
 
 // Register User
 exports.register = async (req, res) => {
@@ -52,7 +52,7 @@ exports.register = async (req, res) => {
             name : user.username
         });
 
-        await emailService.sendRegistrationEmail(user.email, user.username) 
+        await sendRegistrationEmail(user.email, user.username) 
 
     } catch (error) {
 
