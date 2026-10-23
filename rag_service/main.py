@@ -330,8 +330,8 @@ class RevaRAGHandler(BaseHTTPRequestHandler):
                 context = payload.get("context", {})
                 if not isinstance(question, str) or not question.strip() or len(question) > 500:
                     raise RequestError(400, "question must be a non-empty string of at most 500 characters")
-                if not isinstance(user_ids, list) or not 1 <= len(user_ids) <= 100:
-                    raise RequestError(400, "authorizedUserIds must contain between 1 and 100 IDs")
+                if not isinstance(user_ids, list) or len(user_ids) > 100:
+                    raise RequestError(400, "authorizedUserIds must contain at most 100 IDs")
                 if not all(isinstance(value, str) for value in user_ids):
                     raise RequestError(400, "authorizedUserIds must contain strings")
                 if not isinstance(context, dict):
