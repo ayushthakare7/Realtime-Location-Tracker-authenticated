@@ -65,7 +65,7 @@ function placeMatches(item, placeQuery, countryMatch) {
     address.hamlet || item.name || ""
   );
   const searchable = normalizeQuery([
-    settlement, item.name, item.display_name, address.state
+    settlement, item.name, item.display_name, address.state, address.country
   ].filter(Boolean).join(" "));
   const tokens = normalizeQuery(placeQuery).split(/\s+/).filter(Boolean);
   if (!tokens.length || !tokens.every(token => searchable.includes(token))) return false;
@@ -83,7 +83,12 @@ async function geocodePlace(input) {
   if (!normalizedQuery) return null;
 
   const countryMatch = detectCountry(query);
-  const placeQuery = removeCountry(query, countryMatch) || query;
+  const isCountryOnly = Boolean(countryMatch && countryMatch.aliases.some(
+    alias => normalizeQuery(alias) === normalizedQuery
+  ));
+  const placeQuery = isCountryOnly
+    ? countryMatch.country
+    : (removeCountry(query, countryMatch) || query);
 
   // Validate cache entries too; older versions may have cached a wrong place.
   const cached = await GeocodedPlace.findOne({ normalizedQuery }).lean();
