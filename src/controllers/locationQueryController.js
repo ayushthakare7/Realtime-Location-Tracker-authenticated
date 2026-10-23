@@ -135,7 +135,7 @@ async function answerDistanceQuestion(req, parsed) {
 
 async function inferFriendPlaceDistanceIntent(question, currentUserId) {
   const q = String(question || "").trim();
-  if (!/\\b(distance|far|apart|kilomet(?:er|re)s?|miles?|how long|travel time|drive|driving)\\b/i.test(q)) return null;
+  if (!/\b(distance|far|apart|kilomet(?:er|re)s?|miles?|how long|travel time|drive|driving)\b/i.test(q)) return null;
 
   const friendships = await Friendship.find({
     status: "accepted",
@@ -147,7 +147,7 @@ async function inferFriendPlaceDistanceIntent(question, currentUserId) {
   const matches = friends
     .filter(person => {
       const name = String(person.username || "");
-      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\function inferPlaceDistanceIntent(question) {");
+      const escaped = name.replace(/[.*+?^\${}()|[\]\\]/g, "\\$&");
       return new RegExp("(^|[^a-z0-9_])" + escaped + "([^a-z0-9_]|$)", "i").test(q);
     })
     .sort((a, b) => lower.indexOf(a.username.toLocaleLowerCase("en")) - lower.indexOf(b.username.toLocaleLowerCase("en")));
@@ -159,14 +159,12 @@ async function inferFriendPlaceDistanceIntent(question, currentUserId) {
   const before = q.slice(0, index).trim();
   const after = q.slice(index + name.length).trim();
   const cleanPlace = value => value
-    .replace(/^[\\s,;:.-]*(?:(?:how\\s+far\\s+is|how\\s+far|how\\s+long\\s+is|what\\s+is\\s+the\\s+distance|distance\\s+between|distance\\s+from|calculate\\s+(?:the\\s+)?distance|tell\\s+me\\s+the\\s+distance)\\s+)?/i, "")
-    .replace(/^[\\s,;:.-]*(?:from|to|and|of|in)\\s+/i, "")
-    .replace(/\\s+(?:from|to|away|by\\s+road|in\\s+a\\s+straight\\s+line)\\s*$/i, "")
+    .replace(/^[\s,;:.-]*(?:(?:how\s+far\s+is|how\s+far|how\s+long\s+is|what\s+is\s+the\s+distance|distance\s+between|distance\s+from|calculate\s+(?:the\s+)?distance|tell\s+me\s+the\s+distance)\s+)?/i, "")
+    .replace(/^[\s,;:.-]*(?:from|to|and|of|in)\s+/i, "")
+    .replace(/\s+(?:from|to|away|by\s+road|in\s+a\s+straight\s+line)\s*$/i, "")
     .replace(/[?.!,;:]+$/g, "")
     .trim();
-  const placeBefore = cleanPlace(before);
-  const placeAfter = cleanPlace(after);
-  const candidate = placeBefore || placeAfter;
+  const candidate = cleanPlace(before) || cleanPlace(after);
   if (!candidate || /^(me|myself|you|user)$/i.test(candidate)) return null;
   return {
     intent: "distance",
