@@ -20,11 +20,13 @@ function asPlace(record) {
  */
 async function geocodePlace(input) {
   const query = String(input || "").trim();
-  const normalizedQuery = normalizeQuery(query);
   // "America" is commonly used to mean the United States in conversational queries.
   const searchQuery = /^(america|usa|u\.s\.a\.?|us)$/i.test(query)
     ? "United States of America"
     : query;
+  // Cache by the normalized search target, not the raw alias. This prevents
+  // stale "america" entries from the former India-only search returning an Indian city.
+  const normalizedQuery = normalizeQuery(searchQuery);
   if (!normalizedQuery) return null;
 
   const cached = await GeocodedPlace.findOne({ normalizedQuery }).lean();
