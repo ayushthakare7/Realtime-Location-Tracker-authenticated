@@ -22,7 +22,7 @@ module.exports = (io) => {
     socket.join("user:" + userId);
 
     try {
-      const user = await User.findById(userId).select("sharingEnabled");
+      const user = await User.findById(userId).select("sharingEnabled historyEnabled");
       const links = await Friendship.find({ status: "accepted", $or: [{ requester: userId }, { recipient: userId }] }).lean();
       const friendIds = links.map(f => String(f.requester) === String(userId) ? f.recipient : f.requester);
       const friends = await User.find({ _id: { $in: friendIds }, sharingEnabled: true }).select("_id username").lean();
@@ -30,7 +30,7 @@ module.exports = (io) => {
         const loc = await Location.findOne({ userId: friend._id }).lean();
         if (loc) socket.emit("receive-location", { userId: String(friend._id), username: friend.username, latitude: loc.latitude, longitude: loc.longitude, lastSeen: loc.lastSeen });
       }
-      socket.emit("sharing-status", { enabled: Boolean(user && user.sharingEnabled) });
+      socket.emit("sharing-status", { enabled: Boolean(user && user.sharingEnabled), historyEnabled: user?.historyEnabled !== false });
     } catch (e) { console.error("Socket initialization failed:", e.message); }
 
     socket.on("send-location", async (data) => {
@@ -38,12 +38,14 @@ module.exports = (io) => {
         const latitude = Number(data && data.latitude);
         const longitude = Number(data && data.longitude);
         if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) return;
-        const user = await User.findById(userId).select("sharingEnabled username");
+        const user = await User.findById(userId).select("sharingEnabled historyEnabled username");
         if (!user || !user.sharingEnabled) return;
         const now = new Date();
         await Location.findOneAndUpdate({ userId }, { userId, username: user.username || username, latitude, longitude, lastSeen: now }, { upsert: true, new: true });
-        await LocationPoint.create({ userId, username: user.username || username, latitude, longitude, recordedAt: now });
-        await processLocationEvent({ userId, username: user.username || username, latitude, longitude, recordedAt: now });
+        if (user.historyEnabled !== false) {
+          await LocationPoint.create({ userId, username: user.username || username, latitude, longitude, recordedAt: now });
+          await processLocationEvent({ userId, username: user.username || username, latitude, longitude, recordedAt: now });
+        }
         const links = await Friendship.find({ status: "accepted", $or: [{ requester: userId }, { recipient: userId }] }).lean();
         const friendIds = links.map(f => String(f.requester) === String(userId) ? f.recipient : f.requester);
         const recipients = await User.find({ _id: { $in: friendIds }, sharingEnabled: true }).select("_id").lean();
