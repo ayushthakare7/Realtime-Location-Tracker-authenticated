@@ -1,126 +1,59 @@
 const jwt = require("jsonwebtoken");
+const User = require("../models/User");
 const Location = require("../models/Location");
-
-const onlineUsers = {};
+const LocationPoint = require("../models/LocationPoint");
+const LocationVisit = require("../models/LocationVisit");
+const { processLocationEvent } = require("../services/locationEvents.service");
+const Friendship = require("../models/Friendship");
 
 module.exports = (io) => {
+  io.use((socket, next) => {
+    try {
+      const token = socket.handshake.auth && socket.handshake.auth.token;
+      if (!token) return next(new Error("Authentication required"));
+      socket.user = jwt.verify(token, process.env.JWT_SECRET);
+      next();
+    } catch { next(new Error("Invalid token")); }
+  });
 
-    io.on("connection", (socket) => {
+  io.on("connection", async (socket) => {
+    const userId = socket.user.userId;
+    const username = socket.user.username;
+    socket.join("user:" + userId);
 
-        console.log("Socket Connected:", socket.id);
+    try {
+      const user = await User.findById(userId).select("sharingEnabled historyEnabled");
+      const links = await Friendship.find({ status: "accepted", $or: [{ requester: userId }, { recipient: userId }] }).lean();
+      const friendIds = links.map(f => String(f.requester) === String(userId) ? f.recipient : f.requester);
+      const friends = await User.find({ _id: { $in: friendIds }, sharingEnabled: true }).select("_id username").lean();
+      for (const friend of friends) {
+        const loc = await Location.findOne({ userId: friend._id }).lean();
+        if (loc) socket.emit("receive-location", { userId: String(friend._id), username: friend.username, latitude: loc.latitude, longitude: loc.longitude, lastSeen: loc.lastSeen });
+      }
+      socket.emit("sharing-status", { enabled: Boolean(user && user.sharingEnabled), historyEnabled: user?.historyEnabled !== false });
+    } catch (e) { console.error("Socket initialization failed:", e.message); }
 
-        socket.on("join", async (token) => {
-
-            try {
-
-                const decoded = jwt.verify(
-                    token,
-                    process.env.JWT_SECRET
-                );
-
-                onlineUsers[socket.id] = {
-                    userId: decoded.userId,
-                    username: decoded.username
-                };
-
-                console.log(
-                    `${decoded.username} joined`
-                );
-
-            } catch (error) {
-
-                console.log("Invalid Token");
-                socket.disconnect();
-
-            }
-
-        });
-
-        socket.on(
-            "send-location",
-            async (data) => {
-
-                const currentUser =
-                    onlineUsers[socket.id];
-
-                if (!currentUser) return;
-
-                try {
-
-                    await Location.findOneAndUpdate(
-                        {
-                            userId:
-                                currentUser.userId
-                        },
-                        {
-                            userId:
-                                currentUser.userId,
-
-                            username:
-                                currentUser.username,
-
-                            latitude:
-                                data.latitude,
-
-                            longitude:
-                                data.longitude,
-
-                            lastSeen:
-                                new Date()
-                        },
-                        {
-                            upsert: true,
-                            new: true
-                        }
-                    );
-
-                    io.emit(
-                        "receive-location",
-                        {
-                            username:
-                                currentUser.username,
-
-                            latitude:
-                                data.latitude,
-
-                            longitude:
-                                data.longitude
-                        }
-                    );
-
-                } catch (error) {
-
-                    console.log(error);
-
-                }
-
-            }
-        );
-
-        socket.on(
-            "disconnect",
-            () => {
-
-                const user =
-                    onlineUsers[socket.id];
-
-                if (user) {
-
-                    io.emit(
-                        "user-disconnected",
-                        user.username
-                    );
-
-                    delete onlineUsers[socket.id];
-                }
-
-                console.log(
-                    "Disconnected:",
-                    socket.id
-                );
-            }
-        );
-
+    socket.on("send-location", async (data) => {
+      try {
+        const latitude = Number(data && data.latitude);
+        const longitude = Number(data && data.longitude);
+        if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) return;
+        const user = await User.findById(userId).select("sharingEnabled historyEnabled username");
+        if (!user || !user.sharingEnabled) return;
+        const now = new Date();
+        await Location.findOneAndUpdate({ userId }, { userId, username: user.username || username, latitude, longitude, lastSeen: now }, { upsert: true, new: true });
+        if (user.historyEnabled !== false) {
+          await LocationPoint.create({ userId, username: user.username || username, latitude, longitude, recordedAt: now });
+          await processLocationEvent({ userId, username: user.username || username, latitude, longitude, recordedAt: now });
+        }
+        const links = await Friendship.find({ status: "accepted", $or: [{ requester: userId }, { recipient: userId }] }).lean();
+        const friendIds = links.map(f => String(f.requester) === String(userId) ? f.recipient : f.requester);
+        const recipients = await User.find({ _id: { $in: friendIds }, sharingEnabled: true }).select("_id").lean();
+        const payload = { userId: String(userId), username: user.username || username, latitude, longitude, lastSeen: now };
+        for (const recipient of recipients) io.to("user:" + recipient._id).emit("receive-location", payload);
+      } catch (e) { console.error("Location update failed:", e.message); }
     });
 
+    socket.on("disconnect", () => console.log("Socket disconnected:", socket.id));
+  });
 };
