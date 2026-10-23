@@ -1,12 +1,13 @@
 import os
 import hmac
+import json
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlparse
 from datetime import datetime, timedelta
 from typing import Any, TypedDict
 
 from bson import ObjectId
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException
-from pydantic import BaseModel, Field
 from pymongo import MongoClient
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -20,7 +21,7 @@ MONGO_URI = os.getenv("MONGO_URI", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-VECTOR_INDEX = os.getenv("RAG_VECTOR_INDEX", "location_event_vector_index")
+VECTOR_INDEX = os.getenv("RAG_VECTOR_INDEX", "location_event_vector_index_384")
 TOP_K = int(os.getenv("RAG_TOP_K", "10"))
 DB_NAME = os.getenv("MONGO_DB_NAME", "location_tracker")
 if MONGO_URI and not os.getenv("MONGO_DB_NAME"):
@@ -30,18 +31,9 @@ if MONGO_URI and not os.getenv("MONGO_DB_NAME"):
     except Exception:
         pass
 
-app = FastAPI(title="Reva Python RAG Microservice", version="1.0.0")
 mongo = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000) if MONGO_URI else None
 _embeddings = None
 _llm = None
-
-class AskRequest(BaseModel):
-    question: str = Field(min_length=1, max_length=500)
-    authorizedUserIds: list[str] = Field(min_length=1, max_length=100)
-    context: dict[str, Any] = Field(default_factory=dict)
-
-class IndexRequest(BaseModel):
-    eventId: str
 
 class GraphState(TypedDict, total=False):
     question: str
@@ -211,52 +203,132 @@ def build_graph():
 
 workflow = build_graph()
 
+class RequestError(Exception):
+    def __init__(self, status: int, message: str):
+        super().__init__(message)
+        self.status = status
+
+
 def check_token(authorization: str | None):
     if not TOKEN or not authorization or not hmac.compare_digest(authorization, "Bearer " + TOKEN):
-        raise HTTPException(status_code=401, detail="Unauthorized")
+        raise RequestError(401, "Unauthorized")
 
-@app.get("/health")
-def health():
-    return {"success": True, "service": "reva-rag", "configured": bool(TOKEN and MONGO_URI and GROQ_API_KEY)}
 
-@app.post("/index-event")
-def index_event_endpoint(payload: IndexRequest, authorization: str | None = Header(default=None)):
-    check_token(authorization)
+class RevaRAGHandler(BaseHTTPRequestHandler):
+    server_version = "RevaRAG/1.0"
+
+    def send_json(self, status: int, payload: dict[str, Any]):
+        body = json.dumps(payload, default=str).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        if urlparse(self.path).path == "/health":
+            self.send_json(200, {
+                "success": True,
+                "service": "reva-rag",
+                "configured": bool(TOKEN and MONGO_URI and GROQ_API_KEY),
+            })
+            return
+        self.send_json(404, {"success": False, "detail": "Not found"})
+
+    def do_POST(self):
+        path = urlparse(self.path).path
+        try:
+            check_token(self.headers.get("Authorization"))
+            length = int(self.headers.get("Content-Length", "0"))
+            if length <= 0 or length > 1_000_000:
+                raise RequestError(400, "Invalid request body size")
+            try:
+                payload = json.loads(self.rfile.read(length))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                raise RequestError(400, "Request body must be valid JSON")
+
+            if path == "/index-event":
+                event_id = payload.get("eventId")
+                if not isinstance(event_id, str) or not event_id:
+                    raise RequestError(400, "eventId is required")
+                try:
+                    result = {"success": True, "indexed": index_event(event_id)}
+                except Exception as exc:
+                    print(f"[Reva RAG] indexing failed: {type(exc).__name__}: {exc}", flush=True)
+                    raise RequestError(502, "Could not index location event") from exc
+                self.send_json(200, result)
+                return
+
+            if path == "/reindex":
+                try:
+                    index_status = ensure_vector_index()
+                    cursor = collection().find(
+                        {"eventType": {"$in": ["arrival", "stay", "departure"]}},
+                        {"_id": 1, "embedding": 1},
+                    )
+                    total = 0
+                    for row in cursor:
+                        if index_event(str(row["_id"])):
+                            total += 1
+                    result = {"success": True, "vectorIndex": index_status, "indexedEvents": total}
+                except Exception as exc:
+                    print(f"[Reva RAG] reindex failed: {type(exc).__name__}: {exc}", flush=True)
+                    raise RequestError(502, "Could not reindex location events") from exc
+                self.send_json(200, result)
+                return
+
+            if path == "/ask":
+                question = payload.get("question")
+                user_ids = payload.get("authorizedUserIds")
+                context = payload.get("context", {})
+                if not isinstance(question, str) or not question.strip() or len(question) > 500:
+                    raise RequestError(400, "question must be a non-empty string of at most 500 characters")
+                if not isinstance(user_ids, list) or not 1 <= len(user_ids) <= 100:
+                    raise RequestError(400, "authorizedUserIds must contain between 1 and 100 IDs")
+                if not all(isinstance(value, str) for value in user_ids):
+                    raise RequestError(400, "authorizedUserIds must contain strings")
+                if not isinstance(context, dict):
+                    raise RequestError(400, "context must be an object")
+                try:
+                    result = workflow.invoke({
+                        "question": question.strip(),
+                        "authorized_user_ids": user_ids,
+                        "context": context,
+                    })
+                    response = {
+                        "success": True,
+                        "answer": result.get("answer", ""),
+                        "intent": result.get("intent", "other"),
+                        "retrievedEvents": len(result.get("events", [])),
+                    }
+                except Exception as exc:
+                    print(f"[Reva RAG] request failed: {type(exc).__name__}: {exc}", flush=True)
+                    raise RequestError(502, "RAG processing failed. Check service logs and configuration.") from exc
+                self.send_json(200, response)
+                return
+
+            self.send_json(404, {"success": False, "detail": "Not found"})
+        except RequestError as exc:
+            self.send_json(exc.status, {"success": False, "detail": str(exc)})
+        except Exception as exc:
+            print(f"[Reva RAG] HTTP handler failed: {type(exc).__name__}: {exc}", flush=True)
+            self.send_json(500, {"success": False, "detail": "Internal server error"})
+
+    def log_message(self, fmt: str, *args):
+        print(f"[Reva RAG] {self.address_string()} - {fmt % args}", flush=True)
+
+
+if __name__ == "__main__":
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "8001"))
+    server = ThreadingHTTPServer((host, port), RevaRAGHandler)
+    print(f"Reva RAG service listening on {host}:{port}", flush=True)
     try:
-        return {"success": True, "indexed": index_event(payload.eventId)}
-    except Exception as exc:
-        print(f"[Reva RAG] indexing failed: {type(exc).__name__}: {exc}", flush=True)
-        raise HTTPException(status_code=502, detail="Could not index location event.") from exc
-
-@app.post("/reindex")
-def reindex(authorization: str | None = Header(default=None)):
-    check_token(authorization)
-    try:
-        index_status = ensure_vector_index()
-        cursor = collection().find(
-            {"eventType": {"$in": ["arrival", "stay", "departure"]}},
-            {"_id": 1, "embedding": 1},
-        )
-        total = 0
-        for row in cursor:
-            if index_event(str(row["_id"])):
-                total += 1
-        return {"success": True, "vectorIndex": index_status, "indexedEvents": total}
-    except Exception as exc:
-        print(f"[Reva RAG] reindex failed: {type(exc).__name__}: {exc}", flush=True)
-        raise HTTPException(status_code=502, detail="Could not reindex location events.") from exc
-
-@app.post("/ask")
-def ask(payload: AskRequest, authorization: str | None = Header(default=None)):
-    check_token(authorization)
-    try:
-        result = workflow.invoke({
-            "question": payload.question.strip(),
-            "authorized_user_ids": payload.authorizedUserIds,
-            "context": payload.context,
-        })
-        return {"success": True, "answer": result.get("answer", ""),
-                "intent": result.get("intent", "other"), "retrievedEvents": len(result.get("events", []))}
-    except Exception as exc:
-        print(f"[Reva RAG] request failed: {type(exc).__name__}: {exc}", flush=True)
-        raise HTTPException(status_code=502, detail="RAG processing failed. Check service logs and configuration.") from exc
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+        if mongo is not None:
+            mongo.close()
