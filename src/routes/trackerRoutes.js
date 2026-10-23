@@ -1,6 +1,7 @@
 const express = require('express');
 const auth = require('../middleware/authMiddleware');
 const controller = require('../controllers/trackerController');
+const locationQueryController = require('../controllers/locationQueryController');
 const router = express.Router();
 router.use(auth);
 router.get('/friends', controller.listFriends);
@@ -10,5 +11,5 @@ router.patch('/sharing', controller.setSharing);
 router.patch('/history', controller.setHistory);
 router.get('/history', controller.history);
 router.delete('/history', controller.deleteHistory);
-router.post('/ask', controller.askMap);
+router.post('/ask', locationQueryController.ask);
 module.exports = router;
