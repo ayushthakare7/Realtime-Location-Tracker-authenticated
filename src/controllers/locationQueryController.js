@@ -4,6 +4,7 @@ const Friendship = require("../models/Friendship");
 const { askMap } = require("./trackerController");
 const { understandLocationQuestion } = require("../services/gemini.service");
 const { geocodePlace } = require("../services/geocoding.service");
+const { inferPersonDistanceIntent } = require("../services/personDistanceIntent.service");
 
 function distanceKm(aLat, aLon, bLat, bLon) {
   const rad = value => value * Math.PI / 180;
@@ -138,7 +139,8 @@ exports.ask = async (req, res) => {
   try {
     // LLM understands the open-ended question; deterministic code then performs
     // authorization, coordinate resolution, Haversine distance, and road routing.
-    const parsed = await understandLocationQuestion(question);
+    const parsed = await inferPersonDistanceIntent(question, req.user.userId)
+      || await understandLocationQuestion(question);
 
     if (parsed?.intent === "distance") {
       const answer = await answerDistanceQuestion(req, parsed);
