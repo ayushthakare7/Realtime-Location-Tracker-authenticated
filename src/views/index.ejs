@@ -38,7 +38,7 @@
     <section class="panel">
       <h3>Ask My Map</h3>
       <p class="muted">Answers use your latest location, location history, and only accepted friends who enabled sharing. Coordinates may be sensitive.</p>
-      <form id="askForm"><textarea id="question" rows="3" maxlength="500" placeholder="Example: What was the latest location shared with me?" required></textarea><button>Ask Gemini</button></form>
+      <form id="askForm"><textarea id="question" rows="3" maxlength="500" placeholder="Example: What was the latest location shared with me?" required></textarea><label style="display:block;font-size:13px;margin:8px 0"><input id="aiConsent" type="checkbox" required style="width:auto"> I consent to sending the retrieved location records in this question to Gemini. Google may process free-tier API data under its free-tier terms.</label><button>Ask Gemini</button></form>
       <p id="answer"></p>
     </section>
   </aside>
