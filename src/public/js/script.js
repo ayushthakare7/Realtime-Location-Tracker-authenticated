@@ -132,7 +132,7 @@ document.getElementById("askForm").addEventListener("submit", async event => {
   const answer = document.getElementById("answer");
   answer.textContent = "Asking Gemini…";
   try {
-    const data = await api("/ask", { method: "POST", body: JSON.stringify({ question: document.getElementById("question").value }) });
+    const data = await api("/ask", { method: "POST", body: JSON.stringify({ question: document.getElementById("question").value, aiConsent: document.getElementById("aiConsent").checked }) });
     answer.textContent = data.answer;
   } catch (e) { answer.textContent = e.message; }
 });
