@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 const LocationEvent = require("../models/LocationEvent");
 const { embedText } = require("./embedding.service");
 
-const VECTOR_INDEX = process.env.RAG_VECTOR_INDEX || "location_event_vector_index";
+const VECTOR_INDEX = process.env.RAG_VECTOR_INDEX || "location_event_vector_index_384";
 
 function cleanEvent(event) {
   return {
@@ -84,8 +84,6 @@ async function retrieveLocationEvents({ userIds, question, limit = 12 }) {
   try {
     return await vectorRetrieve({ userIds, question, limit });
   } catch (error) {
-    // If Atlas vector search is not configured yet, keep the application usable while setup is completed.
-    // This fallback is lexical only and is not the primary RAG path.
     console.error("Vector retrieval unavailable:", error.message);
     const queryTerms = [...new Set(String(question).toLowerCase().match(/[a-z0-9]+/g) || [])].filter(word => word.length > 2);
     const events = await LocationEvent.find({ userId: { $in: userIds }, eventType: { $in: ["arrival", "stay", "departure"] } })
