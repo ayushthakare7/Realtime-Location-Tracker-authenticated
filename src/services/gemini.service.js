@@ -24,15 +24,6 @@ async function groqChat(messages, { temperature = 0.2, max_tokens = 450 } = {}) 
   return data.choices?.[0]?.message?.content?.trim() || "";
 }
 
-async function askGemini(prompt) {
-  return groqChat([
-    {
-      role: "system",
-      content: "You are Reva, a privacy-aware location-history assistant. Answer only from the authorized context supplied by the application. Never invent locations, times, events, distances, routes, or people. If the supplied evidence is insufficient, say so clearly."
-    },
-    { role: "user", content: String(prompt || "") }
-  ]);
-}
 
 async function understandLocationQuestion(question) {
   const raw = await groqChat([
@@ -67,4 +58,4 @@ Examples:
   return parsed;
 }
 
-module.exports = { askGemini, understandLocationQuestion };
+module.exports = { understandLocationQuestion };
