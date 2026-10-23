@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Private Location Tracker</title>
+  <title>Reva — Your Location Companion</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <style>
@@ -16,6 +16,13 @@
     #map{height:calc(100vh - 110px);min-height:420px;border-radius:14px;overflow:hidden}
     .muted{font-size:13px;color:#5e6b7d}.friend{padding:9px 0;border-bottom:1px solid #edf0f5}
     #status{font-size:13px;color:#5e6b7d;white-space:pre-wrap} #answer{white-space:pre-wrap}
+    .reva-card{background:linear-gradient(145deg,#fff 0%,#f4f0ff 100%);border-color:#dcd4ff}
+    .reva-brand{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+    .reva-orb{display:grid;place-items:center;width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,#7c3aed,#ec4899);color:white;font-size:22px;box-shadow:0 6px 18px #7c3aed33}
+    .reva-title{margin:0;font-size:20px}.reva-subtitle{margin:4px 0 12px;color:#5e5282;font-size:13px}
+    .reva-prompts{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 10px}.reva-prompts button{background:#eee8ff;color:#4b2b87;border:1px solid #d9ccff;border-radius:999px;font-size:12px;padding:7px 10px}
+    #askForm button[type=submit]{background:linear-gradient(90deg,#6d28d9,#a21caf);font-weight:650;padding:11px 15px}
+    #answer{margin-top:12px;padding:10px 0;line-height:1.55;white-space:pre-wrap}
     @media(max-width:850px){main{grid-template-columns:1fr}#map{height:55vh;min-height:350px}}
   </style>
 </head>
@@ -35,11 +42,16 @@
       <div id="requests"></div>
       <h3>Friends</h3><div id="friends">Loading friends…</div>
     </section>
-    <section class="panel">
-      <h3>Ask My Map</h3>
-      <p class="muted">Answers use your latest location, location history, and only accepted friends who enabled sharing. Coordinates may be sensitive.</p>
-      <form id="askForm"><textarea id="question" rows="3" maxlength="500" placeholder="Example: What was the latest location shared with me?" required></textarea><label style="display:block;font-size:13px;margin:8px 0"><input id="aiConsent" type="checkbox" required style="width:auto"> I consent to sending the retrieved location records in this question to Gemini. Google may process free-tier API data under its free-tier terms.</label><button>Ask Gemini</button></form>
-      <p id="answer"></p>
+    <section class="panel reva-card">
+      <div class="reva-brand"><div class="reva-orb" aria-hidden="true">✦</div><div><h3 class="reva-title">Meet Reva</h3><div class="reva-subtitle">Your little guide to the places and moments that matter.</div></div></div>
+      <p class="muted">Ask about shared visits, time spent at a place, recent movements, or how far away a sharing friend is. Reva only uses location information you are authorized to see.</p>
+      <div class="reva-prompts" aria-label="Try a question">
+        <button type="button" data-question="How far away are my sharing friends?">📍 Who's nearby?</button>
+        <button type="button" data-question="What places did my friends visit recently?">🗺 Recent places</button>
+        <button type="button" data-question="How long did my friends stay at each place?">⏳ Time spent</button>
+      </div>
+      <form id="askForm"><textarea id="question" rows="3" maxlength="500" placeholder="Ask Reva about a shared place, visit, or distance…" required></textarea><label style="display:block;font-size:13px;margin:8px 0"><input id="aiConsent" type="checkbox" required style="width:auto"> I agree to send the relevant shared location records to Reva's external AI service to answer this question. Location details can be sensitive.</label><button type="submit">✦ Ask Reva</button></form>
+      <p id="answer" aria-live="polite"></p>
     </section>
   </aside>
   <div id="map"></div>
