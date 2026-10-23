@@ -1,6 +1,5 @@
 const LocationVisit = require("../models/LocationVisit");
 const LocationEvent = require("../models/LocationEvent");
-const { indexLocationEvent } = require("./ragClient.service");
 
 const VISIT_RADIUS_METERS = Number(process.env.VISIT_RADIUS_METERS) || 150;
 const MIN_STAY_MINUTES = Number(process.env.MIN_STAY_MINUTES) || 15;
@@ -78,14 +77,6 @@ function eventText(event) {
   ].join(". ");
 }
 
-async function indexEvent(event) {
-  try {
-    await indexLocationEvent(event._id);
-  } catch (error) {
-    console.error("Python RAG event indexing failed:", error.message);
-  }
-}
-
 async function saveEvent({ userId, username, eventType, placeName, latitude, longitude, startAt, endAt, recordedAt, durationMinutes, eventKey }) {
   const duration = Number.isFinite(durationMinutes) ? Math.max(0, Math.round(durationMinutes)) : undefined;
   const summary = eventType === "arrival"
@@ -94,17 +85,11 @@ async function saveEvent({ userId, username, eventType, placeName, latitude, lon
       ? `${username} left ${placeName} at ${new Date(recordedAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" })} after approximately ${duration || 0} minutes.`
       : `${username} stayed at ${placeName} for approximately ${duration || 0} minutes.`;
 
-  const previous = await LocationEvent.findOne({ eventKey }).select("+embedding summary durationMinutes placeName eventType").lean();
   const event = await LocationEvent.findOneAndUpdate(
     { eventKey },
     { $set: { userId, username, eventType, placeName, latitude, longitude, startAt, endAt, recordedAt, durationMinutes: duration, summary, eventKey } },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
-  const durationDelta = Math.abs((duration || 0) - (previous?.durationMinutes || 0));
-  const needsEmbedding = !previous?.embedding ||
-    eventType !== "stay" && (!previous || previous.summary !== summary || previous.placeName !== placeName) ||
-    eventType === "stay" && durationDelta >= 15;
-  if (needsEmbedding) void indexEvent(event.toObject());
   return event;
 }
 
@@ -141,4 +126,4 @@ async function processLocationEvent({ userId, username, latitude, longitude, rec
   await startVisit(userId, username, latitude, longitude, at);
 }
 
-module.exports = { processLocationEvent, distanceMeters, indexEvent, placeLabel, reverseGeocode };
+module.exports = { processLocationEvent, distanceMeters, placeLabel, reverseGeocode };
