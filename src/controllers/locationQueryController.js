@@ -133,13 +133,31 @@ async function answerDistanceQuestion(req, parsed) {
   }
 }
 
+function inferPlaceDistanceIntent(question) {
+  const q = String(question || "").trim().replace(/[?.!]+$/g, "");
+  if (!/\b(distance|far|apart|kilomet(?:er|re)s?|miles?|how long|travel time|drive|driving)\b/i.test(q)) return null;
+  const patterns = [
+    /^(.+?)\s+(?:distance|far)\s+from\s+me$/i,
+    /^how\s+far\s+is\s+(.+?)\s+from\s+me$/i,
+    /^how\s+long\s+does\s+it\s+take\s+from\s+me\s+to\s+(.+)$/i,
+    /^distance\s+from\s+me\s+to\s+(.+)$/i,
+    /^(?:calculate\s+)?(?:the\s+)?distance\s+between\s+me\s+and\s+(.+)$/i
+  ];
+  for (const pattern of patterns) {
+    const match = q.match(pattern);
+    if (match && match[1].trim()) return { intent: "distance", origin: "me", destination: match[1].trim(), destinationType: "place" };
+  }
+  return null;
+}
+
 exports.ask = async (req, res) => {
   const question = String(req.body.question || "").trim();
 
   try {
     // LLM understands the open-ended question; deterministic code then performs
     // authorization, coordinate resolution, Haversine distance, and road routing.
-    const parsed = await inferPersonDistanceIntent(question, req.user.userId)
+    const parsed = inferPlaceDistanceIntent(question)
+      || await inferPersonDistanceIntent(question, req.user.userId)
       || await understandLocationQuestion(question);
 
     if (parsed?.intent === "distance") {
