@@ -1,6 +1,6 @@
 const LocationVisit = require("../models/LocationVisit");
 const LocationEvent = require("../models/LocationEvent");
-const { embedText, EMBEDDING_MODEL } = require("./embedding.service");
+const { indexLocationEvent } = require("./ragClient.service");
 
 const VISIT_RADIUS_METERS = Number(process.env.VISIT_RADIUS_METERS) || 150;
 const MIN_STAY_MINUTES = Number(process.env.MIN_STAY_MINUTES) || 15;
@@ -80,10 +80,9 @@ function eventText(event) {
 
 async function indexEvent(event) {
   try {
-    const embedding = await embedText(eventText(event));
-    await LocationEvent.updateOne({ _id: event._id }, { $set: { embedding, embeddingModel: EMBEDDING_MODEL, embeddingUpdatedAt: new Date() } });
+    await indexLocationEvent(event._id);
   } catch (error) {
-    console.error("Location event embedding failed:", error.message);
+    console.error("Python RAG event indexing failed:", error.message);
   }
 }
 
