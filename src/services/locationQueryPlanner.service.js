@@ -38,6 +38,34 @@ function planDistanceQuestion(question, friendUsernames = []) {
     .sort((a, b) => question.toLowerCase().indexOf(a.toLowerCase()) - question.toLowerCase().indexOf(b.toLowerCase()));
 
   const selfMentioned = SELF_TERMS.test(question);
+
+  const compareMatch = String(question).match(/\bwhich\b.*?\bcloser\s+to\s+([^,?]+)\s*,\s*(.+?)\s+or\s+(.+?)(?:[?.!]|$)/i);
+  if (compareMatch) {
+    const targetText = compareMatch[1].trim();
+    let targetType = "place";
+    let target = cleanPlace(targetText, matched);
+    if (SELF_TERMS.test(targetText)) {
+      targetType = "me";
+      target = null;
+    } else {
+      const targetFriend = matched.find(name => includesWholeName(targetText, name));
+      if (targetFriend) {
+        targetType = "person";
+        target = targetFriend;
+      }
+    }
+    const firstPlace = cleanPlace(compareMatch[2]);
+    const secondPlace = cleanPlace(compareMatch[3]);
+    if (firstPlace && secondPlace) {
+      return {
+        intent: "compare_places",
+        targetType,
+        target,
+        places: [firstPlace, secondPlace]
+      };
+    }
+  }
+
   const ranking = /\b(closest|nearest|farthest|furthest)\b/i.exec(question);
   const asksForPerson = /\b(who|which friend|which person)\b/i.test(question);
   if (ranking && asksForPerson) {
