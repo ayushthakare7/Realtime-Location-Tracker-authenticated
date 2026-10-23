@@ -28,7 +28,7 @@ Python service (FastAPI + LangChain + LangGraph)
 MongoDB locationevents collection + vector index
 ```
 
-Both services read the same MongoDB database. The Python service is private to the backend and should not be called directly by the browser.
+Both services read the same MongoDB database. The Python service is private to the backend and should not be called directly by the browser. The local launch command binds it to `127.0.0.1:8001`.
 
 ## Request and response flow
 
@@ -170,7 +170,6 @@ This can take time on the first run because the embedding model must be download
 | `GROQ_MODEL` | Chat model identifier |
 | `RAG_SERVICE_URL` | Internal Python service URL |
 | `RAG_SERVICE_TOKEN` | Shared secret for Node-to-Python requests |
-| `RAG_PORT` | Intended Python port; local command defaults to 8001 |
 | `EMBEDDING_MODEL` | Python Sentence Transformers model |
 | `RAG_VECTOR_INDEX` | MongoDB Atlas vector index name |
 | `RAG_TOP_K` | Maximum number of relevant events retrieved |
