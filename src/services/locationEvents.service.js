@@ -86,15 +86,27 @@ async function saveEvent({ userId, username, eventType, placeName, latitude, lon
       ? `${username} left ${placeName} at ${new Date(recordedAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" })} after approximately ${duration || 0} minutes.`
       : `${username} stayed at ${placeName} for approximately ${duration || 0} minutes.`;
 
+  const previous = await LocationEvent.findOne({ eventKey })
+    .select("+embedding summary durationMinutes placeName eventType")
+    .lean();
   const event = await LocationEvent.findOneAndUpdate(
     { eventKey },
     { $set: { userId, username, eventType, placeName, latitude, longitude, startAt, endAt, recordedAt, durationMinutes: duration, summary, eventKey } },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
-  // Index asynchronously: a temporary Python outage must not block location tracking.
-  void indexLocationEvent(event._id).catch(error => {
-    console.error("Python RAG event indexing failed:", error.message);
-  });
+
+  const durationDelta = Math.abs((duration || 0) - (previous?.durationMinutes || 0));
+  const needsEmbedding = !previous?.embedding ||
+    (eventType !== "stay" && (!previous || previous.summary !== summary || previous.placeName !== placeName)) ||
+    (eventType === "stay" && durationDelta >= 15);
+
+  // Index asynchronously and only when evidence meaningfully changes. A temporary
+  // Python outage must not block location tracking or trigger an embedding per GPS ping.
+  if (needsEmbedding) {
+    void indexLocationEvent(event._id).catch(error => {
+      console.error("Python RAG event indexing failed:", error.message);
+    });
+  }
   return event;
 }
 
