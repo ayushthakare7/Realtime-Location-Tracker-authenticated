@@ -145,10 +145,20 @@ exports.ask = async (req, res) => {
     if (parsed?.intent === "distance") {
       const answer = await answerDistanceQuestion(req, parsed);
       if (answer) return res.json({ success: true, answer });
+      return res.json({
+        success: true,
+        answer: "I recognized a distance question, but couldn't confidently identify both endpoints. Please include the two people or the city/place."
+      });
     }
   } catch (error) {
-    // If query understanding fails, keep the existing RAG/history assistant available.
     console.error("Location question understanding failed:", error.message);
+    // Do not send a distance request to RAG, where it could invent or miss a calculation.
+    if (/\\b(distance|far|apart|kilomet(?:er|re)s?|miles?|how long|travel time|drive|driving)\\b/i.test(question)) {
+      return res.json({
+        success: true,
+        answer: "I couldn't reliably interpret that distance question right now. Please try again with both people or a city/place named."
+      });
+    }
   }
 
   return askMap(req, res);
