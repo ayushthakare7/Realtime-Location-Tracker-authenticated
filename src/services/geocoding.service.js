@@ -56,13 +56,42 @@ async function geocodePlace(input) {
   const results = await response.json();
   if (!Array.isArray(results) || results.length === 0) return null;
 
-  // Prefer exact settlement or country matches, then use Nominatim's ranked result.
-  const result = results.find(item => {
+  // Never blindly accept Nominatim's first result: ambiguous queries such as
+  // "Nagpur INDIA" can otherwise resolve to an unrelated island or region.
+  const countryWords = new Set([
+    "india", "united", "states", "state", "america", "american", "usa", "us",
+    "kingdom", "uk", "britain", "great", "britain", "canada", "australia",
+    "malaysia", "singapore", "indonesia", "thailand", "japan", "china",
+    "france", "germany", "italy", "spain", "brazil", "mexico", "russia",
+    "uae", "emirates", "saudi", "arabia", "pakistan", "nepal", "sri", "lanka"
+  ]);
+  const queryTokens = normalizeQuery(query)
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+  const placeTokens = queryTokens.filter(token => !countryWords.has(token));
+  const requiredTokens = placeTokens.length ? placeTokens : queryTokens;
+  const resultText = item => {
+    const address = item.address || {};
+    return normalizeQuery([
+      item.name, item.display_name, address.city, address.town, address.village,
+      address.municipality, address.county, address.state, address.country
+    ].filter(Boolean).join(" "));
+  };
+  const relevant = results.filter(item => {
+    const text = resultText(item);
+    return requiredTokens.every(token => text.includes(token));
+  });
+  if (!relevant.length) {
+    console.warn("[Geocoding] Refusing unrelated result for query:", query);
+    return null;
+  }
+  const result = relevant.find(item => {
     const address = item.address || {};
     const settlement = address.city || address.town || address.village ||
-      address.municipality || address.hamlet || address.country;
-    return settlement && normalizeQuery(settlement) === normalizeQuery(searchQuery);
-  }) || results[0];
+      address.municipality || address.hamlet || address.country || item.name;
+    return settlement && normalizeQuery(settlement) === normalizeQuery(query);
+  }) || relevant[0];
 
   if (!result) return null;
 
