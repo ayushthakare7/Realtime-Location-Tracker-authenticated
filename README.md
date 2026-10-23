@@ -1,76 +1,194 @@
-# Privacy-Aware Real-Time Location Tracker with RAG
+# Reva — Privacy-Aware Real-Time Location Tracker
 
-A Node.js, Express, MongoDB, Socket.IO, Leaflet and Gemini project with opt-in location sharing, accepted-friend access control, semantic location history, Gemini embeddings, MongoDB Vector Search, and a Reva location-history assistant.
+Reva is a location-sharing application with a Node.js web backend/frontend and a separate Python RAG microservice. The existing JavaScript application remains responsible for accounts, authentication, friendships, live GPS sharing, consent, and deterministic geospatial calculations. Python owns the RAG pipeline: embeddings, MongoDB Vector Search retrieval, LangGraph orchestration, and natural-language answer generation through LangChain.
 
-## RAG architecture
+## Two-service architecture
 
-Reva is now a real RAG pipeline rather than keyword search:
+```text
+Browser (EJS + JavaScript + Leaflet)
+          |
+          | HTTP / Socket.IO
+          v
+Node.js service (Express + MongoDB/Mongoose)
+  - Authentication and authorization
+  - Friends and sharing permissions
+  - Live location and location-event creation
+  - Deterministic distance/geocoding/routing
+  - Consent check and authorized user ID selection
+          |
+          | HTTP POST + Bearer service token
+          v
+Python service (FastAPI + LangChain + LangGraph)
+  - Event embeddings (sentence-transformers)
+  - MongoDB Vector Search retrieval
+  - LangGraph intent -> retrieve -> evidence -> answer
+  - LangChain LLM and embedding integrations
+          |
+          v
+MongoDB locationevents collection + vector index
+```
 
-1. GPS samples are stored as normal location data and converted into semantic events such as arrivals, stays and departures.
-2. Each meaningful location event is turned into text and embedded with Gemini `gemini-embedding-001`.
-3. The embedding is stored with the event in MongoDB.
-4. MongoDB Vector Search retrieves semantically relevant events using the user's question.
-5. Retrieval is pre-filtered by authorized user IDs and optional time ranges such as today, yesterday and this week.
-6. The retrieved events are passed to Gemini as grounded context for the final answer.
-7. Exact distance questions still use deterministic backend calculations instead of asking an LLM to estimate coordinates.
+Both services read the same MongoDB database. The Python service is private to the backend and should not be called directly by the browser.
 
-The system intentionally embeds semantic events instead of every raw GPS point. Stay-event embeddings are refreshed only when the duration changes meaningfully, reducing unnecessary embedding calls.
+## Request and response flow
+
+1. The user submits a Reva question in the existing browser UI.
+2. Express authentication middleware validates the user's session/JWT. The API checks the user's explicit AI consent.
+3. The Node.js controller computes the allowed scope: the current user and accepted friends who have location sharing enabled. It prepares a minimal current-location/distance context.
+4. For deterministic current-location and distance requests, the JavaScript backend continues to resolve authorized people/places and calculate coordinates/distances. The LLM is never trusted to invent coordinates or calculate exact distances.
+5. For history and general location questions, Node sends the question, authorized user IDs, and minimal context to `POST /ask` on the Python service, using `Authorization: Bearer <RAG_SERVICE_TOKEN>`.
+6. LangGraph classifies the question, retrieves semantically relevant authorized events from MongoDB Vector Search, prepares evidence, and generates a grounded response with LangChain.
+7. Python returns a JSON answer. Node returns it through the existing API to the browser.
+
+## Python RAG workflow
+
+The current graph in `rag_service/main.py` is:
+
+- `classify_intent`: classifies the query as history, summary, shared presence, or other.
+- `retrieve_authorized_events`: embeds the question and performs MongoDB Vector Search, filtering by the authorized ObjectId list and optional time range.
+- `prepare_evidence`: formats the retrieved events into explicit evidence.
+- `generate_answer`: asks the language model to answer only from supplied evidence and current context.
+
+LangGraph coordinates the workflow. LangChain provides the chat model and Hugging Face embedding integration. The application does **not** fine-tune a model on users' locations; it retrieves relevant records at question time.
+
+## Location event indexing
+
+The JavaScript backend still detects visits and creates arrival/stay/departure records in `LocationEvent`. It no longer generates embeddings. When an event is saved, Node calls the Python service's `POST /index-event` endpoint. Python creates the semantic text, generates a 384-dimensional embedding, and stores it on the event document.
+
+The `npm run rag:setup` command calls the Python `POST /reindex` endpoint. That endpoint creates the configured Atlas Vector Search index if necessary and embeds existing location events. The index fields are:
+
+- `embedding`: vector, 384 dimensions, cosine similarity
+- `userId`: filter
+- `recordedAt`: filter
+
+MongoDB Atlas Vector Search is required for semantic retrieval. If an existing index has a different dimension count, use the configured index name `location_event_vector_index_384` and allow Atlas time to finish building it.
+
+## Repository layout
+
+```text
+.
+├── server.js                       # Starts Express, MongoDB and Socket.IO
+├── package.json                    # Node scripts/dependencies
+├── rag_service/
+│   ├── main.py                     # FastAPI + LangChain + LangGraph service
+│   └── requirements.txt            # Python-only dependencies
+├── scripts/
+│   └── setup-rag.js                # Requests setup/reindex from Python
+└── src/
+    ├── app.js                      # Express configuration and web routes
+    ├── config/db.js                # MongoDB connection
+    ├── controllers/
+    │   ├── trackerController.js    # Sharing, history and Node-to-RAG handoff
+    │   └── locationQueryController.js # Deterministic location/distance tools
+    ├── models/
+    │   ├── LocationEvent.js        # Semantic location events and embeddings
+    │   ├── Location.js             # Latest shared coordinates
+    │   ├── LocationVisit.js        # Active/recent visit state
+    │   ├── LocationPoint.js        # Raw historical GPS points
+    │   ├── Friendship.js           # Friendship/access relationships
+    │   └── User.js                 # Account and privacy settings
+    ├── routes/trackerRoutes.js     # Authenticated tracker endpoints
+    ├── services/
+    │   ├── ragClient.service.js    # Authenticated HTTP client for Python
+    │   ├── locationEvents.service.js # Detects visits; asks Python to embed events
+    │   ├── locationQueryPlanner.service.js # Deterministic distance-query parsing
+    │   ├── geocoding.service.js    # Resolves place names to coordinates
+    │   └── gemini.service.js       # Existing hosted-model query parsing/answer helpers
+    ├── sockets/locationSocket.js   # Real-time location updates
+    ├── views/                      # EJS web pages
+    └── public/                     # Browser JavaScript and CSS
+```
 
 ## Setup
 
-1. Create a local `.env` file based on `.env.example`.
-2. Set `MONGO_URI`, a long random `JWT_SECRET`, and `GEMINI_API_KEY`.
-3. Use a MongoDB deployment that supports MongoDB Vector Search. Atlas is recommended.
-4. Install dependencies:
-   ```bash
-   npm install
-   ```
-5. Create the vector index and embed existing location events:
-   ```bash
-   npm run rag:setup
-   ```
-6. Start the app:
-   ```bash
-   npm run dev
-   ```
-7. Open `http://localhost:3000/register` and create test accounts.
-8. Sign in to separate browser profiles, create an accepted friendship, and enable location sharing.
-9. Use Reva to ask questions such as:
-   - `Where did Rahul spend most of his time yesterday?`
-   - `When did I last visit IIT Bhilai?`
-   - `What places did my friends visit recently?`
-   - `How long did I stay at the university?`
-   - `How far away is Rahul?`
+### 1. Configure Node.js
 
-### RAG environment variables
+1. Copy `.env.example` to `.env`.
+2. Set `MONGO_URI`, a long random `JWT_SECRET`, `GROQ_API_KEY`, and a long random `RAG_SERVICE_TOKEN`.
+3. Keep `RAG_SERVICE_URL=http://127.0.0.1:8001` for local development.
+4. Never commit the real `.env` file or expose the service token in browser code.
 
-- `EMBEDDING_MODEL=gemini-embedding-001`
-- `EMBEDDING_DIMENSIONS=768`
-- `RAG_VECTOR_INDEX=location_event_vector_index`
+Install Node dependencies:
 
-The vector index contains the `embedding` vector plus filter fields for `userId` and `recordedAt`.
+```bash
+npm install
+```
 
-## Privacy behavior
+### 2. Configure Python
 
-- Location sharing defaults to off for new users.
-- Socket.IO verifies the JWT during the handshake.
-- Live coordinates are sent only to accepted friends who have sharing enabled, not broadcast globally.
-- Reva authorization happens before retrieval: only the current user's own events and events belonging to accepted friends who currently share are eligible for retrieval.
-- MongoDB Vector Search pre-filters the semantic search by those authorized user IDs.
-- Stopping sharing deletes the latest live-location record and notifies accepted friends; the user's history remains available to that user for personal history questions.
-- Gemini is called only from the server. Never expose `GEMINI_API_KEY` in browser code or commit a real `.env` file.
-- Do not send real sensitive location data to an external model unless every user understands and accepts that processing.
+Use Python 3.11 or a compatible recent Python version. From the repository root:
 
-## MongoDB Vector Search note
+**Windows PowerShell**
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r rag_service/requirements.txt
+```
 
-`npm run rag:setup` attempts to create `location_event_vector_index` programmatically and then embeds all existing location events. On MongoDB environments where programmatic search-index creation is unavailable, create the same Vector Search index in the MongoDB/Atlas UI with:
+**macOS/Linux**
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r rag_service/requirements.txt
+```
 
-- Field `embedding`: vector, 768 dimensions, cosine similarity
-- Field `userId`: filter
-- Field `recordedAt`: filter
+The Python service reads the same root `.env` file, including `MONGO_URI`, `GROQ_API_KEY`, `RAG_SERVICE_TOKEN`, `RAG_VECTOR_INDEX`, and `EMBEDDING_MODEL`.
 
-After the index is ready, run `npm run rag:setup` again to populate embeddings.
+### 3. Run both services
 
-## Important limitations before public deployment
+Terminal 1 — Python RAG service:
 
-This is a development foundation, not a security audit. Configure HTTPS, a strong secret, production CORS origin, request rate limits, input validation, account deletion/export, retention controls, and automated authorization tests before public deployment. Location history is sensitive. Do not use real users' data for early testing.
+```bash
+npm run rag:start
+```
+
+Terminal 2 — Node.js application:
+
+```bash
+npm run dev
+```
+
+Open `http://localhost:3000`. Check Python service health at `http://127.0.0.1:8001/health`.
+
+### 4. Create the vector index and embed existing events
+
+With both services running and MongoDB Atlas configured:
+
+```bash
+npm run rag:setup
+```
+
+This can take time on the first run because the embedding model must be downloaded and existing events must be embedded. Ensure the vector index finishes building before testing semantic queries.
+
+## Environment variables
+
+| Variable | Purpose |
+|---|---|
+| `MONGO_URI` | Shared MongoDB connection string |
+| `JWT_SECRET` | Node authentication secret |
+| `GROQ_API_KEY` | Model API key used by the existing backend and Python service |
+| `GROQ_MODEL` | Chat model identifier |
+| `RAG_SERVICE_URL` | Internal Python service URL |
+| `RAG_SERVICE_TOKEN` | Shared secret for Node-to-Python requests |
+| `RAG_PORT` | Intended Python port; local command defaults to 8001 |
+| `EMBEDDING_MODEL` | Python Sentence Transformers model |
+| `RAG_VECTOR_INDEX` | MongoDB Atlas vector index name |
+| `RAG_TOP_K` | Maximum number of relevant events retrieved |
+
+## Privacy and security
+
+- The browser never receives the Python service token or model API key.
+- The Node backend verifies identity and consent before calling the RAG service.
+- The Python service accepts only authorized user IDs supplied by Node and applies them as a vector-search filter.
+- Keep the Python port bound to localhost for local development; in production, use a private network and service authentication.
+- Location data is highly sensitive. Make external model processing clear to users and send only the context required to answer the question.
+- This is a development foundation, not a security audit. Add rate limits, production HTTPS, retention controls, deletion/export flows, monitoring, and automated authorization tests before public deployment.
+
+## Troubleshooting
+
+- **401 from Python:** ensure Node and Python load the same `RAG_SERVICE_TOKEN` from the same `.env`.
+- **Connection refused:** start Python first and check `RAG_SERVICE_URL` and port 8001.
+- **Vector index error:** verify MongoDB Atlas Vector Search support, the index name, 384 dimensions, and the `userId`/`recordedAt` filter fields.
+- **No history answer:** confirm history events exist, have embeddings, and belong to the authorized user IDs.
+- **First query is slow:** the Python embedding model may be downloading/loading for the first time.
+- **Road distance vs. straight-line distance:** deterministic routing remains in the JavaScript location-query layer; semantic RAG should not estimate route distances.
