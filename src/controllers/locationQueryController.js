@@ -19,12 +19,25 @@ async function geocodeCity(city) {
     return null;
   }
 
-  if (process.env.GEOCODING_ENABLED !== "true") {
-    console.warn(
-      "[Geocoding] Disabled. Set GEOCODING_ENABLED=true in the runtime environment and restart/redeploy."
-    );
-    return null;
-  }
+  // Common-city fallback coordinates keep distance questions working if the
+  // public geocoding service is unavailable. Coordinates are approximate city centers.
+  const cityFallbacks = {
+    "nagpur": { latitude: 21.1458, longitude: 79.0882, name: "Nagpur", state: "Maharashtra" },
+    "pune": { latitude: 18.5204, longitude: 73.8567, name: "Pune", state: "Maharashtra" },
+    "mumbai": { latitude: 19.0760, longitude: 72.8777, name: "Mumbai", state: "Maharashtra" },
+    "delhi": { latitude: 28.6139, longitude: 77.2090, name: "Delhi", state: "Delhi" },
+    "new delhi": { latitude: 28.6139, longitude: 77.2090, name: "New Delhi", state: "Delhi" },
+    "bengaluru": { latitude: 12.9716, longitude: 77.5946, name: "Bengaluru", state: "Karnataka" },
+    "bangalore": { latitude: 12.9716, longitude: 77.5946, name: "Bengaluru", state: "Karnataka" },
+    "hyderabad": { latitude: 17.3850, longitude: 78.4867, name: "Hyderabad", state: "Telangana" },
+    "chennai": { latitude: 13.0827, longitude: 80.2707, name: "Chennai", state: "Tamil Nadu" },
+    "kolkata": { latitude: 22.5726, longitude: 88.3639, name: "Kolkata", state: "West Bengal" },
+    "ahmedabad": { latitude: 23.0225, longitude: 72.5714, name: "Ahmedabad", state: "Gujarat" },
+    "jaipur": { latitude: 26.9124, longitude: 75.7873, name: "Jaipur", state: "Rajasthan" },
+    "bhopal": { latitude: 23.2599, longitude: 77.4126, name: "Bhopal", state: "Madhya Pradesh" },
+    "raipur": { latitude: 21.2514, longitude: 81.6296, name: "Raipur", state: "Chhattisgarh" }
+  };
+  const fallback = cityFallbacks[place.toLocaleLowerCase("en-IN")];
 
   try {
     const url = new URL("https://nominatim.openstreetmap.org/search");
@@ -47,13 +60,13 @@ async function geocodeCity(city) {
         response.status,
         response.statusText
       );
-      return null;
+      return fallback ? { ...fallback, country: "India" } : null;
     }
 
     const results = await response.json();
     if (!Array.isArray(results) || results.length === 0) {
       console.warn("[Geocoding] No India results for destination:", place);
-      return null;
+      return fallback ? { ...fallback, country: "India" } : null;
     }
 
     // Prefer a city/town/municipality match when Nominatim returns several results.
@@ -115,6 +128,10 @@ async function geocodeCity(city) {
       "-",
       error.message
     );
+    if (fallback) {
+      console.warn("[Geocoding] Using built-in city coordinates for:", place);
+      return { ...fallback, country: "India" };
+    }
     return null;
   }
 }
