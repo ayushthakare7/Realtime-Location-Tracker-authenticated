@@ -4,6 +4,7 @@ const LocationVisit = require("../models/LocationVisit");
 const Friendship = require("../models/Friendship");
 const { askGemini } = require("../services/gemini.service");
 const { retrieveLocationEvents } = require("../services/locationRag.service");
+const { placeLabel } = require("../services/locationEvents.service");
 
 exports.setSharing = async (req, res) => {
   try {
@@ -80,6 +81,10 @@ function requestedUsername(question, usernames) {
   return usernames.find(name => lower.includes(String(name).toLowerCase()));
 }
 
+function isFallbackPlace(place) {
+  return !place || /^Location near -?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/i.test(String(place).trim());
+}
+
 exports.askMap = async (req, res) => {
   try {
     const question = String(req.body.question || "").trim();
@@ -100,8 +105,8 @@ exports.askMap = async (req, res) => {
     ]);
     const visitByUser = new Map(visits.map(v => [String(v.userId), v]));
 
-    // Live/current-location questions must use the authoritative latest Location record,
-    // not vector retrieval. RAG is for historical/semantic questions.
+    // Live/current-location questions use the latest Location record, never vector retrieval.
+    // If an older visit only has a coordinate fallback, reverse-geocode it again now.
     if (isCurrentQuestion(question)) {
       const allVisibleUsers = [{ _id: uid, username: "you" }, ...users];
       const requested = requestedUsername(question, allVisibleUsers.map(u => u.username));
@@ -109,19 +114,27 @@ exports.askMap = async (req, res) => {
 
       if (targetUser && String(targetUser._id) === String(uid)) {
         if (!mine) return res.json({ success: true, answer: "I don't have your latest location. Turn on location sharing and allow location access first." });
-        const visit = visitByUser.get(String(uid));
-        const place = visit?.placeName;
-        return res.json({ success: true, answer: place ? `You are currently at ${place}. Your location was updated ${Math.max(0, Math.round((Date.now() - new Date(mine.lastSeen).getTime()) / 60000))} minute(s) ago.` : `I have your latest coordinates, but I don't have a place name for them yet.` });
+        let visit = visitByUser.get(String(uid));
+        let place = visit?.placeName;
+        if (isFallbackPlace(place)) {
+          place = await placeLabel(mine.latitude, mine.longitude);
+          if (visit) await LocationVisit.updateOne({ _id: visit._id }, { $set: { placeName: place } });
+        }
+        return res.json({ success: true, answer: place && !isFallbackPlace(place) ? `You are currently at ${place}. Your location was updated ${Math.max(0, Math.round((Date.now() - new Date(mine.lastSeen).getTime()) / 60000))} minute(s) ago.` : `I have your latest coordinates, but I don't have a place name for them yet.` });
       }
 
       const target = targetUser && String(targetUser._id) !== String(uid)
         ? others.find(p => String(p.userId) === String(targetUser._id))
         : null;
       if (!target) return res.json({ success: true, answer: "I can't access a current location for that person. They may not be sharing right now, or their latest location is unavailable." });
-      const visit = visitByUser.get(String(target.userId));
-      const place = visit?.placeName;
+      let visit = visitByUser.get(String(target.userId));
+      let place = visit?.placeName;
+      if (isFallbackPlace(place)) {
+        place = await placeLabel(target.latitude, target.longitude);
+        if (visit) await LocationVisit.updateOne({ _id: visit._id }, { $set: { placeName: place } });
+      }
       const ageMinutes = Math.max(0, Math.round((Date.now() - new Date(target.lastSeen).getTime()) / 60000));
-      if (place) return res.json({ success: true, answer: `${target.username} is currently at ${place}. Their latest location was updated ${ageMinutes} minute(s) ago.` });
+      if (place && !isFallbackPlace(place)) return res.json({ success: true, answer: `${target.username} is currently at ${place}. Their latest location was updated ${ageMinutes} minute(s) ago.` });
       return res.json({ success: true, answer: `${target.username} is sharing a current location, but I don't have a resolved place name for it yet.` });
     }
 
