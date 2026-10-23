@@ -40,7 +40,10 @@ async function reverseGeocode(latitude, longitude) {
       headers: { "User-Agent": "PrivacyAwareLocationTracker/1.0" },
       signal: AbortSignal.timeout(4000)
     });
-    if (!response.ok) return fallback;
+    if (!response.ok) {
+      console.error("Nominatim reverse geocoding failed:", response.status, response.statusText);
+      return fallback;
+    }
     const data = await response.json();
     const address = data.address || {};
     const city = address.city || address.town || address.municipality || address.village || address.city_district || null;
@@ -52,7 +55,10 @@ async function reverseGeocode(latitude, longitude) {
     geocodeCache.set(cacheKey, result);
     if (geocodeCache.size > 1000) geocodeCache.delete(geocodeCache.keys().next().value);
     return result;
-  } catch { return fallback; }
+  } catch (error) {
+    console.error("Reverse geocoding error:", error.message);
+    return fallback;
+  }
 }
 
 async function placeLabel(latitude, longitude) {
