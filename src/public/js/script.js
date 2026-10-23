@@ -22,7 +22,6 @@ let socket;
 let lastSent = null;
 let lastSentAt = 0;
 let latestPosition = null;
-let playbackTimer = null;
 
 function setStatus(message) { document.getElementById("status").textContent = message; }
 function ageText(date) {
@@ -89,7 +88,7 @@ function handleLocationError(error) {
 function connectSocket() {
   socket = io({ auth: { token } });
   socket.on("connect", () => {
-    setStatus("Connected. Location sharing is " + (sharing ? "on." : "off.") );
+    setStatus("Connected. Location sharing is " + (sharing ? "on." : "off."));
     if (sharing && latestPosition) sendLatestPosition(true);
   });
   socket.on("connect_error", error => setStatus("Socket connection: " + error.message));
@@ -158,69 +157,33 @@ async function setHistory(enabled) {
   try {
     const data = await api("/history", { method: "PATCH", body: JSON.stringify({ enabled }) });
     historyEnabled = data.historyEnabled;
-    if (!historyEnabled) document.getElementById("timeline").textContent = "History is disabled. New location history will not be stored.";
-    else await loadTimeline();
     setStatus(historyEnabled ? "Location history enabled." : "Location history disabled. New tracking points and semantic events will not be stored.");
   } catch (e) { document.getElementById("historyToggle").checked = !enabled; alert(e.message); }
 }
 
 async function deleteHistory() {
   if (!confirm("Delete your stored location history, visits and semantic events? This cannot be undone.")) return;
-  try { await api("/history", { method: "DELETE" }); await loadTimeline(); setStatus("Your location history was deleted."); } catch (e) { alert(e.message); }
-}
-
-async function loadTimeline() {
-  const root = document.getElementById("timeline");
-  try {
-    const data = await api("/history");
-    if (!data.historyEnabled) { root.textContent = "History is disabled."; return; }
-    const events = data.events || [];
-    root.replaceChildren();
-    if (!events.length) { root.textContent = "No history yet. Keep sharing for a while to build your timeline."; return; }
-    const summary = document.getElementById("dailySummary");
-    const grouped = new Map();
-    events.forEach(e => { const key = new Date(e.startAt).toLocaleDateString(); if (!grouped.has(key)) grouped.set(key, { places: new Set(), minutes: 0 }); const g = grouped.get(key); g.places.add(e.placeName); g.minutes += Number(e.durationMinutes || 0); });
-    const today = grouped.get(new Date().toLocaleDateString());
-    summary.textContent = today ? `${today.places.size} places • ${Math.round(today.minutes)} tracked minutes` : "No events recorded today";
-    events.slice().reverse().forEach(event => {
-      const row = document.createElement("div"); row.className = "timeline-item";
-      const when = new Date(event.startAt).toLocaleString();
-      row.innerHTML = `<strong>${event.eventType.toUpperCase()}</strong> <span>${event.placeName}</span><div class="muted">${when} • ${Math.round(event.durationMinutes || 0)} min</div>`;
-      row.onclick = () => { map.setView([event.latitude, event.longitude], 17); L.popup().setLatLng([event.latitude, event.longitude]).setContent(`<b>${event.placeName}</b><br>${event.summary}`).openOn(map); };
-      root.append(row);
-    });
-    window.timelineEvents = events.filter(e => Number.isFinite(e.latitude) && Number.isFinite(e.longitude));
-  } catch (e) { root.textContent = e.message; }
-}
-
-function playTimeline() {
-  if (!window.timelineEvents?.length) return alert("No location history to replay yet.");
-  if (playbackTimer) clearInterval(playbackTimer);
-  let i = 0;
-  const marker = L.marker([window.timelineEvents[0].latitude, window.timelineEvents[0].longitude]).addTo(map).bindTooltip("Playback", { permanent: true });
-  map.setView(marker.getLatLng(), 15);
-  playbackTimer = setInterval(() => {
-    const event = window.timelineEvents[i++];
-    if (!event) { clearInterval(playbackTimer); playbackTimer = null; map.removeLayer(marker); return; }
-    marker.setLatLng([event.latitude, event.longitude]); map.panTo(marker.getLatLng());
-  }, 1200);
+  try { await api("/history", { method: "DELETE" }); setStatus("Your location history was deleted."); } catch (e) { alert(e.message); }
 }
 
 document.getElementById("start").addEventListener("click", () => setSharing(true));
 document.getElementById("stop").addEventListener("click", () => setSharing(false));
 document.getElementById("historyToggle").addEventListener("change", event => setHistory(event.target.checked));
 document.getElementById("deleteHistory").addEventListener("click", deleteHistory);
-document.getElementById("playTimeline").addEventListener("click", playTimeline);
 document.getElementById("logout").addEventListener("click", () => { if (watchId !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchId); localStorage.removeItem("token"); if (socket) socket.disconnect(); window.location.replace("/login"); });
 document.getElementById("friendForm").addEventListener("submit", async event => { event.preventDefault(); try { await api("/friends/request", { method: "POST", body: JSON.stringify({ username: document.getElementById("friendUsername").value.trim() }) }); document.getElementById("friendUsername").value = ""; alert("Friend request sent."); await loadFriends(); } catch (e) { alert(e.message); } });
 document.getElementById("askForm").addEventListener("submit", async event => { event.preventDefault(); const answer = document.getElementById("answer"); answer.textContent = "Reva is connecting the dots in your shared location story…"; try { const data = await api("/ask", { method: "POST", body: JSON.stringify({ question: document.getElementById("question").value, aiConsent: document.getElementById("aiConsent").checked }) }); answer.textContent = data.answer; } catch (e) { answer.textContent = e.message; } });
-loadFriends();
-loadTimeline();
-setInterval(() => loadFriends({ quiet: true }), 15000);
-setInterval(() => { if (historyEnabled) loadTimeline(); }, 30000);
-document.querySelectorAll("[data-question]").forEach(button => button.addEventListener("click", () => { document.getElementById("question").value = button.dataset.question; document.getElementById("question").focus(); }));
+
+document.querySelectorAll("[data-question]").forEach(button => button.addEventListener("click", () => {
+  const question = button.dataset.question;
+  if (!question) return;
+  document.getElementById("question").value = question;
+  document.getElementById("question").focus();
+}));
 
 document.getElementById("currentLocationPrompt").addEventListener("click", () => {
   document.getElementById("question").value = "Where am I currently?";
   document.getElementById("question").focus();
 });
+
+loadFriends();
