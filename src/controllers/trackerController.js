@@ -53,6 +53,7 @@ exports.askMap = async (req, res) => {
   try {
     const question = String(req.body.question || "").trim();
     if (!question || question.length > 500) return res.status(400).json({ success: false, message: "Question must be 1-500 characters." });
+    if (req.body.aiConsent !== true) return res.status(400).json({ success: false, message: "Consent is required before sending location records to Gemini." });
     const uid = req.user.userId;
     const links = await Friendship.find({ status: "accepted", $or: [{ requester: uid }, { recipient: uid }] }).lean();
     const ids = links.map(f => String(f.requester) === String(uid) ? f.recipient : f.requester);
