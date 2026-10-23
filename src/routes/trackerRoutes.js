@@ -7,5 +7,8 @@ router.get('/friends', controller.listFriends);
 router.post('/friends/request', controller.sendFriendRequest);
 router.post('/friends/requests/:id/respond', controller.respondToRequest);
 router.patch('/sharing', controller.setSharing);
+router.patch('/history', controller.setHistory);
+router.get('/history', controller.history);
+router.delete('/history', controller.deleteHistory);
 router.post('/ask', controller.askMap);
 module.exports = router;
