@@ -18,7 +18,7 @@ Node.js service (Express + MongoDB/Mongoose)
           |
           | HTTP POST + Bearer service token
           v
-Python service (FastAPI + LangChain + LangGraph)
+Python service (standard-library HTTP server + LangChain + LangGraph)
   - Event embeddings (sentence-transformers)
   - MongoDB Vector Search retrieval
   - LangGraph intent -> retrieve -> evidence -> answer
@@ -70,7 +70,7 @@ MongoDB Atlas Vector Search is required for semantic retrieval. If an existing i
 ├── server.js                       # Starts Express, MongoDB and Socket.IO
 ├── package.json                    # Node scripts/dependencies
 ├── rag_service/
-│   ├── main.py                     # FastAPI + LangChain + LangGraph service
+│   ├── main.py                     # Python HTTP + LangChain + LangGraph service
 │   └── requirements.txt            # Python-only dependencies
 ├── scripts/
 │   └── setup-rag.js                # Requests setup/reindex from Python
