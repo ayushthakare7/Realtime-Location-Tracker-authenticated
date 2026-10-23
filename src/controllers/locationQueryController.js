@@ -13,30 +13,110 @@ function distanceKm(aLat, aLon, bLat, bLon) {
 }
 
 async function geocodeCity(city) {
-  if (process.env.GEOCODING_ENABLED !== "true") return null;
-  const url = new URL("https://nominatim.openstreetmap.org/search");
-  url.searchParams.set("format", "jsonv2");
-  url.searchParams.set("q", `${city}, India`);
-  url.searchParams.set("limit", "1");
-  url.searchParams.set("addressdetails", "1");
-  const response = await fetch(url, {
-    headers: { "User-Agent": "PrivacyAwareLocationTracker/1.0" },
-    signal: AbortSignal.timeout(4000)
-  });
-  if (!response.ok) return null;
-  const results = await response.json();
-  if (!Array.isArray(results) || !results.length) return null;
-  const result = results[0];
-  const lat = Number(result.lat);
-  const lon = Number(result.lon);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-  return {
-    latitude: lat,
-    longitude: lon,
-    name: result.address?.city || result.address?.town || result.address?.municipality || city,
-    state: result.address?.state || null,
-    country: result.address?.country || "India"
-  };
+  const place = String(city || "").trim();
+  if (!place) {
+    console.warn("[Geocoding] Empty destination received.");
+    return null;
+  }
+
+  if (process.env.GEOCODING_ENABLED !== "true") {
+    console.warn(
+      "[Geocoding] Disabled. Set GEOCODING_ENABLED=true in the runtime environment and restart/redeploy."
+    );
+    return null;
+  }
+
+  try {
+    const url = new URL("https://nominatim.openstreetmap.org/search");
+    url.searchParams.set("format", "jsonv2");
+    url.searchParams.set("q", `${place}, India`);
+    url.searchParams.set("countrycodes", "in");
+    url.searchParams.set("limit", "5");
+    url.searchParams.set("addressdetails", "1");
+
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "PrivacyAwareLocationTracker/1.0 (city geocoding)"
+      },
+      signal: AbortSignal.timeout(10000)
+    });
+
+    if (!response.ok) {
+      console.error(
+        "[Geocoding] Nominatim returned HTTP",
+        response.status,
+        response.statusText
+      );
+      return null;
+    }
+
+    const results = await response.json();
+    if (!Array.isArray(results) || results.length === 0) {
+      console.warn("[Geocoding] No India results for destination:", place);
+      return null;
+    }
+
+    // Prefer a city/town/municipality match when Nominatim returns several results.
+    const normalizedPlace = place.toLocaleLowerCase("en-IN");
+    const result = results.find(item => {
+      const address = item.address || {};
+      const names = [
+        address.city,
+        address.town,
+        address.municipality,
+        address.village,
+        item.name,
+        item.display_name?.split(",")[0]
+      ].filter(Boolean).map(value => String(value).toLocaleLowerCase("en-IN"));
+      return names.includes(normalizedPlace);
+    }) || results[0];
+
+    const latitude = Number(result.lat);
+    const longitude = Number(result.lon);
+    if (
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude) ||
+      latitude < -90 || latitude > 90 ||
+      longitude < -180 || longitude > 180
+    ) {
+      console.error("[Geocoding] Invalid coordinates returned for:", place);
+      return null;
+    }
+
+    const address = result.address || {};
+    const resolvedName =
+      address.city ||
+      address.town ||
+      address.municipality ||
+      address.village ||
+      result.name ||
+      place;
+
+    console.info(
+      "[Geocoding] Resolved destination:",
+      place,
+      "->",
+      resolvedName,
+      latitude,
+      longitude
+    );
+
+    return {
+      latitude,
+      longitude,
+      name: resolvedName,
+      state: address.state || null,
+      country: address.country || "India"
+    };
+  } catch (error) {
+    console.error(
+      "[Geocoding] Request failed for",
+      place,
+      "-",
+      error.message
+    );
+    return null;
+  }
 }
 
 async function getRoadRoute(fromLat, fromLon, toLat, toLon) {
