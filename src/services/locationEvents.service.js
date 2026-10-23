@@ -56,10 +56,7 @@ function eventText(event) {
 async function indexEvent(event) {
   try {
     const embedding = await embedText(eventText(event));
-    await LocationEvent.updateOne(
-      { _id: event._id },
-      { $set: { embedding, embeddingModel: EMBEDDING_MODEL, embeddingUpdatedAt: new Date() } }
-    );
+    await LocationEvent.updateOne({ _id: event._id }, { $set: { embedding, embeddingModel: EMBEDDING_MODEL, embeddingUpdatedAt: new Date() } });
   } catch (error) {
     console.error("Location event embedding failed:", error.message);
   }
@@ -73,17 +70,17 @@ async function saveEvent({ userId, username, eventType, placeName, latitude, lon
       ? `${username} left ${placeName} at ${new Date(recordedAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" })} after approximately ${duration || 0} minutes.`
       : `${username} stayed at ${placeName} for approximately ${duration || 0} minutes.`;
 
-  const previous = await LocationEvent.findOne({ eventKey }).select("summary durationMinutes placeName embedding").lean();
+  const previous = await LocationEvent.findOne({ eventKey }).select("+embedding summary durationMinutes placeName eventType").lean();
   const event = await LocationEvent.findOneAndUpdate(
     { eventKey },
     { $set: { userId, username, eventType, placeName, latitude, longitude, startAt, endAt, recordedAt, durationMinutes: duration, summary, eventKey } },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
-  // Do not embed every GPS update. Arrival/departure are embedded once; stay events are re-embedded
-  // only when the semantic duration changes by at least 15 minutes.
   const durationDelta = Math.abs((duration || 0) - (previous?.durationMinutes || 0));
-  const needsEmbedding = !previous?.embedding || previous.summary !== summary || previous.placeName !== placeName && eventType !== "stay" || (eventType === "stay" && durationDelta >= 15);
+  const needsEmbedding = !previous?.embedding ||
+    eventType !== "stay" && (!previous || previous.summary !== summary || previous.placeName !== placeName) ||
+    eventType === "stay" && durationDelta >= 15;
   if (needsEmbedding) void indexEvent(event.toObject());
   return event;
 }
