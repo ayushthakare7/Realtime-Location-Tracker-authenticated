@@ -101,6 +101,7 @@ function distanceKm(aLat, aLon, bLat, bLon) {
 }
 
 function isCurrentQuestion(question) { return /\b(right now|currently|current location|current place|where is .* now|where .* now|where .* currently)\b/i.test(question); }
+function isOwnCurrentQuestion(question) { return /\b(where am i|where i'm|where i am|my current location|my current place|where is my location|where is me)\b/i.test(question); }
 function isGeoAddressQuestion(question) { return /\b(which city|what city|which state|what state|which country|what country|city.*state.*country|state.*country|country.*city|city and state|city and country|state and country|in which city|in what city)\b/i.test(question); }
 function requestedUsername(question, usernames) { const lower = question.toLowerCase(); return usernames.find(name => lower.includes(String(name).toLowerCase())); }
 function isFallbackPlace(place) { return !place || /^Location near -?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/i.test(String(place).trim()); }
@@ -121,8 +122,8 @@ exports.askMap = async (req, res) => {
     const allVisibleUsers = [{ _id: uid, username: "you" }, ...users];
     const requested = requestedUsername(question, allVisibleUsers.map(u => u.username));
     const targetUser = requested ? allVisibleUsers.find(u => String(u.username).toLowerCase() === String(requested).toLowerCase()) : null;
+    const ownCurrentQuestion = isOwnCurrentQuestion(question);
 
-    // City/state/country is deterministic reverse-geocoding data. Do not ask Gemini to infer geography.
     if (isGeoAddressQuestion(question)) {
       const targetId = targetUser ? String(targetUser._id) : String(uid);
       const targetLocation = targetId === String(uid) ? mine : others.find(p => String(p.userId) === targetId);
@@ -134,16 +135,22 @@ exports.askMap = async (req, res) => {
       return res.json({ success: true, answer: `${targetName} is in ${geo.city || "an unknown city"}, ${geo.state || "an unknown state"}, ${geo.country || "an unknown country"}.` });
     }
 
-    if (isCurrentQuestion(question)) {
-      if (targetUser && String(targetUser._id) === String(uid)) {
+    if (isCurrentQuestion(question) || ownCurrentQuestion) {
+      if (ownCurrentQuestion || (targetUser && String(targetUser._id) === String(uid))) {
         if (!mine) return res.json({ success: true, answer: "I don't have your latest location. Turn on location sharing and allow location access first." });
-        let visit = visitByUser.get(String(uid)); let place = visit?.placeName;
-        if (isFallbackPlace(place)) { place = await placeLabel(mine.latitude, mine.longitude); if (visit) await LocationVisit.updateOne({ _id: visit._id }, { $set: { placeName: place } }); }
-        return res.json({ success: true, answer: place && !isFallbackPlace(place) ? `You are currently at ${place}. Your location was updated ${Math.max(0, Math.round((Date.now() - new Date(mine.lastSeen).getTime()) / 60000))} minute(s) ago.` : `I have your latest coordinates, but I don't have a place name for them yet.` });
+        let visit = visitByUser.get(String(uid));
+        let place = visit?.placeName;
+        if (isFallbackPlace(place)) {
+          place = await placeLabel(mine.latitude, mine.longitude);
+          if (visit) await LocationVisit.updateOne({ _id: visit._id }, { $set: { placeName: place } });
+        }
+        const ageMinutes = Math.max(0, Math.round((Date.now() - new Date(mine.lastSeen).getTime()) / 60000));
+        return res.json({ success: true, answer: place && !isFallbackPlace(place) ? `You are currently at ${place}. Your location was updated ${ageMinutes} minute(s) ago.` : `I have your latest coordinates, but I don't have a resolved place name for them yet.` });
       }
       const target = targetUser && String(targetUser._id) !== String(uid) ? others.find(p => String(p.userId) === String(targetUser._id)) : null;
       if (!target) return res.json({ success: true, answer: "I can't access a current location for that person. They may not be sharing right now, or their latest location is unavailable." });
-      let visit = visitByUser.get(String(target.userId)); let place = visit?.placeName;
+      let visit = visitByUser.get(String(target.userId));
+      let place = visit?.placeName;
       if (isFallbackPlace(place)) { place = await placeLabel(target.latitude, target.longitude); if (visit) await LocationVisit.updateOne({ _id: visit._id }, { $set: { placeName: place } }); }
       const ageMinutes = Math.max(0, Math.round((Date.now() - new Date(target.lastSeen).getTime()) / 60000));
       if (place && !isFallbackPlace(place)) return res.json({ success: true, answer: `${target.username} is currently at ${place}. Their latest location was updated ${ageMinutes} minute(s) ago.` });
