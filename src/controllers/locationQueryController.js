@@ -131,6 +131,33 @@ async function answerDistanceQuestion(req, parsed) {
 }
 
 
+async function answerPlaceComparison(req, parsed) {
+  const targetType = parsed.targetType === "me" ? "person" : parsed.targetType;
+  const targetName = parsed.targetType === "me" ? "me" : parsed.target;
+  const target = await resolveEndpoint(req, targetType, targetName);
+  if (target.error) return target.error;
+
+  const places = await Promise.all((parsed.places || []).map(async name => {
+    const location = await geocodeCity(name);
+    return location ? {
+      name: [location.name, location.state, location.country].filter(Boolean).join(", "),
+      distanceKm: distanceKm(
+        target.location.latitude, target.location.longitude,
+        location.latitude, location.longitude
+      )
+    } : { error: name };
+  }));
+
+  const failed = places.find(place => place.error);
+  if (failed) return `I couldn't resolve "${failed.error}" to a specific place. Try adding a country or region.`;
+  if (places.length !== 2) return "Please compare two places at a time.";
+
+  const [first, second] = places;
+  const closer = first.distanceKm <= second.distanceKm ? first : second;
+  const other = closer === first ? second : first;
+  return `${closer.name} is closer to ${target.label} than ${other.name}: ${closer.distanceKm.toFixed(1)} km versus ${other.distanceKm.toFixed(1)} km in a straight line.`;
+}
+
 async function answerNearestPerson(req, parsed) {
   let targetLocation;
   let targetLabel;
@@ -232,6 +259,16 @@ exports.ask = async (req, res) => {
     parsed = await fallbackParseDistanceQuestion(req, question) || parsed;
   } catch (error) {
     console.error("Local distance intent fallback failed:", error.message);
+  }
+
+  if (parsed?.intent === "compare_places") {
+    try {
+      const answer = await answerPlaceComparison(req, parsed);
+      return res.json({ success: true, answer });
+    } catch (error) {
+      console.error("Place comparison failed:", error.message);
+      return res.status(502).json({ success: false, message: "I understood the comparison, but couldn't calculate it right now. Please try again." });
+    }
   }
 
   if (parsed?.intent === "nearest_person") {
