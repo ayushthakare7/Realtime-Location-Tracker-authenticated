@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 import hmac, json, os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
