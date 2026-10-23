@@ -83,6 +83,31 @@ def event_text(event: dict[str, Any]) -> str:
         f"Duration minutes: {event.get('durationMinutes', 0)}."
     )
 
+def ensure_vector_index() -> str:
+    coll = collection()
+    try:
+        indexes = coll.database.command({"listSearchIndexes": coll.name}).get("cursor", {}).get("firstBatch", [])
+    except Exception:
+        indexes = []
+    existing = next((item for item in indexes if item.get("name") == VECTOR_INDEX), None)
+    if existing:
+        return "existing"
+    coll.database.command({
+        "createSearchIndexes": coll.name,
+        "indexes": [{
+            "name": VECTOR_INDEX,
+            "type": "vectorSearch",
+            "definition": {
+                "fields": [
+                    {"type": "vector", "path": "embedding", "numDimensions": 384, "similarity": "cosine"},
+                    {"type": "filter", "path": "userId"},
+                    {"type": "filter", "path": "recordedAt"}
+                ]
+            }
+        }]
+    })
+    return "created"
+
 def index_event(event_id: str) -> bool:
     if not ObjectId.is_valid(event_id):
         raise ValueError("Invalid eventId")
@@ -207,6 +232,7 @@ def index_event_endpoint(payload: IndexRequest, authorization: str | None = Head
 def reindex(authorization: str | None = Header(default=None)):
     check_token(authorization)
     try:
+        index_status = ensure_vector_index()
         cursor = collection().find(
             {"eventType": {"$in": ["arrival", "stay", "departure"]}},
             {"_id": 1, "embedding": 1},
@@ -215,7 +241,7 @@ def reindex(authorization: str | None = Header(default=None)):
         for row in cursor:
             if index_event(str(row["_id"])):
                 total += 1
-        return {"success": True, "indexedEvents": total}
+        return {"success": True, "vectorIndex": index_status, "indexedEvents": total}
     except Exception as exc:
         print(f"[Reva RAG] reindex failed: {type(exc).__name__}: {exc}", flush=True)
         raise HTTPException(status_code=502, detail="Could not reindex location events.") from exc
