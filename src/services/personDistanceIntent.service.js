@@ -3,10 +3,24 @@ const Friendship = require("../models/Friendship");
 
 const DISTANCE_INTENT = /\b(distance|far|apart|kilomet(?:er|re)s?|miles?|how long|travel time|drive|driving)\b/i;
 
+function hasWholeName(text, name) {
+  const target = name.toLocaleLowerCase("en");
+  let index = text.indexOf(target);
+  while (index !== -1) {
+    const before = index === 0 ? " " : text[index - 1];
+    const end = index + target.length;
+    const after = end >= text.length ? " " : text[end];
+    const isNameCharacter = value => /[a-z0-9_]/i.test(value);
+    if (!isNameCharacter(before) && !isNameCharacter(after)) return true;
+    index = text.indexOf(target, index + 1);
+  }
+  return false;
+}
+
 function findNameOccurrences(question, names) {
   const text = String(question || "").toLocaleLowerCase("en");
   return names
-    .filter(name => name && text.includes(name.toLocaleLowerCase("en")))
+    .filter(name => name && hasWholeName(text, name))
     .sort((a, b) => text.indexOf(a.toLocaleLowerCase("en")) - text.indexOf(b.toLocaleLowerCase("en")));
 }
 
