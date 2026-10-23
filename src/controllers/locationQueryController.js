@@ -188,7 +188,7 @@ async function answerNearestPerson(req, parsed) {
   candidates.sort((a, b) => parsed.relation === "farthest" ? b.distanceKm - a.distanceKm : a.distanceKm - b.distanceKm);
   const winner = candidates[0];
   const adjective = parsed.relation === "farthest" ? "farthest" : "closest";
-  return \`\${winner.username} is currently the \${adjective} sharing friend to \${targetLabel}, at approximately \${winner.distanceKm.toFixed(2)} km in a straight line. This compares the latest available shared locations, not road distances.\`;
+  return `${winner.username} is currently the ${adjective} sharing friend to ${targetLabel}, at approximately ${winner.distanceKm.toFixed(2)} km in a straight line. This compares the latest available shared locations, not road distances.`;
 }
 
 // Local planning is a resilient fallback when the hosted language model is
