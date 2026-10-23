@@ -7,7 +7,7 @@ const connectDB = require("./src/config/db.js");
 async function start() {
   await connectDB();
   const server = http.createServer(app);
-  const allowedOrigin = process.env.CLIENT_ORIGIN || true;
+  const allowedOrigin = process.env.CLIENT_ORIGIN || `http://localhost:${process.env.PORT || 3000}`;
   const io = socketIo(server, { cors: { origin: allowedOrigin, methods: ["GET", "POST"] } });
   app.set("io", io);
   require("./src/sockets/locationSocket")(io);
