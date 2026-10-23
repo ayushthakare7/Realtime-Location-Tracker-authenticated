@@ -4,6 +4,7 @@ const Friendship = require("../models/Friendship");
 const { askMap } = require("./trackerController");
 const { understandLocationQuestion } = require("../services/gemini.service");
 const { geocodePlace } = require("../services/geocoding.service");
+const { inferPersonDistanceIntent } = require("../services/personDistanceIntent.service");
 
 function distanceKm(aLat, aLon, bLat, bLon) {
   const rad = value => value * Math.PI / 180;
@@ -138,15 +139,26 @@ exports.ask = async (req, res) => {
   try {
     // LLM understands the open-ended question; deterministic code then performs
     // authorization, coordinate resolution, Haversine distance, and road routing.
-    const parsed = await understandLocationQuestion(question);
+    const parsed = await inferPersonDistanceIntent(question, req.user.userId)
+      || await understandLocationQuestion(question);
 
     if (parsed?.intent === "distance") {
       const answer = await answerDistanceQuestion(req, parsed);
       if (answer) return res.json({ success: true, answer });
+      return res.json({
+        success: true,
+        answer: "I recognized a distance question, but couldn't confidently identify both endpoints. Please include the two people or the city/place."
+      });
     }
   } catch (error) {
-    // If query understanding fails, keep the existing RAG/history assistant available.
     console.error("Location question understanding failed:", error.message);
+    // Do not send a distance request to RAG, where it could invent or miss a calculation.
+    if (/\\b(distance|far|apart|kilomet(?:er|re)s?|miles?|how long|travel time|drive|driving)\\b/i.test(question)) {
+      return res.json({
+        success: true,
+        answer: "I couldn't reliably interpret that distance question right now. Please try again with both people or a city/place named."
+      });
+    }
   }
 
   return askMap(req, res);
