@@ -39,6 +39,18 @@ test("parses place-to-place distance questions", () => {
   assert.equal(plan.destination, "Durg");
 });
 
+test("plans which-place-is-closer comparisons", () => {
+  assert.deepEqual(
+    planDistanceQuestion("which is closer to me, Raipur or Durg"),
+    {
+      intent: "compare_places",
+      targetType: "me",
+      target: null,
+      places: ["Raipur", "Durg"]
+    }
+  );
+});
+
 test("plans closest/farthest friend comparisons", () => {
   assert.deepEqual(
     planDistanceQuestion("which friend is closest to me", ["Siddhant", "user2"]),
