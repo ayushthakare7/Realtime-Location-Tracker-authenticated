@@ -4,7 +4,7 @@ const LocationPoint = require("../models/LocationPoint");
 const LocationVisit = require("../models/LocationVisit");
 const LocationEvent = require("../models/LocationEvent");
 const Friendship = require("../models/Friendship");
-const { askRagService } = require("../services/ragClient.service");
+const { groqChat } = require("../services/gemini.service");
 const { placeLabel, reverseGeocode } = require("../services/locationEvents.service");
 
 exports.setSharing = async (req, res) => {
@@ -113,7 +113,7 @@ exports.askMap = async (req, res) => {
     const uid = req.user.userId;
     const links = await Friendship.find({ status: "accepted", $or: [{ requester: uid }, { recipient: uid }] }).lean();
     const friendIds = links.map(f => String(f.requester) === String(uid) ? f.recipient : f.requester);
-    const users = await User.find({ _id: { $in: friendIds }, sharingEnabled: true }).select("_id username").lean();
+    const users = await User.find({ _id: { $in: friendIds }, sharingEnabled: true }).select("_id username historyEnabled").lean();
     const names = new Map(users.map(u => [String(u._id), u.username]));
     const visibleIds = users.map(u => u._id);
     const [mine, others, visits] = await Promise.all([Location.findOne({ userId: uid }).lean(), visibleIds.length ? Location.find({ userId: { $in: visibleIds } }).lean() : [], LocationVisit.find({ userId: { $in: [uid, ...visibleIds] } }).lean()]);
@@ -177,14 +177,53 @@ exports.askMap = async (req, res) => {
       ],
       calculatedDistances: distances
     };
-    const result = await askRagService({
-      question,
-      userIds: [uid, ...visibleIds],
-      context
-    });
+    // Keep answering inside the Node service. Historical events are queried directly
+    // from MongoDB, so Reva does not depend on a second Python service or vector index.
+    const me = await User.findById(uid).select("historyEnabled").lean();
+    const historyUserIds = [
+      ...(me?.historyEnabled !== false ? [uid] : []),
+      ...users.filter(user => user.historyEnabled !== false).map(user => user._id)
+    ];
+    const historyEvents = historyUserIds.length
+      ? await LocationEvent.find({ userId: { $in: historyUserIds } })
+          .select("userId username eventType placeName summary startAt endAt recordedAt durationMinutes")
+          .sort({ startAt: -1 })
+          .limit(100)
+          .lean()
+      : [];
+    const history = historyEvents.map(event => ({
+      username: event.username,
+      eventType: event.eventType,
+      placeName: event.placeName,
+      summary: event.summary,
+      startAt: event.startAt,
+      endAt: event.endAt,
+      recordedAt: event.recordedAt,
+      durationMinutes: event.durationMinutes
+    }));
+
+    const answer = await groqChat([
+      {
+        role: "system",
+        content: [
+          "You are Reva, a helpful, privacy-aware location assistant.",
+          "Answer using ONLY the supplied authorized current context and historical event records.",
+          "Never invent a person, place, time, duration, distance, or event.",
+          "For questions about how long someone stayed, use durationMinutes from matching stay/departure records and convert minutes to hours/minutes when useful.",
+          "If there is no matching event or the records are insufficient, say so clearly instead of guessing.",
+          "Distances in calculatedDistances are straight-line distances, not road distances.",
+          "Keep answers concise and friendly."
+        ].join(" ")
+      },
+      {
+        role: "user",
+        content: JSON.stringify({ question, authorizedCurrentContext: context, authorizedHistoricalEvents: history })
+      }
+    ], { temperature: 0.1, max_tokens: 550 });
+
     res.json({
       success: true,
-      answer: result.answer || "I couldn't find enough information in the shared location history to answer that yet."
+      answer: answer || "I couldn't find enough information in the shared location history to answer that yet."
     });
   } catch (e) { console.error("Reva assistant error:", e); res.status(e.status === 429 ? 429 : 502).json({ success: false, message: "Reva couldn't answer right now. Please try again." }); }
 };
