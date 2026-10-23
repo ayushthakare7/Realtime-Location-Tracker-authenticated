@@ -131,6 +131,66 @@ async function answerDistanceQuestion(req, parsed) {
 }
 
 
+async function answerNearestPerson(req, parsed) {
+  let targetLocation;
+  let targetLabel;
+  let excludedUserId = null;
+
+  if (parsed.targetType === "me") {
+    targetLocation = await getCurrentLocation(req.user.userId);
+    targetLabel = "your current location";
+    if (!targetLocation) return "I don't have your latest location to compare against.";
+  } else if (parsed.targetType === "person") {
+    const targetPerson = await resolveAuthorizedPerson(req.user.userId, parsed.target);
+    if (!targetPerson) return \`I couldn't find an accepted friend matching \${parsed.target || "that person"}.\`;
+    if (String(targetPerson._id) !== String(req.user.userId) && !targetPerson.sharingEnabled) {
+      return \`\${targetPerson.username} is not currently sharing their location.\`;
+    }
+    targetLocation = await getCurrentLocation(targetPerson._id);
+    targetLabel = targetPerson.username + "'s location";
+    excludedUserId = String(targetPerson._id);
+    if (!targetLocation) return \`I don't have a latest shared location for \${targetPerson.username}.\`;
+  } else if (parsed.targetType === "place") {
+    targetLocation = await geocodeCity(parsed.target);
+    targetLabel = parsed.target;
+    if (!targetLocation) return \`I couldn't resolve "\${parsed.target}" to a specific place. Try adding a country or region.\`;
+  } else {
+    return "Please specify whose location or which place to compare.";
+  }
+
+  const links = await Friendship.find({
+    status: "accepted",
+    $or: [{ requester: req.user.userId }, { recipient: req.user.userId }]
+  }).lean();
+  const friendIds = links.map(link =>
+    String(link.requester) === String(req.user.userId) ? link.recipient : link.requester
+  ).filter(id => String(id) !== String(req.user.userId) && String(id) !== excludedUserId);
+
+  const friends = await User.find({ _id: { $in: friendIds }, sharingEnabled: true })
+    .select("_id username").lean();
+  if (!friends.length) return "I couldn't find any other accepted friends who are currently sharing their locations.";
+
+  const locations = await Location.find({ userId: { $in: friends.map(friend => friend._id) } }).lean();
+  const byUserId = new Map(locations.map(location => [String(location.userId), location]));
+  const candidates = friends.map(friend => {
+    const location = byUserId.get(String(friend._id));
+    if (!location) return null;
+    return {
+      username: friend.username,
+      distanceKm: distanceKm(
+        targetLocation.latitude, targetLocation.longitude,
+        location.latitude, location.longitude
+      )
+    };
+  }).filter(Boolean);
+
+  if (!candidates.length) return "I don't have current shared coordinates for your friends yet.";
+  candidates.sort((a, b) => parsed.relation === "farthest" ? b.distanceKm - a.distanceKm : a.distanceKm - b.distanceKm);
+  const winner = candidates[0];
+  const adjective = parsed.relation === "farthest" ? "farthest" : "closest";
+  return \`\${winner.username} is currently the \${adjective} sharing friend to \${targetLabel}, at approximately \${winner.distanceKm.toFixed(2)} km in a straight line. This compares the latest available shared locations, not road distances.\`;
+}
+
 // Local planning is a resilient fallback when the hosted language model is
 // unavailable or returns endpoints that do not match the user's words.
 async function fallbackParseDistanceQuestion(req, question) {
@@ -172,6 +232,16 @@ exports.ask = async (req, res) => {
     parsed = await fallbackParseDistanceQuestion(req, question) || parsed;
   } catch (error) {
     console.error("Local distance intent fallback failed:", error.message);
+  }
+
+  if (parsed?.intent === "nearest_person") {
+    try {
+      const answer = await answerNearestPerson(req, parsed);
+      return res.json({ success: true, answer });
+    } catch (error) {
+      console.error("Nearest-person query failed:", error.message);
+      return res.status(502).json({ success: false, message: "I understood the comparison, but couldn't calculate it right now. Please try again." });
+    }
   }
 
   if (parsed?.intent === "distance") {
