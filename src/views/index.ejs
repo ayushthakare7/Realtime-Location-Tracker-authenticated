@@ -18,7 +18,7 @@
     .muted{font-size:13px;color:#5e6b7d}.friend{padding:9px 0;border-bottom:1px solid #edf0f5}
     #status{font-size:13px;color:#5e6b7d;white-space:pre-wrap} #answer{white-space:pre-wrap}
     .reva-card{background:linear-gradient(145deg,#fff 0%,#f4f0ff 100%);border-color:#dcd4ff;margin-top:14px;margin-bottom:0}
-    .reva-brand{margin-bottom:6px}.reva-title{margin:0;font-size:20px}.reva-subtitle{margin:4px 0 12px;color:#5e5282;font-size:13px}
+    .reva-brand{margin-bottom:6px;display:flex;align-items:center;gap:10px}.reva-avatar{width:42px;height:42px;display:grid;place-items:center;flex:0 0 42px;border-radius:50%;background:linear-gradient(145deg,#eee8ff,#fce7f3);border:1px solid #d9ccff;font-size:23px;box-shadow:0 3px 10px rgba(109,40,217,.12)}.reva-title{margin:0;font-size:20px}.reva-subtitle{margin:4px 0 12px;color:#5e5282;font-size:13px}
     .reva-prompts{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 10px}.reva-prompts button{background:#eee8ff;color:#4b2b87;border:1px solid #d9ccff;border-radius:999px;font-size:12px;padding:7px 10px}
     #askForm{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end}
     #askForm textarea{grid-column:1 / -1;min-height:74px;resize:vertical;margin:0}
@@ -55,7 +55,7 @@
   <section class="map-stack">
     <div id="map"></div>
     <section class="panel reva-card">
-      <div class="reva-brand"><h3 class="reva-title">👩‍💻 Reva: Your Location Companion</h3><div class="reva-subtitle">Your little guide to the places and moments that matter.</div></div>
+      <div class="reva-brand"><div class="reva-avatar" aria-hidden="true">👩‍💻</div><div><h3 class="reva-title">Reva: Your Location Companion</h3><div class="reva-subtitle">Your little guide to the places and moments that matter.</div></div></div>
       <p class="muted">Ask about shared visits, time spent at a place, recent movements, current locations, distances, or your location history. Reva retrieves only authorized semantic events before generating an answer.</p>
       <div class="reva-prompts" aria-label="Try a question">
         <button type="button" id="currentLocationPrompt" data-question="">📍 Current location</button>
