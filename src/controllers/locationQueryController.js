@@ -132,21 +132,107 @@ async function answerDistanceQuestion(req, parsed) {
   }
 }
 
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^$()|[\]\\]/g, "\\exports.ask = async (req, res) => {");
+}
+
+// Resilient local fallback for when the language-model parser is unavailable.
+// Only accepted friends with sharing enabled are candidate people; execution
+// checks friendship and sharing permissions again before reading coordinates.
+async function fallbackParseDistanceQuestion(req, question) {
+  const distanceLike = /\b(distance|how far|far away|away from|separate|separation|closer|closest|nearest|nearer|nearby|kilomet(?:er|re)s?|miles?|met(?:er|re)s?)\b/i.test(question);
+  if (!distanceLike) return null;
+
+  const links = await Friendship.find({
+    status: "accepted",
+    $or: [{ requester: req.user.userId }, { recipient: req.user.userId }]
+  }).lean();
+  const friendIds = links.map(link =>
+    String(link.requester) === String(req.user.userId) ? link.recipient : link.requester
+  );
+  const friends = await User.find({ _id: { $in: friendIds }, sharingEnabled: true })
+    .select("_id username")
+    .lean();
+
+  const matchedFriends = friends
+    .filter(friend => new RegExp("(^|[^a-z0-9_])" + escapeRegex(friend.username) + "([^a-z0-9_]|$)", "i").test(question))
+    .sort((a, b) => question.toLowerCase().indexOf(a.username.toLowerCase()) - question.toLowerCase().indexOf(b.username.toLowerCase()));
+
+  if (matchedFriends.length >= 2) {
+    return {
+      intent: "distance",
+      origin: "friend",
+      originPerson: matchedFriends[0].username,
+      destination: matchedFriends[1].username,
+      destinationType: "person"
+    };
+  }
+
+  const mentionsSelf = /\b(me|myself|my location|where i am|where am i)\b/i.test(question);
+  if (matchedFriends.length === 1) {
+    const friend = matchedFriends[0];
+    const withoutFriend = question.replace(new RegExp(escapeRegex(friend.username), "ig"), " ");
+    const place = withoutFriend
+      .replace(/\b(?:how|far|is|are|the|distance|between|from|to|of|for|me|myself|my|location|current|right|now|please|calculate|work|out|tell|what|would|be|in|at|and|away|separate|separation|closer|closest|nearest|nearer|nearby|kilometers?|kilometres?|kms?|miles?|meters?|metres?)\b/gi, " ")
+      .replace(/[?!,.;:]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (mentionsSelf && !place) {
+      return { intent: "distance", origin: "me", originPerson: null, destination: friend.username, destinationType: "person" };
+    }
+    if (place) {
+      return { intent: "distance", origin: "friend", originPerson: friend.username, destination: place, destinationType: "place" };
+    }
+  }
+
+  if (mentionsSelf) {
+    const place = question
+      .replace(/\b(?:me|myself|my|i|am|where|how|far|is|are|the|distance|between|from|to|of|for|location|current|right|now|please|calculate|work|out|tell|what|would|be|in|at|and|away|kilometers?|kilometres?|kms?|miles?|meters?|metres?)\b/gi, " ")
+      .replace(/[?!,.;:]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (place) return { intent: "distance", origin: "me", originPerson: null, destination: place, destinationType: "place" };
+  }
+
+  return null;
+}
+
 exports.ask = async (req, res) => {
   const question = String(req.body.question || "").trim();
+  if (!question || question.length > 500) {
+    return res.status(400).json({ success: false, message: "Question must be 1-500 characters." });
+  }
+  if (req.body.aiConsent !== true) {
+    return res.status(400).json({ success: false, message: "Consent is required before sending location records to the assistant." });
+  }
 
+  let parsed = null;
   try {
-    // LLM understands the open-ended question; deterministic code then performs
-    // authorization, coordinate resolution, Haversine distance, and road routing.
-    const parsed = await understandLocationQuestion(question);
+    // The LLM maps natural language to structured endpoints; calculations remain deterministic.
+    parsed = await understandLocationQuestion(question);
+  } catch (error) {
+    console.error("Location question understanding failed:", error.message);
+  }
 
-    if (parsed?.intent === "distance") {
+  // Distance questions should not depend entirely on an external LLM being reachable.
+  if (parsed?.intent !== "distance") {
+    try {
+      parsed = await fallbackParseDistanceQuestion(req, question) || parsed;
+    } catch (error) {
+      console.error("Local distance intent fallback failed:", error.message);
+    }
+  }
+
+  if (parsed?.intent === "distance") {
+    try {
       const answer = await answerDistanceQuestion(req, parsed);
       if (answer) return res.json({ success: true, answer });
+    } catch (error) {
+      console.error("Distance execution failed:", error.message);
+      return res.status(502).json({ success: false, message: "I understood this as a distance question, but couldn't calculate it right now. Please try again." });
     }
-  } catch (error) {
-    // If query understanding fails, keep the existing RAG/history assistant available.
-    console.error("Location question understanding failed:", error.message);
   }
 
   return askMap(req, res);
