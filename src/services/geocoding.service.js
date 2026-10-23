@@ -42,7 +42,19 @@ function detectCountry(query) {
   const normalized = normalizeQuery(query);
   for (const entry of COUNTRY_ALIASES) {
     for (const alias of entry.aliases) {
+      // Match whole words only: "us" must not be inferred from "user2".
+      const escaped = alias.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\function detectCountry(query) {
+  const normalized = normalizeQuery(query);
+  for (const entry of COUNTRY_ALIASES) {
+    for (const alias of entry.aliases) {
       if (normalized.includes(alias)) return { ...entry, matchedAlias: alias };
+    }
+  }
+  return null;
+}");
+      if (new RegExp("\\\\b" + escaped + "\\\\b", "i").test(normalized)) {
+        return { ...entry, matchedAlias: alias };
+      }
     }
   }
   return null;
