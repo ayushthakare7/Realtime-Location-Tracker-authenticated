@@ -71,6 +71,32 @@ async function geocodePlace(input) {
     .filter(Boolean);
   const placeTokens = queryTokens.filter(token => !countryWords.has(token));
   const requiredTokens = placeTokens.length ? placeTokens : queryTokens;
+  const countryAliases = [
+    { aliases: ["india"], country: "india" },
+    { aliases: ["america", "american", "usa", "us", "united", "states"], country: "united states" },
+    { aliases: ["uk", "united", "kingdom", "britain", "great"], country: "united kingdom" },
+    { aliases: ["canada"], country: "canada" },
+    { aliases: ["australia"], country: "australia" },
+    { aliases: ["malaysia"], country: "malaysia" },
+    { aliases: ["singapore"], country: "singapore" },
+    { aliases: ["indonesia"], country: "indonesia" },
+    { aliases: ["thailand"], country: "thailand" },
+    { aliases: ["japan"], country: "japan" },
+    { aliases: ["china"], country: "china" },
+    { aliases: ["france"], country: "france" },
+    { aliases: ["germany"], country: "germany" },
+    { aliases: ["italy"], country: "italy" },
+    { aliases: ["spain"], country: "spain" },
+    { aliases: ["brazil"], country: "brazil" },
+    { aliases: ["mexico"], country: "mexico" },
+    { aliases: ["russia"], country: "russia" },
+    { aliases: ["pakistan"], country: "pakistan" },
+    { aliases: ["nepal"], country: "nepal" },
+    { aliases: ["sri", "lanka"], country: "sri lanka" }
+  ];
+  const expectedCountry = countryAliases.find(entry =>
+    entry.aliases.every(token => queryTokens.includes(token))
+  )?.country || null;
   const resultText = item => {
     const address = item.address || {};
     return normalizeQuery([
@@ -80,7 +106,9 @@ async function geocodePlace(input) {
   };
   const relevant = results.filter(item => {
     const text = resultText(item);
-    return requiredTokens.every(token => text.includes(token));
+    const country = normalizeQuery(item.address?.country || "");
+    return requiredTokens.every(token => text.includes(token)) &&
+      (!expectedCountry || country === expectedCountry);
   });
   if (!relevant.length) {
     console.warn("[Geocoding] Refusing unrelated result for query:", query);
