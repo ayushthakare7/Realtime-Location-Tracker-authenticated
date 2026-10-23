@@ -1,12 +1,13 @@
 const mongoose = require("mongoose");
 const LocationEvent = require("../models/LocationEvent");
 const { embedText } = require("./embedding.service");
+const { buildLocationInsights } = require("./locationReasoning.service");
 
 const VECTOR_INDEX = process.env.RAG_VECTOR_INDEX || "location_event_vector_index_384";
 
 function cleanEvent(event) {
   return {
-    id: String(event._id),
+    id: event._id ? String(event._id) : undefined,
     username: event.username,
     eventType: event.eventType,
     placeName: event.placeName,
@@ -48,31 +49,9 @@ async function vectorRetrieve({ userIds, question, limit = 12 }) {
   };
   const range = timeRange(question);
   if (range) filter.recordedAt = { $gte: range.start, $lte: range.end };
-
   const results = await LocationEvent.aggregate([
-    {
-      $vectorSearch: {
-        index: VECTOR_INDEX,
-        path: "embedding",
-        queryVector: queryEmbedding,
-        numCandidates: Math.max(100, limit * 20),
-        limit,
-        filter
-      }
-    },
-    {
-      $project: {
-        username: 1,
-        eventType: 1,
-        placeName: 1,
-        summary: 1,
-        startAt: 1,
-        endAt: 1,
-        durationMinutes: 1,
-        recordedAt: 1,
-        similarity: { $meta: "vectorSearchScore" }
-      }
-    }
+    { $vectorSearch: { index: VECTOR_INDEX, path: "embedding", queryVector: queryEmbedding, numCandidates: Math.max(100, limit * 20), limit, filter } },
+    { $project: { username: 1, eventType: 1, placeName: 1, summary: 1, startAt: 1, endAt: 1, durationMinutes: 1, recordedAt: 1, similarity: { $meta: "vectorSearchScore" } } }
   ]);
   return results.map(cleanEvent);
 }
@@ -82,18 +61,23 @@ async function vectorRetrieve({ userIds, question, limit = 12 }) {
 async function retrieveLocationEvents({ userIds, question, limit = 12 }) {
   if (!userIds?.length) return [];
   try {
-    return await vectorRetrieve({ userIds, question, limit });
+    const [semanticEvents, insights] = await Promise.all([
+      vectorRetrieve({ userIds, question, limit }),
+      buildLocationInsights({ userIds, question })
+    ]);
+    return [
+      ...semanticEvents,
+      { eventType: "structured_insights", summary: "Computed from authorized location events only.", reasoning: insights }
+    ];
   } catch (error) {
-    console.error("Vector retrieval unavailable:", error.message);
+    console.error("Vector/structured retrieval unavailable:", error.message);
     const queryTerms = [...new Set(String(question).toLowerCase().match(/[a-z0-9]+/g) || [])].filter(word => word.length > 2);
-    const events = await LocationEvent.find({ userId: { $in: userIds }, eventType: { $in: ["arrival", "stay", "departure"] } })
-      .sort({ recordedAt: -1 }).limit(300).lean();
+    const events = await LocationEvent.find({ userId: { $in: userIds }, eventType: { $in: ["arrival", "stay", "departure"] } }).sort({ recordedAt: -1 }).limit(300).lean();
     return events.map(event => {
       const content = `${event.username} ${event.eventType} ${event.placeName} ${event.summary}`.toLowerCase();
       const score = queryTerms.reduce((total, term) => total + (content.includes(term) ? 1 : 0), 0);
       return { event, score };
-    }).sort((a, b) => b.score - a.score || new Date(b.event.recordedAt) - new Date(a.event.recordedAt))
-      .slice(0, limit).map(({ event }) => cleanEvent(event));
+    }).sort((a, b) => b.score - a.score || new Date(b.event.recordedAt) - new Date(a.event.recordedAt)).slice(0, limit).map(({ event }) => cleanEvent(event));
   }
 }
 
