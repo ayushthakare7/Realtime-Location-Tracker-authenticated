@@ -1,29 +1,29 @@
-const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || "gemini-embedding-001";
-const EMBEDDING_DIMENSIONS = Number(process.env.EMBEDDING_DIMENSIONS) || 768;
+const { pipeline } = require("@huggingface/transformers");
+
+const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || "Xenova/all-MiniLM-L6-v2";
+const EMBEDDING_DIMENSIONS = 384;
+
+let extractorPromise;
+
+async function getExtractor() {
+  if (!extractorPromise) {
+    extractorPromise = pipeline("feature-extraction", EMBEDDING_MODEL, {
+      dtype: "fp32"
+    });
+  }
+  return extractorPromise;
+}
 
 async function embedText(text) {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) throw new Error("GEMINI_API_KEY is missing");
-
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${EMBEDDING_MODEL}:embedContent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-    body: JSON.stringify({
-      content: { parts: [{ text: String(text || "").slice(0, 8000) }] },
-      outputDimensionality: EMBEDDING_DIMENSIONS
-    })
+  const extractor = await getExtractor();
+  const output = await extractor(String(text || "").slice(0, 8000), {
+    pooling: "mean",
+    normalize: true
   });
+  const values = Array.from(output.data);
 
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const error = new Error(data.error?.message || "Embedding API request failed");
-    error.status = response.status;
-    throw error;
-  }
-
-  const values = data.embedding?.values;
-  if (!Array.isArray(values) || values.length !== EMBEDDING_DIMENSIONS) {
-    throw new Error(`Embedding API returned ${values?.length || 0} dimensions; expected ${EMBEDDING_DIMENSIONS}.`);
+  if (values.length !== EMBEDDING_DIMENSIONS) {
+    throw new Error(`Sentence Transformer returned ${values.length} dimensions; expected ${EMBEDDING_DIMENSIONS}.`);
   }
   return values;
 }
