@@ -9,47 +9,61 @@
   <style>
     body{margin:0;font-family:system-ui,sans-serif;background:#f4f7fb;color:#172033}
     header{padding:16px 20px;background:#15263d;color:white;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-    main{display:grid;grid-template-columns:minmax(260px,340px) 1fr;gap:14px;padding:14px}
+    main{display:grid;grid-template-columns:minmax(280px,370px) 1fr;gap:14px;padding:14px}
     .panel{background:white;border:1px solid #dce4ee;border-radius:14px;padding:16px;margin-bottom:12px}
     input,textarea,button{font:inherit;padding:10px;border:1px solid #c8d3e0;border-radius:8px;max-width:100%;box-sizing:border-box}
     input,textarea{width:100%;margin:5px 0 8px} button{cursor:pointer;background:#1c5bd6;color:white;border:0;margin:3px 0} button.secondary{background:#e7edf6;color:#172033}
-    #map{height:calc(100vh - 110px);min-height:420px;border-radius:14px;overflow:hidden}
+    #map{height:calc(100vh - 110px);min-height:520px;border-radius:14px;overflow:hidden}
     .muted{font-size:13px;color:#5e6b7d}.friend{padding:9px 0;border-bottom:1px solid #edf0f5}
     #status{font-size:13px;color:#5e6b7d;white-space:pre-wrap} #answer{white-space:pre-wrap}
     .reva-card{background:linear-gradient(145deg,#fff 0%,#f4f0ff 100%);border-color:#dcd4ff}
-    .reva-brand{margin-bottom:6px}
-    .reva-title{margin:0;font-size:20px}.reva-subtitle{margin:4px 0 12px;color:#5e5282;font-size:13px}
+    .reva-brand{margin-bottom:6px}.reva-title{margin:0;font-size:20px}.reva-subtitle{margin:4px 0 12px;color:#5e5282;font-size:13px}
     .reva-prompts{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 10px}.reva-prompts button{background:#eee8ff;color:#4b2b87;border:1px solid #d9ccff;border-radius:999px;font-size:12px;padding:7px 10px}
     #askForm button[type=submit]{background:linear-gradient(90deg,#6d28d9,#a21caf);font-weight:650;padding:11px 15px}
     #answer{margin-top:12px;padding:10px 0;line-height:1.55;white-space:pre-wrap}
+    .timeline-item{padding:10px 8px;border-bottom:1px solid #edf0f5;cursor:pointer;border-radius:8px}.timeline-item:hover{background:#f7f9fc}
+    .switch-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0}.switch-row input{width:auto;margin:0}
+    .stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}.stat{padding:10px;border:1px solid #e4e9f0;border-radius:10px;background:#fafbfd}.stat strong{display:block;font-size:18px}
     @media(max-width:850px){main{grid-template-columns:1fr}#map{height:55vh;min-height:350px}}
   </style>
 </head>
 <body>
-<header><strong>Private Location Tracker</strong><button id="logout" class="secondary">Log out</button></header>
+<header><strong>Private Location Tracker</strong><span id="gpsInfo" class="muted" style="color:#dce6f4">GPS idle</span><button id="logout" class="secondary">Log out</button></header>
 <main>
   <aside>
     <section class="panel">
       <h3>Location sharing</h3>
-      <p class="muted">Your location is off by default. Turn it on only when you want accepted friends to see your live location.</p>
+      <p class="muted">Your location is off by default. Turn it on only when you want accepted friends to see your latest location.</p>
       <button id="start">Start sharing</button> <button id="stop" class="secondary">Stop sharing</button>
       <div id="status">Sharing is off until you opt in.</div>
     </section>
     <section class="panel">
-      <h3>Add a friend</h3>
+      <h3>Friends</h3>
       <form id="friendForm"><input id="friendUsername" placeholder="Friend's exact username" required><button>Send request</button></form>
-      <div id="requests"></div>
-      <h3>Friends</h3><div id="friends">Loading friends…</div>
+      <div id="requests"></div><div id="friends">Loading friends…</div>
+    </section>
+    <section class="panel">
+      <h3>Privacy controls</h3>
+      <div class="switch-row"><span>Store location history</span><input id="historyToggle" type="checkbox" checked></div>
+      <p class="muted">When disabled, new GPS history points and semantic location events are not stored. Live sharing can still work.</p>
+      <button id="deleteHistory" class="secondary">Delete my location history</button>
+    </section>
+    <section class="panel">
+      <h3>Movement summary</h3>
+      <div class="stats"><div class="stat"><strong id="dailySummary">—</strong><span class="muted">today</span></div><div class="stat"><strong id="timelineCount">Timeline</strong><span class="muted">click an event to locate it</span></div></div>
+      <button id="playTimeline">▶ Replay movement</button>
+      <div id="timeline" style="margin-top:8px">Loading timeline…</div>
     </section>
     <section class="panel reva-card">
       <div class="reva-brand"><h3 class="reva-title">Meet Reva</h3><div class="reva-subtitle">Your little guide to the places and moments that matter.</div></div>
-      <p class="muted">Ask about shared visits, time spent at a place, recent movements, or how far away a sharing friend is. Reva uses semantic retrieval over authorized location events before generating an answer.</p>
+      <p class="muted">Ask about shared visits, time spent at a place, recent movements, current locations, distances, or your location history. Reva retrieves only authorized semantic events before generating an answer.</p>
       <div class="reva-prompts" aria-label="Try a question">
-        <button type="button" data-question="How far away are my sharing friends?">📍 Who's nearby?</button>
+        <button type="button" data-question="Where is user2 currently?">📍 Current location</button>
         <button type="button" data-question="What places did my friends visit recently?">🗺 Recent places</button>
         <button type="button" data-question="How long did my friends stay at each place?">⏳ Time spent</button>
+        <button type="button" data-question="Summarize my movement today">📊 My day</button>
       </div>
-      <form id="askForm"><textarea id="question" rows="3" maxlength="500" placeholder="Ask Reva about a shared place, visit, or distance…" required></textarea><label style="display:block;font-size:13px;margin:8px 0"><input id="aiConsent" type="checkbox" required style="width:auto"> I agree to send the relevant shared location records to Reva's external AI service to answer this question. Location details can be sensitive.</label><button type="submit">Ask Reva</button></form>
+      <form id="askForm"><textarea id="question" rows="3" maxlength="500" placeholder="Ask Reva about a place, visit, movement, or distance…" required></textarea><label style="display:block;font-size:13px;margin:8px 0"><input id="aiConsent" type="checkbox" required style="width:auto"> I agree to send the relevant shared location records to Reva's external AI service to answer this question. Location details can be sensitive.</label><button type="submit">Ask Reva</button></form>
       <p id="answer" aria-live="polite"></p>
     </section>
   </aside>
