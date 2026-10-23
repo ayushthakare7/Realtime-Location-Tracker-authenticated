@@ -8,7 +8,12 @@ exports.setSharing = async (req, res) => {
   try {
     const enabled = req.body.enabled === true;
     await User.findByIdAndUpdate(req.user.userId, { sharingEnabled: enabled });
-    if (!enabled) { await Location.deleteOne({ userId: req.user.userId }); await LocationEvent.deleteMany({ userId: req.user.userId }); }
+    if (!enabled) {
+      await Location.deleteOne({ userId: req.user.userId });
+      const links = await Friendship.find({ status: "accepted", $or: [{ requester: req.user.userId }, { recipient: req.user.userId }] }).lean();
+      const friendIds = links.map(f => String(f.requester) === String(req.user.userId) ? f.recipient : f.requester);
+      for (const friendId of friendIds) req.app.get("io")?.to("user:" + friendId).emit("sharing-stopped", { userId: String(req.user.userId) });
+    }
     res.json({ success: true, sharingEnabled: enabled });
   } catch { res.status(500).json({ success: false, message: "Could not update sharing." }); }
 };
