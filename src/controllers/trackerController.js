@@ -6,7 +6,7 @@ const LocationEvent = require("../models/LocationEvent");
 const Friendship = require("../models/Friendship");
 const { askGemini } = require("../services/gemini.service");
 const { retrieveLocationEvents } = require("../services/locationRag.service");
-const { placeLabel } = require("../services/locationEvents.service");
+const { placeLabel, reverseGeocode } = require("../services/locationEvents.service");
 
 exports.setSharing = async (req, res) => {
   try {
@@ -56,11 +56,7 @@ exports.setHistory = async (req, res) => {
 exports.deleteHistory = async (req, res) => {
   try {
     const uid = req.user.userId;
-    await Promise.all([
-      LocationPoint.deleteMany({ userId: uid }),
-      LocationVisit.deleteMany({ userId: uid }),
-      LocationEvent.deleteMany({ userId: uid })
-    ]);
+    await Promise.all([LocationPoint.deleteMany({ userId: uid }), LocationVisit.deleteMany({ userId: uid }), LocationEvent.deleteMany({ userId: uid })]);
     res.json({ success: true, message: "Your location history was deleted." });
   } catch { res.status(500).json({ success: false, message: "Could not delete location history." }); }
 };
@@ -105,6 +101,7 @@ function distanceKm(aLat, aLon, bLat, bLon) {
 }
 
 function isCurrentQuestion(question) { return /\b(right now|currently|current location|current place|where is .* now|where .* now|where .* currently)\b/i.test(question); }
+function isGeoAddressQuestion(question) { return /\b(which city|what city|which state|what state|which country|what country|city.*state.*country|state.*country|country.*city|city and state|city and country|state and country|in which city|in what city)\b/i.test(question); }
 function requestedUsername(question, usernames) { const lower = question.toLowerCase(); return usernames.find(name => lower.includes(String(name).toLowerCase())); }
 function isFallbackPlace(place) { return !place || /^Location near -?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/i.test(String(place).trim()); }
 
@@ -121,11 +118,23 @@ exports.askMap = async (req, res) => {
     const visibleIds = users.map(u => u._id);
     const [mine, others, visits] = await Promise.all([Location.findOne({ userId: uid }).lean(), visibleIds.length ? Location.find({ userId: { $in: visibleIds } }).lean() : [], LocationVisit.find({ userId: { $in: [uid, ...visibleIds] } }).lean()]);
     const visitByUser = new Map(visits.map(v => [String(v.userId), v]));
+    const allVisibleUsers = [{ _id: uid, username: "you" }, ...users];
+    const requested = requestedUsername(question, allVisibleUsers.map(u => u.username));
+    const targetUser = requested ? allVisibleUsers.find(u => String(u.username).toLowerCase() === String(requested).toLowerCase()) : null;
+
+    // City/state/country is deterministic reverse-geocoding data. Do not ask Gemini to infer geography.
+    if (isGeoAddressQuestion(question)) {
+      const targetId = targetUser ? String(targetUser._id) : String(uid);
+      const targetLocation = targetId === String(uid) ? mine : others.find(p => String(p.userId) === targetId);
+      if (!targetLocation) return res.json({ success: true, answer: "I can't access a shared location for that person right now." });
+      const geo = await reverseGeocode(targetLocation.latitude, targetLocation.longitude);
+      const targetName = targetId === String(uid) ? "You" : (targetUser?.username || "That user");
+      const parts = [geo.city, geo.state, geo.country].filter(Boolean);
+      if (!parts.length) return res.json({ success: true, answer: `${targetName}'s coordinates are available, but the city/state/country could not be resolved yet.` });
+      return res.json({ success: true, answer: `${targetName} is in ${geo.city || "an unknown city"}, ${geo.state || "an unknown state"}, ${geo.country || "an unknown country"}.` });
+    }
 
     if (isCurrentQuestion(question)) {
-      const allVisibleUsers = [{ _id: uid, username: "you" }, ...users];
-      const requested = requestedUsername(question, allVisibleUsers.map(u => u.username));
-      const targetUser = requested ? allVisibleUsers.find(u => String(u.username).toLowerCase() === String(requested).toLowerCase()) : null;
       if (targetUser && String(targetUser._id) === String(uid)) {
         if (!mine) return res.json({ success: true, answer: "I don't have your latest location. Turn on location sharing and allow location access first." });
         let visit = visitByUser.get(String(uid)); let place = visit?.placeName;
@@ -148,8 +157,8 @@ exports.askMap = async (req, res) => {
     const distanceQuestion = /\b(how far|how many\s*(km|kilometers?|metres?|meters?)|distance|away from me|nearby)\b/i.test(question);
     if (distanceQuestion) {
       const words = question.toLowerCase().match(/[a-z0-9_]+/g) || [];
-      const requested = others.filter(friend => words.includes(String(names.get(String(friend.userId)) || friend.username || "").toLowerCase()));
-      const selected = requested.length ? requested : others;
+      const requestedFriends = others.filter(friend => words.includes(String(names.get(String(friend.userId)) || friend.username || "").toLowerCase()));
+      const selected = requestedFriends.length ? requestedFriends : others;
       if (!mine) return res.json({ success: true, answer: "I need your latest location first. Turn on location sharing and allow location access, then ask me again." });
       if (!selected.length) return res.json({ success: true, answer: "I can't calculate a distance yet. No accepted friend with sharing enabled has a latest location available." });
       return res.json({ success: true, answer: selected.map(friend => { const username = names.get(String(friend.userId)) || friend.username || "Your friend"; const km = distanceKm(mine.latitude, mine.longitude, friend.latitude, friend.longitude); const meters = Math.round(km * 1000); const ageMinutes = Math.max(0, Math.round((Date.now() - new Date(friend.lastSeen).getTime()) / 60000)); return username + " is approximately " + meters.toLocaleString("en-IN") + " metres (" + km.toFixed(2) + " km) away in a straight line. Their location was updated " + ageMinutes + " minute(s) ago."; }).join("\n") });
