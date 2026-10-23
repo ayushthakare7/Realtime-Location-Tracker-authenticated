@@ -216,13 +216,12 @@ exports.ask = async (req, res) => {
     console.error("Location question understanding failed:", error.message);
   }
 
-  // Distance questions should not depend entirely on an external LLM being reachable.
-  if (parsed?.intent !== "distance") {
-    try {
-      parsed = await fallbackParseDistanceQuestion(req, question) || parsed;
-    } catch (error) {
-      console.error("Local distance intent fallback failed:", error.message);
-    }
+  // Prefer exact authorized usernames detected locally when available, even if the
+  // LLM returned a distance intent with the wrong endpoints.
+  try {
+    parsed = await fallbackParseDistanceQuestion(req, question) || parsed;
+  } catch (error) {
+    console.error("Local distance intent fallback failed:", error.message);
   }
 
   if (parsed?.intent === "distance") {
