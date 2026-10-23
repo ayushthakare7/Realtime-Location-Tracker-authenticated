@@ -127,37 +127,83 @@ def classify_node(state: GraphState) -> GraphState:
     return {"intent": intent}
 
 def retrieve_node(state: GraphState) -> GraphState:
+    """Retrieve authorized history semantically first, with a MongoDB fallback.
+
+    The fallback is important during first deployment, while Atlas builds the
+    vector index, or if embedding/vector search temporarily fails.
+    """
     ids = [ObjectId(value) for value in state["authorized_user_ids"] if ObjectId.is_valid(value)]
     if not ids:
         return {"events": []}
-    query_vector = embeddings().embed_query(state["question"])
-    vector_filter: dict[str, Any] = {"userId": {"$in": ids}}
+
     q = state["question"].lower()
     now = datetime.utcnow()
+    date_filter: dict[str, Any] = {}
     if "yesterday" in q:
         end = datetime(now.year, now.month, now.day)
-        vector_filter["recordedAt"] = {"$gte": end - timedelta(days=1), "$lt": end}
+        date_filter = {"$gte": end - timedelta(days=1), "$lt": end}
     elif "today" in q or "tonight" in q:
         start = datetime(now.year, now.month, now.day)
-        vector_filter["recordedAt"] = {"$gte": start, "$lte": now}
+        date_filter = {"$gte": start, "$lte": now}
     elif "this week" in q:
         start = datetime(now.year, now.month, now.day) - timedelta(days=now.weekday())
-        vector_filter["recordedAt"] = {"$gte": start, "$lte": now}
-    pipeline = [
-        {"$vectorSearch": {"index": VECTOR_INDEX, "path": "embedding", "queryVector": query_vector,
-                           "numCandidates": max(100, TOP_K * 20), "limit": TOP_K, "filter": vector_filter}},
-        {"$project": {"userId": 1, "username": 1, "eventType": 1, "placeName": 1, "summary": 1,
-                      "startAt": 1, "endAt": 1, "durationMinutes": 1, "recordedAt": 1,
-                      "score": {"$meta": "vectorSearchScore"}}},
-    ]
-    events = list(collection().aggregate(pipeline))
-    for event in events:
-        event["_id"] = str(event.get("_id", ""))
-        event["userId"] = str(event.get("userId", ""))
-        for key in ("startAt", "endAt", "recordedAt"):
-            if event.get(key):
-                event[key] = event[key].isoformat()
-    return {"events": events}
+        date_filter = {"$gte": start, "$lte": now}
+
+    base_query: dict[str, Any] = {"userId": {"$in": ids}}
+    if date_filter:
+        base_query["recordedAt"] = date_filter
+
+    fields = {
+        "userId": 1, "username": 1, "eventType": 1, "placeName": 1,
+        "summary": 1, "startAt": 1, "endAt": 1, "durationMinutes": 1,
+        "recordedAt": 1,
+    }
+
+    def serialize(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        for event in events:
+            event["_id"] = str(event.get("_id", ""))
+            event["userId"] = str(event.get("userId", ""))
+            for key in ("startAt", "endAt", "recordedAt"):
+                if event.get(key):
+                    event[key] = event[key].isoformat()
+        return events
+
+    # Semantic retrieval is the primary path. It may fail if Atlas vector search
+    # is not configured yet, or the vector index is still being built.
+    try:
+        query_vector = embeddings().embed_query(state["question"])
+        vector_filter: dict[str, Any] = {"userId": {"$in": ids}}
+        if date_filter:
+            vector_filter["recordedAt"] = date_filter
+        pipeline = [
+            {"$vectorSearch": {
+                "index": VECTOR_INDEX, "path": "embedding",
+                "queryVector": query_vector,
+                "numCandidates": max(100, TOP_K * 20),
+                "limit": TOP_K, "filter": vector_filter,
+            }},
+            {"$project": {
+                **fields,
+                "score": {"$meta": "vectorSearchScore"},
+            }},
+        ]
+        events = list(collection().aggregate(pipeline))
+        if events:
+            print(f"[Reva RAG] semantic retrieval returned {len(events)} events", flush=True)
+            return {"events": serialize(events)}
+        print("[Reva RAG] vector search returned no events; using MongoDB fallback", flush=True)
+    except Exception as exc:
+        print(f"[Reva RAG] semantic retrieval unavailable ({type(exc).__name__}: {exc}); using MongoDB fallback", flush=True)
+
+    # Reliable non-vector fallback: query only authorized users and sort by time.
+    # Include enough events to answer multi-place/stay-duration questions.
+    events = list(
+        collection().find(base_query, fields)
+        .sort([("startAt", -1)])
+        .limit(max(100, TOP_K * 10))
+    )
+    print(f"[Reva RAG] MongoDB fallback returned {len(events)} events", flush=True)
+    return {"events": serialize(events)}
 
 def evidence_node(state: GraphState) -> GraphState:
     events = state.get("events", [])
@@ -284,8 +330,8 @@ class RevaRAGHandler(BaseHTTPRequestHandler):
                 context = payload.get("context", {})
                 if not isinstance(question, str) or not question.strip() or len(question) > 500:
                     raise RequestError(400, "question must be a non-empty string of at most 500 characters")
-                if not isinstance(user_ids, list) or not 1 <= len(user_ids) <= 100:
-                    raise RequestError(400, "authorizedUserIds must contain between 1 and 100 IDs")
+                if not isinstance(user_ids, list) or len(user_ids) > 100:
+                    raise RequestError(400, "authorizedUserIds must contain at most 100 IDs")
                 if not all(isinstance(value, str) for value in user_ids):
                     raise RequestError(400, "authorizedUserIds must contain strings")
                 if not isinstance(context, dict):
