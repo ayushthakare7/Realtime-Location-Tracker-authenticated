@@ -134,7 +134,7 @@ document.getElementById("friendForm").addEventListener("submit", async event => 
 document.getElementById("askForm").addEventListener("submit", async event => {
   event.preventDefault();
   const answer = document.getElementById("answer");
-  answer.textContent = "Asking Gemini…";
+  answer.textContent = "Reva is connecting the dots in your shared location story…";
   try {
     const data = await api("/ask", { method: "POST", body: JSON.stringify({ question: document.getElementById("question").value, aiConsent: document.getElementById("aiConsent").checked }) });
     answer.textContent = data.answer;
@@ -143,3 +143,11 @@ document.getElementById("askForm").addEventListener("submit", async event => {
 loadFriends();
 // Fallback refresh for missed socket events and updated friend locations.
 setInterval(() => loadFriends({ quiet: true }), 15000);
+
+// Example questions help users discover Reva's location-history features.
+document.querySelectorAll("[data-question]").forEach(button => {
+  button.addEventListener("click", () => {
+    document.getElementById("question").value = button.dataset.question;
+    document.getElementById("question").focus();
+  });
+});
