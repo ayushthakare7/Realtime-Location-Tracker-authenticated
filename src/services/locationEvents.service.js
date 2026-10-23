@@ -28,12 +28,16 @@ async function placeLabel(latitude, longitude) {
     url.searchParams.set("format", "jsonv2");
     url.searchParams.set("lat", String(latitude));
     url.searchParams.set("lon", String(longitude));
-    url.searchParams.set("zoom", "16");
-    const response = await fetch(url, { headers: { "User-Agent": "PrivacyAwareLocationTracker/1.0" }, signal: AbortSignal.timeout(4000) });
+    url.searchParams.set("zoom", "18");
+    url.searchParams.set("addressdetails", "1");
+    const response = await fetch(url, {
+      headers: { "User-Agent": "PrivacyAwareLocationTracker/1.0" },
+      signal: AbortSignal.timeout(4000)
+    });
     if (!response.ok) return fallback;
     const data = await response.json();
     const address = data.address || {};
-    const label = address.amenity || address.building || address.university || address.suburb || address.neighbourhood || address.road || address.town || address.city || address.village || data.name;
+    const label = data.name || address.amenity || address.hostel || address.building || address.university || address.hospital || address.college || address.school || address.road || address.neighbourhood || address.suburb || address.town || address.city || address.village;
     const result = label ? String(label).slice(0, 160) : fallback;
     geocodeCache.set(cacheKey, result);
     if (geocodeCache.size > 1000) geocodeCache.delete(geocodeCache.keys().next().value);
@@ -124,4 +128,4 @@ async function processLocationEvent({ userId, username, latitude, longitude, rec
   await startVisit(userId, username, latitude, longitude, at);
 }
 
-module.exports = { processLocationEvent, distanceMeters, indexEvent };
+module.exports = { processLocationEvent, distanceMeters, indexEvent, placeLabel };
