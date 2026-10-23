@@ -104,9 +104,9 @@ async function answerDistanceQuestion(req, parsed) {
     if (!toLocation) return `I don't have a latest shared location for ${toLabel}.`;
   } else if (parsed.destinationType === "place" && parsed.destination) {
     const destination = await geocodeCity(parsed.destination);
-    if (!destination) return `I couldn't resolve ${parsed.destination} to a location in India.`;
+    if (!destination) return `I couldn't resolve ${parsed.destination} to a location. Try adding a country or region, for example New York, USA.`;
     toLocation = destination;
-    toLabel = `${destination.name}${destination.state ? `, ${destination.state}` : ""}`;
+    toLabel = [destination.name, destination.state, destination.country].filter(Boolean).join(", ");
   } else {
     return null;
   }
