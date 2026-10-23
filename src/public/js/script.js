@@ -21,6 +21,7 @@ let watchId = null;
 let socket;
 let lastSent = null;
 let lastSentAt = 0;
+let latestPosition = null;
 let playbackTimer = null;
 
 function setStatus(message) { document.getElementById("status").textContent = message; }
@@ -54,9 +55,43 @@ function removeMarker(id) {
   const circle = accuracyCircles.get(key); if (circle) map.removeLayer(circle);
   markers.delete(key); accuracyCircles.delete(key);
 }
+function sendLatestPosition(force = false) {
+  if (!sharing || !latestPosition || !socket || !socket.connected) return false;
+  const { latitude, longitude, accuracy } = latestPosition;
+  const moved = !lastSent || distanceMeters(lastSent.lat, lastSent.lon, latitude, longitude) >= 30;
+  const enoughTime = Date.now() - lastSentAt >= 15000;
+  if (!force && !moved && !enoughTime) return false;
+  socket.emit("send-location", { latitude, longitude });
+  lastSent = { lat: latitude, lon: longitude };
+  lastSentAt = Date.now();
+  upsertMarker({ userId: "me", username: "You", latitude, longitude }, accuracy);
+  document.getElementById("gpsInfo").textContent = `GPS accuracy ±${Math.round(accuracy || 0)} m • ${new Date().toLocaleTimeString()}`;
+  return true;
+}
+function handlePosition(position) {
+  latestPosition = {
+    latitude: position.coords.latitude,
+    longitude: position.coords.longitude,
+    accuracy: position.coords.accuracy
+  };
+  upsertMarker({ userId: "me", username: "You", latitude: latestPosition.latitude, longitude: latestPosition.longitude }, latestPosition.accuracy);
+  if (sendLatestPosition(false)) setStatus("Location updated. Your current position is being shared with accepted friends.");
+  else if (!socket || !socket.connected) setStatus("GPS location received. Waiting for the secure connection to send it…");
+}
+function handleLocationError(error) {
+  const messages = {
+    1: "Location permission was denied. Allow location access in your browser and try again.",
+    2: "Your device could not determine a location. Check GPS/location services and try again.",
+    3: "Getting your location timed out. Keep location services enabled and try again."
+  };
+  setStatus(messages[error.code] || "Unable to read your current location.");
+}
 function connectSocket() {
   socket = io({ auth: { token } });
-  socket.on("connect", () => setStatus("Connected. Location sharing is " + (sharing ? "on." : "off.")));
+  socket.on("connect", () => {
+    setStatus("Connected. Location sharing is " + (sharing ? "on." : "off.") );
+    if (sharing && latestPosition) sendLatestPosition(true);
+  });
   socket.on("connect_error", error => setStatus("Socket connection: " + error.message));
   socket.on("sharing-status", data => { if (data) historyEnabled = data.historyEnabled !== false; if (!sharing) setStatus(data.enabled ? "Your sharing is enabled on this account." : "Sharing is off until you opt in."); });
   socket.on("receive-location", data => upsertMarker(data));
@@ -95,6 +130,7 @@ async function loadFriends({ quiet = false } = {}) {
     sharing = Boolean(data.sharingEnabled); historyEnabled = data.historyEnabled !== false;
     document.getElementById("historyToggle").checked = historyEnabled;
     if (!quiet) setStatus(sharing ? "Sharing is enabled. Accepted friends can see your latest location." : "Sharing is off. Your location is not being broadcast.");
+    if (sharing && latestPosition && socket?.connected) sendLatestPosition(true);
   } catch (e) { if (!quiet) setStatus(e.message); }
 }
 
@@ -106,19 +142,11 @@ async function setSharing(enabled) {
     watchId = null; lastSent = null; lastSentAt = 0;
     if (sharing) {
       if (!navigator.geolocation) throw new Error("This browser does not support geolocation.");
-      watchId = navigator.geolocation.watchPosition(position => {
-        const lat = position.coords.latitude, lon = position.coords.longitude;
-        const moved = !lastSent || distanceMeters(lastSent.lat, lastSent.lon, lat, lon) >= 30;
-        const enoughTime = Date.now() - lastSentAt >= 15000;
-        if (socket && socket.connected && sharing && (moved || enoughTime)) {
-          socket.emit("send-location", { latitude: lat, longitude: lon });
-          lastSent = { lat, lon }; lastSentAt = Date.now();
-          upsertMarker({ userId: "me", username: "You", latitude: lat, longitude: lon }, position.coords.accuracy);
-          document.getElementById("gpsInfo").textContent = `GPS accuracy ±${Math.round(position.coords.accuracy || 0)} m • ${new Date().toLocaleTimeString()}`;
-        }
-      }, error => setStatus("Location permission/error: " + error.message), { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 });
-      setStatus("Sharing enabled. Updates are sent after meaningful movement or at a short heartbeat.");
+      setStatus("Sharing enabled. Getting your current GPS location…");
+      navigator.geolocation.getCurrentPosition(handlePosition, handleLocationError, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
+      watchId = navigator.geolocation.watchPosition(handlePosition, handleLocationError, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
     } else {
+      latestPosition = null;
       setStatus("Sharing stopped. Your latest location was removed; history follows your history setting.");
       removeMarker("me");
     }
@@ -193,6 +221,6 @@ setInterval(() => { if (historyEnabled) loadTimeline(); }, 30000);
 document.querySelectorAll("[data-question]").forEach(button => button.addEventListener("click", () => { document.getElementById("question").value = button.dataset.question; document.getElementById("question").focus(); }));
 
 document.getElementById("currentLocationPrompt").addEventListener("click", () => {
-  document.getElementById("question").value = "Where is you currently?";
+  document.getElementById("question").value = "Where am I currently?";
   document.getElementById("question").focus();
 });
