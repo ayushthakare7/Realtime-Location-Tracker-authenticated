@@ -107,7 +107,33 @@ exports.askMap = async (req, res) => {
       calculatedDistances: distances,
       retrievedLocationEvents: events
     };
-    const prompt = "You are Reva, a helpful location-history assistant. Answer only from the supplied data. Prefer retrieved location events for visit/history questions and calculatedDistances for distance questions. Distances are straight-line, not driving distance. Never invent a place name, event, time, or route. If evidence is missing, say so. Respect timestamps as recorded.\nDATA=" + JSON.stringify(data) + "\nQUESTION=" + question;
+    // Handle exact distance questions with deterministic backend math rather than an LLM guess.
+    const distanceQuestion = /\\b(how far|how many\\s*(km|kilometers?|metres?|meters?)|distance|away from me|nearby)\\b/i.test(question);
+    if (distanceQuestion) {
+      const words = question.toLowerCase().match(/[a-z0-9_]+/g) || [];
+      const requested = others.filter(friend => {
+        const username = names.get(String(friend.userId)) || friend.username || "";
+        return words.includes(String(username).toLowerCase());
+      });
+      const selected = requested.length ? requested : others;
+      let answer;
+      if (!mine) {
+        answer = "I need your latest location first. Turn on location sharing and allow location access, then ask me again.";
+      } else if (!selected.length) {
+        answer = "I can't calculate a distance yet. No accepted friend with sharing enabled has a latest location available.";
+      } else {
+        answer = selected.map(friend => {
+          const username = names.get(String(friend.userId)) || friend.username || "Your friend";
+          const km = distanceKm(mine.latitude, mine.longitude, friend.latitude, friend.longitude);
+          const meters = Math.round(km * 1000);
+          const ageMinutes = Math.max(0, Math.round((Date.now() - new Date(friend.lastSeen).getTime()) / 60000));
+          return username + " is approximately " + meters.toLocaleString("en-IN") + " metres (" + km.toFixed(2) + " km) away in a straight line. Their location was updated " + ageMinutes + " minute(s) ago.";
+        }).join("\\n");
+      }
+      return res.json({ success: true, answer });
+    }
+
+    const prompt = "You are Reva, a helpful location-history assistant. Answer only from the supplied data. Prefer retrieved location events for visit/history questions. Never invent a place name, event, time, or route. If evidence is missing, say so. Respect timestamps as recorded.\\nDATA=" + JSON.stringify(data) + "\\nQUESTION=" + question;
     const answer = await askGemini(prompt);
     res.json({ success: true, answer: answer || "I couldn't find enough information in the shared location history to answer that yet." });
   } catch (e) {
