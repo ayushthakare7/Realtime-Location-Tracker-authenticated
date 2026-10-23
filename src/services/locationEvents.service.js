@@ -15,8 +15,14 @@ function distanceMeters(aLat, aLon, bLat, bLon) {
   return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-async function placeLabel(latitude, longitude) {
-  const fallback = `Location near ${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
+async function reverseGeocode(latitude, longitude) {
+  const fallback = {
+    placeName: `Location near ${latitude.toFixed(3)}, ${longitude.toFixed(3)}`,
+    city: null,
+    state: null,
+    country: null,
+    countryCode: null
+  };
   if (process.env.GEOCODING_ENABLED !== "true") return fallback;
   const cacheKey = `${latitude.toFixed(3)},${longitude.toFixed(3)}`;
   if (geocodeCache.has(cacheKey)) return geocodeCache.get(cacheKey);
@@ -37,12 +43,21 @@ async function placeLabel(latitude, longitude) {
     if (!response.ok) return fallback;
     const data = await response.json();
     const address = data.address || {};
-    const label = data.name || address.amenity || address.hostel || address.building || address.university || address.hospital || address.college || address.school || address.road || address.neighbourhood || address.suburb || address.town || address.city || address.village;
-    const result = label ? String(label).slice(0, 160) : fallback;
+    const city = address.city || address.town || address.municipality || address.village || address.city_district || null;
+    const state = address.state || address.state_district || null;
+    const country = address.country || null;
+    const countryCode = address.country_code || null;
+    const placeName = data.name || address.amenity || address.hostel || address.building || address.university || address.hospital || address.college || address.school || address.road || address.neighbourhood || address.suburb || city || fallback.placeName;
+    const result = { placeName: String(placeName).slice(0, 160), city: city ? String(city) : null, state: state ? String(state) : null, country: country ? String(country) : null, countryCode: countryCode ? String(countryCode).toUpperCase() : null };
     geocodeCache.set(cacheKey, result);
     if (geocodeCache.size > 1000) geocodeCache.delete(geocodeCache.keys().next().value);
     return result;
   } catch { return fallback; }
+}
+
+async function placeLabel(latitude, longitude) {
+  const result = await reverseGeocode(latitude, longitude);
+  return result.placeName;
 }
 
 function eventText(event) {
@@ -80,7 +95,6 @@ async function saveEvent({ userId, username, eventType, placeName, latitude, lon
     { $set: { userId, username, eventType, placeName, latitude, longitude, startAt, endAt, recordedAt, durationMinutes: duration, summary, eventKey } },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
-
   const durationDelta = Math.abs((duration || 0) - (previous?.durationMinutes || 0));
   const needsEmbedding = !previous?.embedding ||
     eventType !== "stay" && (!previous || previous.summary !== summary || previous.placeName !== placeName) ||
@@ -110,22 +124,16 @@ async function processLocationEvent({ userId, username, latitude, longitude, rec
   const gapMinutes = (at.getTime() - new Date(visit.lastSeen).getTime()) / 60000;
   const meters = distanceMeters(visit.latitude, visit.longitude, latitude, longitude);
   const sameVisit = meters <= VISIT_RADIUS_METERS && gapMinutes >= 0 && gapMinutes <= 30;
-
   if (sameVisit) {
     visit = await LocationVisit.findOneAndUpdate({ userId }, { $set: { username, lastSeen: at }, $inc: { pointCount: 1 } }, { new: true }).lean();
     const durationMinutes = (at.getTime() - new Date(visit.startedAt).getTime()) / 60000;
-    if (durationMinutes >= MIN_STAY_MINUTES) {
-      await saveEvent({ userId, username, eventType: "stay", placeName: visit.placeName, latitude: visit.latitude, longitude: visit.longitude, startAt: visit.startedAt, endAt: at, recordedAt: at, durationMinutes, eventKey: `visit:${userId}:${new Date(visit.startedAt).getTime()}:stay` });
-    }
+    if (durationMinutes >= MIN_STAY_MINUTES) await saveEvent({ userId, username, eventType: "stay", placeName: visit.placeName, latitude: visit.latitude, longitude: visit.longitude, startAt: visit.startedAt, endAt: at, recordedAt: at, durationMinutes, eventKey: `visit:${userId}:${new Date(visit.startedAt).getTime()}:stay` });
     return;
   }
-
   const previousDuration = (new Date(visit.lastSeen).getTime() - new Date(visit.startedAt).getTime()) / 60000;
-  if (previousDuration >= MIN_STAY_MINUTES) {
-    await saveEvent({ userId, username: visit.username, eventType: "stay", placeName: visit.placeName, latitude: visit.latitude, longitude: visit.longitude, startAt: visit.startedAt, endAt: visit.lastSeen, recordedAt: visit.lastSeen, durationMinutes: previousDuration, eventKey: `visit:${userId}:${new Date(visit.startedAt).getTime()}:stay` });
-  }
+  if (previousDuration >= MIN_STAY_MINUTES) await saveEvent({ userId, username: visit.username, eventType: "stay", placeName: visit.placeName, latitude: visit.latitude, longitude: visit.longitude, startAt: visit.startedAt, endAt: visit.lastSeen, recordedAt: visit.lastSeen, durationMinutes: previousDuration, eventKey: `visit:${userId}:${new Date(visit.startedAt).getTime()}:stay` });
   await saveEvent({ userId, username: visit.username, eventType: "departure", placeName: visit.placeName, latitude: visit.latitude, longitude: visit.longitude, startAt: visit.startedAt, endAt: visit.lastSeen, recordedAt: at, durationMinutes: previousDuration, eventKey: `visit:${userId}:${new Date(visit.startedAt).getTime()}:departure` });
   await startVisit(userId, username, latitude, longitude, at);
 }
 
-module.exports = { processLocationEvent, distanceMeters, indexEvent, placeLabel };
+module.exports = { processLocationEvent, distanceMeters, indexEvent, placeLabel, reverseGeocode };
