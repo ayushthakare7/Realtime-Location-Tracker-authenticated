@@ -24,6 +24,10 @@ exports.sendFriendRequest = async (req, res) => {
     const exists = await Friendship.findOne({ $or: [{ requester: req.user.userId, recipient: target._id }, { requester: target._id, recipient: req.user.userId }] });
     if (exists) return res.status(409).json({ success: false, message: "Request or friendship already exists." });
     await Friendship.create({ requester: req.user.userId, recipient: target._id });
+    // Notify the recipient immediately if they are currently connected.
+    req.app.get("io")?.to("user:" + target._id).emit("friend-request-received", {
+      username: req.user.username || "A user"
+    });
     res.status(201).json({ success: true });
   } catch { res.status(500).json({ success: false, message: "Could not send request." }); }
 };
