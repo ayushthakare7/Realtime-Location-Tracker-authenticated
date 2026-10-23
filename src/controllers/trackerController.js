@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const Location = require("../models/Location");
 const LocationEvent = require("../models/LocationEvent");
+const LocationVisit = require("../models/LocationVisit");
 const Friendship = require("../models/Friendship");
 const { askGemini } = require("../services/gemini.service");
 const { retrieveLocationEvents } = require("../services/locationRag.service");
@@ -11,6 +12,8 @@ exports.setSharing = async (req, res) => {
     await User.findByIdAndUpdate(req.user.userId, { sharingEnabled: enabled });
     if (!enabled) {
       await Location.deleteOne({ userId: req.user.userId });
+      // End the in-progress visit so a later opt-in starts a fresh visit.
+      await LocationVisit.deleteOne({ userId: req.user.userId });
       const links = await Friendship.find({ status: "accepted", $or: [{ requester: req.user.userId }, { recipient: req.user.userId }] }).lean();
       const friendIds = links.map(f => String(f.requester) === String(req.user.userId) ? f.recipient : f.requester);
       for (const friendId of friendIds) req.app.get("io")?.to("user:" + friendId).emit("sharing-stopped", { userId: String(req.user.userId) });
