@@ -1,6 +1,7 @@
 import hmac, json, os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
+from typing import TypedDict
 from bson import ObjectId
 from pymongo import MongoClient
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -8,12 +9,20 @@ from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
 from langgraph.graph import StateGraph, START, END
 
+class RevaState(TypedDict, total=False):
+    question: str
+    user_ids: list[str]
+    context: dict
+    evidence: list
+    answer: str
+
 PORT = int(os.getenv("RAG_PORT", "8001"))
 INDEX = os.getenv("RAG_VECTOR_INDEX", "location_event_vector_index_384")
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2",
                                    encode_kwargs={"normalize_embeddings": True})
 mongo = MongoClient(os.environ["MONGO_URI"], serverSelectionTimeoutMS=5000)
-db = mongo[os.getenv("MONGO_DB_NAME", "location_tracker")]
+db_name = os.getenv("MONGO_DB_NAME")
+db = mongo[db_name] if db_name else mongo.get_default_database()
 events = db[os.getenv("LOCATION_EVENTS_COLLECTION", "locationevents")]
 
 def retrieve(state):
@@ -34,7 +43,7 @@ def generate(state):
     result = llm.invoke([SystemMessage(content="You are Reva, a privacy-aware location history assistant."), HumanMessage(content=prompt)])
     return {"answer": str(result.content).strip()}
 
-workflow = StateGraph(dict)
+workflow = StateGraph(RevaState)
 workflow.add_node("retrieve", retrieve)
 workflow.add_node("generate", generate)
 workflow.add_edge(START, "retrieve")
@@ -82,4 +91,4 @@ class Handler(BaseHTTPRequestHandler):
         print("[RAG HTTP] " + (fmt % args), flush=True)
 
 if __name__ == "__main__":
-    ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
+    ThreadingHTTPServer((os.getenv("RAG_HOST", "127.0.0.1"), PORT), Handler).serve_forever()
