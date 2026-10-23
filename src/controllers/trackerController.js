@@ -4,7 +4,7 @@ const LocationPoint = require("../models/LocationPoint");
 const LocationVisit = require("../models/LocationVisit");
 const LocationEvent = require("../models/LocationEvent");
 const Friendship = require("../models/Friendship");
-const { groqChat } = require("../services/gemini.service");
+const { askRagService } = require("../services/ragClient.service");
 const { placeLabel, reverseGeocode } = require("../services/locationEvents.service");
 
 exports.setSharing = async (req, res) => {
@@ -177,53 +177,20 @@ exports.askMap = async (req, res) => {
       ],
       calculatedDistances: distances
     };
-    // Keep answering inside the Node service. Historical events are queried directly
-    // from MongoDB, so Reva does not depend on a second Python service or vector index.
+    // Node remains the API/auth layer; LangChain + LangGraph RAG runs in Python.
     const me = await User.findById(uid).select("historyEnabled").lean();
-    const historyUserIds = [
+    const authorizedHistoryIds = [
       ...(me?.historyEnabled !== false ? [uid] : []),
       ...users.filter(user => user.historyEnabled !== false).map(user => user._id)
     ];
-    const historyEvents = historyUserIds.length
-      ? await LocationEvent.find({ userId: { $in: historyUserIds } })
-          .select("userId username eventType placeName summary startAt endAt recordedAt durationMinutes")
-          .sort({ startAt: -1 })
-          .limit(100)
-          .lean()
-      : [];
-    const history = historyEvents.map(event => ({
-      username: event.username,
-      eventType: event.eventType,
-      placeName: event.placeName,
-      summary: event.summary,
-      startAt: event.startAt,
-      endAt: event.endAt,
-      recordedAt: event.recordedAt,
-      durationMinutes: event.durationMinutes
-    }));
-
-    const answer = await groqChat([
-      {
-        role: "system",
-        content: [
-          "You are Reva, a helpful, privacy-aware location assistant.",
-          "Answer using ONLY the supplied authorized current context and historical event records.",
-          "Never invent a person, place, time, duration, distance, or event.",
-          "For questions about how long someone stayed, use durationMinutes from matching stay/departure records and convert minutes to hours/minutes when useful.",
-          "If there is no matching event or the records are insufficient, say so clearly instead of guessing.",
-          "Distances in calculatedDistances are straight-line distances, not road distances.",
-          "Keep answers concise and friendly."
-        ].join(" ")
-      },
-      {
-        role: "user",
-        content: JSON.stringify({ question, authorizedCurrentContext: context, authorizedHistoricalEvents: history })
-      }
-    ], { temperature: 0.1, max_tokens: 550 });
-
+    const result = await askRagService({
+      question,
+      userIds: authorizedHistoryIds,
+      context
+    });
     res.json({
       success: true,
-      answer: answer || "I couldn't find enough information in the shared location history to answer that yet."
+      answer: result.answer || "I couldn't find enough information in the shared location history to answer that yet."
     });
   } catch (e) { console.error("Reva assistant error:", e); res.status(e.status === 429 ? 429 : 502).json({ success: false, message: "Reva couldn't answer right now. Please try again." }); }
 };
