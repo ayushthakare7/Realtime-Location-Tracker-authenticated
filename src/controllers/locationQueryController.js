@@ -1,4 +1,6 @@
 const Location = require("../models/Location");
+const User = require("../models/User");
+const Friendship = require("../models/Friendship");
 const { askMap } = require("./trackerController");
 
 function distanceKm(aLat, aLon, bLat, bLon) {
@@ -19,6 +21,18 @@ function extractCityDistanceTarget(question) {
     .trim();
   if (!target || target.length > 80) return null;
   return target;
+}
+
+function extractCityDistanceFromFriend(question) {
+  const match = String(question || "").match(/\bhow\s+far\s+is\s+(.+?)\s+from\s+(?:my\s+)?friend\s+([a-z0-9_]+)\b/i);
+  if (!match) return null;
+  const city = match[1]
+    .replace(/\b(?:the|city)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const username = match[2].trim();
+  if (!city || city.length > 80 || !username) return null;
+  return { city, username };
 }
 
 async function geocodeCity(city) {
@@ -80,7 +94,66 @@ function formatDuration(totalMinutes) {
 
 exports.ask = async (req, res) => {
   const question = String(req.body.question || "").trim();
+  const cityFromFriend = extractCityDistanceFromFriend(question);
   const targetCity = extractCityDistanceTarget(question);
+
+  if (cityFromFriend) {
+    try {
+      const friend = await User.findOne({ username: cityFromFriend.username }).select("_id username sharingEnabled").lean();
+      if (!friend) {
+        return res.json({ success: true, answer: `I couldn't find a user named ${cityFromFriend.username}.` });
+      }
+
+      const friendship = await Friendship.findOne({
+        status: "accepted",
+        $or: [
+          { requester: req.user.userId, recipient: friend._id },
+          { requester: friend._id, recipient: req.user.userId }
+        ]
+      }).lean();
+
+      if (!friendship) {
+        return res.json({ success: true, answer: `I can only calculate distances involving your accepted friends. ${friend.username} is not an accepted friend.` });
+      }
+
+      if (!friend.sharingEnabled) {
+        return res.json({ success: true, answer: `${friend.username} is not currently sharing their location.` });
+      }
+
+      const friendLocation = await Location.findOne({ userId: friend._id }).lean();
+      if (!friendLocation) {
+        return res.json({ success: true, answer: `I don't have a latest shared location for ${friend.username}.` });
+      }
+
+      const destination = await geocodeCity(cityFromFriend.city);
+      if (!destination) {
+        return res.json({ success: true, answer: `I couldn't resolve ${cityFromFriend.city} to a location in India.` });
+      }
+
+      const straightLineKm = distanceKm(friendLocation.latitude, friendLocation.longitude, destination.latitude, destination.longitude);
+
+      try {
+        const route = await getRoadRoute(friendLocation.latitude, friendLocation.longitude, destination.latitude, destination.longitude);
+        const displayName = destination.name || cityFromFriend.city;
+        const state = destination.state ? `, ${destination.state}` : "";
+        return res.json({
+          success: true,
+          answer: `${displayName}${state} is approximately ${route.distanceKm.toFixed(1)} km away from ${friend.username} by road. Estimated driving time is about ${formatDuration(route.durationMinutes)}. Straight-line distance is ${straightLineKm.toFixed(1)} km.`
+        });
+      } catch (routeError) {
+        console.error("Road routing from friend failed:", routeError.message);
+        const displayName = destination.name || cityFromFriend.city;
+        const state = destination.state ? `, ${destination.state}` : "";
+        return res.json({
+          success: true,
+          answer: `${displayName}${state} is approximately ${straightLineKm.toFixed(2)} km from ${friend.username} in a straight line. I couldn't get a road route right now.`
+        });
+      }
+    } catch (error) {
+      console.error("City-from-friend distance query failed:", error.message);
+      return askMap(req, res);
+    }
+  }
 
   if (!targetCity) return askMap(req, res);
 
