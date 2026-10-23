@@ -142,18 +142,18 @@ async function answerNearestPerson(req, parsed) {
     if (!targetLocation) return "I don't have your latest location to compare against.";
   } else if (parsed.targetType === "person") {
     const targetPerson = await resolveAuthorizedPerson(req.user.userId, parsed.target);
-    if (!targetPerson) return \`I couldn't find an accepted friend matching \${parsed.target || "that person"}.\`;
+    if (!targetPerson) return `I couldn't find an accepted friend matching ${parsed.target || "that person"}.`;
     if (String(targetPerson._id) !== String(req.user.userId) && !targetPerson.sharingEnabled) {
-      return \`\${targetPerson.username} is not currently sharing their location.\`;
+      return `${targetPerson.username} is not currently sharing their location.`;
     }
     targetLocation = await getCurrentLocation(targetPerson._id);
     targetLabel = targetPerson.username + "'s location";
     excludedUserId = String(targetPerson._id);
-    if (!targetLocation) return \`I don't have a latest shared location for \${targetPerson.username}.\`;
+    if (!targetLocation) return `I don't have a latest shared location for ${targetPerson.username}.`;
   } else if (parsed.targetType === "place") {
     targetLocation = await geocodeCity(parsed.target);
     targetLabel = parsed.target;
-    if (!targetLocation) return \`I couldn't resolve "\${parsed.target}" to a specific place. Try adding a country or region.\`;
+    if (!targetLocation) return `I couldn't resolve "${parsed.target}" to a specific place. Try adding a country or region.`;
   } else {
     return "Please specify whose location or which place to compare.";
   }
