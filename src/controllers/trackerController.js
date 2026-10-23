@@ -4,8 +4,7 @@ const LocationPoint = require("../models/LocationPoint");
 const LocationVisit = require("../models/LocationVisit");
 const LocationEvent = require("../models/LocationEvent");
 const Friendship = require("../models/Friendship");
-const { askGemini } = require("../services/gemini.service");
-const { retrieveLocationEvents } = require("../services/locationRag.service");
+const { askRagService } = require("../services/ragClient.service");
 const { placeLabel, reverseGeocode } = require("../services/locationEvents.service");
 
 exports.setSharing = async (req, res) => {
@@ -157,21 +156,35 @@ exports.askMap = async (req, res) => {
       return res.json({ success: true, answer: `${target.username} is sharing a current location, but I don't have a resolved place name for it yet.` });
     }
 
-    const events = await retrieveLocationEvents({ userIds: [uid, ...visibleIds], question, limit: 12 });
     const distances = [];
-    if (mine) for (const friend of others) { const km = distanceKm(mine.latitude, mine.longitude, friend.latitude, friend.longitude); distances.push({ username: names.get(String(friend.userId)) || friend.username, distanceKm: Number(km.toFixed(2)), measuredAt: friend.lastSeen, meaning: "straight-line distance, not road distance" }); }
-    const data = { currentLocations: [...(mine ? [{ username: "you", placeName: visitByUser.get(String(uid))?.placeName || null, lastSeen: mine.lastSeen }] : []), ...others.map(p => ({ username: names.get(String(p.userId)) || p.username, placeName: visitByUser.get(String(p.userId))?.placeName || null, lastSeen: p.lastSeen }))], calculatedDistances: distances, retrievedLocationEvents: events };
-    const distanceQuestion = /\b(how far|how many\s*(km|kilometers?|metres?|meters?)|distance|away from me|nearby)\b/i.test(question);
-    if (distanceQuestion) {
-      const words = question.toLowerCase().match(/[a-z0-9_]+/g) || [];
-      const requestedFriends = others.filter(friend => words.includes(String(names.get(String(friend.userId)) || friend.username || "").toLowerCase()));
-      const selected = requestedFriends.length ? requestedFriends : others;
-      if (!mine) return res.json({ success: true, answer: "I need your latest location first. Turn on location sharing and allow location access, then ask me again." });
-      if (!selected.length) return res.json({ success: true, answer: "I can't calculate a distance yet. No accepted friend with sharing enabled has a latest location available." });
-      return res.json({ success: true, answer: selected.map(friend => { const username = names.get(String(friend.userId)) || friend.username || "Your friend"; const km = distanceKm(mine.latitude, mine.longitude, friend.latitude, friend.longitude); const meters = Math.round(km * 1000); const ageMinutes = Math.max(0, Math.round((Date.now() - new Date(friend.lastSeen).getTime()) / 60000)); return username + " is approximately " + meters.toLocaleString("en-IN") + " metres (" + km.toFixed(2) + " km) away in a straight line. Their location was updated " + ageMinutes + " minute(s) ago."; }).join("\n") });
+    if (mine) for (const friend of others) {
+      const km = distanceKm(mine.latitude, mine.longitude, friend.latitude, friend.longitude);
+      distances.push({
+        username: names.get(String(friend.userId)) || friend.username,
+        distanceKm: Number(km.toFixed(2)),
+        measuredAt: friend.lastSeen,
+        meaning: "straight-line distance, not road distance"
+      });
     }
-    const prompt = "You are Reva, a helpful location-history assistant. Answer only from the supplied data. Use retrieved semantic location events for visit/history questions. Current location data is authoritative when supplied. Never invent a place name, event, time, or route. If evidence is missing, say so. Respect timestamps as recorded.\nDATA=" + JSON.stringify(data) + "\nQUESTION=" + question;
-    const answer = await askGemini(prompt);
-    res.json({ success: true, answer: answer || "I couldn't find enough information in the shared location history to answer that yet." });
+    const context = {
+      currentLocations: [
+        ...(mine ? [{ username: "you", placeName: visitByUser.get(String(uid))?.placeName || null, lastSeen: mine.lastSeen }] : []),
+        ...others.map(p => ({
+          username: names.get(String(p.userId)) || p.username,
+          placeName: visitByUser.get(String(p.userId))?.placeName || null,
+          lastSeen: p.lastSeen
+        }))
+      ],
+      calculatedDistances: distances
+    };
+    const result = await askRagService({
+      question,
+      userIds: [uid, ...visibleIds],
+      context
+    });
+    res.json({
+      success: true,
+      answer: result.answer || "I couldn't find enough information in the shared location history to answer that yet."
+    });
   } catch (e) { console.error("Reva assistant error:", e); res.status(e.status === 429 ? 429 : 502).json({ success: false, message: "Reva couldn't answer right now. Please try again." }); }
 };
