@@ -48,6 +48,36 @@ async function geocodeCity(city) {
   };
 }
 
+async function getRoadRoute(fromLat, fromLon, toLat, toLon) {
+  const coordinates = `${fromLon},${fromLat};${toLon},${toLat}`;
+  const url = `https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=false&alternatives=false&steps=false`;
+  const response = await fetch(url, {
+    headers: { "User-Agent": "PrivacyAwareLocationTracker/1.0" },
+    signal: AbortSignal.timeout(8000)
+  });
+
+  if (!response.ok) throw new Error(`OSRM HTTP ${response.status}`);
+  const data = await response.json();
+  if (data.code !== "Ok" || !data.routes?.length) {
+    throw new Error(data.code || "No route found");
+  }
+
+  const route = data.routes[0];
+  return {
+    distanceKm: Number(route.distance) / 1000,
+    durationMinutes: Number(route.duration) / 60
+  };
+}
+
+function formatDuration(totalMinutes) {
+  const minutes = Math.max(0, Math.round(totalMinutes));
+  const hours = Math.floor(minutes / 60);
+  const remaining = minutes % 60;
+  if (hours === 0) return `${remaining} min`;
+  if (remaining === 0) return `${hours} hr`;
+  return `${hours} hr ${remaining} min`;
+}
+
 exports.ask = async (req, res) => {
   const question = String(req.body.question || "").trim();
   const targetCity = extractCityDistanceTarget(question);
@@ -66,15 +96,35 @@ exports.ask = async (req, res) => {
     const destination = await geocodeCity(targetCity);
     if (!destination) return askMap(req, res);
 
-    const km = distanceKm(mine.latitude, mine.longitude, destination.latitude, destination.longitude);
-    const meters = Math.round(km * 1000);
-    const displayName = destination.name || targetCity;
-    const state = destination.state ? `, ${destination.state}` : "";
+    const straightLineKm = distanceKm(mine.latitude, mine.longitude, destination.latitude, destination.longitude);
 
-    return res.json({
-      success: true,
-      answer: `${displayName}${state} is approximately ${meters.toLocaleString("en-IN")} metres (${km.toFixed(2)} km) from your current location in a straight line. This is geographic distance, not road distance.`
-    });
+    try {
+      const route = await getRoadRoute(
+        mine.latitude,
+        mine.longitude,
+        destination.latitude,
+        destination.longitude
+      );
+
+      const displayName = destination.name || targetCity;
+      const state = destination.state ? `, ${destination.state}` : "";
+
+      return res.json({
+        success: true,
+        answer: `${displayName}${state} is approximately ${route.distanceKm.toFixed(1)} km away by road. Estimated driving time is about ${formatDuration(route.durationMinutes)}. Straight-line distance is ${straightLineKm.toFixed(1)} km. Route distance is based on the fastest driving route available from OpenStreetMap road data.`
+      });
+    } catch (routeError) {
+      console.error("Road routing failed:", routeError.message);
+
+      const meters = Math.round(straightLineKm * 1000);
+      const displayName = destination.name || targetCity;
+      const state = destination.state ? `, ${destination.state}` : "";
+
+      return res.json({
+        success: true,
+        answer: `${displayName}${state} is approximately ${meters.toLocaleString("en-IN")} metres (${straightLineKm.toFixed(2)} km) from your current location in a straight line. I couldn't get a road route right now, so this is geographic distance rather than driving distance.`
+      });
+    }
   } catch (error) {
     console.error("City distance query failed:", error.message);
     return askMap(req, res);
