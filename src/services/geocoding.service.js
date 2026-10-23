@@ -1,7 +1,7 @@
 const GeocodedPlace = require("../models/GeocodedPlace");
 
 function normalizeQuery(value) {
-  return String(value || "").trim().toLocaleLowerCase("en-IN").replace(/\\s+/g, " ");
+  return String(value || "").trim().toLocaleLowerCase("en-IN").replace(/\s+/g, " ");
 }
 
 function asPlace(record) {
