@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const connectDB = require("../src/config/db");
 const LocationEvent = require("../src/models/LocationEvent");
 const { indexEvent } = require("../src/services/locationEvents.service");
-const { EMBEDDING_DIMENSIONS } = require("../src/services/embedding.service");
+const { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } = require("../src/services/embedding.service");
 const { VECTOR_INDEX } = require("../src/services/locationRag.service");
 
 async function main() {
@@ -19,7 +19,8 @@ async function main() {
     console.log("Could not list existing vector indexes. Attempting creation.");
   }
 
-  if (!indexes.some(index => index.name === VECTOR_INDEX)) {
+  const existing = indexes.find(index => index.name === VECTOR_INDEX);
+  if (!existing) {
     await db.command({
       createSearchIndexes: collectionName,
       indexes: [{
@@ -34,7 +35,7 @@ async function main() {
         }
       }]
     });
-    console.log(`Created vector index '${VECTOR_INDEX}'.`);
+    console.log(`Created vector index '${VECTOR_INDEX}' with ${EMBEDDING_DIMENSIONS} dimensions.`);
   } else {
     console.log(`Vector index '${VECTOR_INDEX}' already exists.`);
   }
@@ -44,8 +45,12 @@ async function main() {
   for (const event of events) {
     await indexEvent(event);
     count += 1;
+    if (count % 25 === 0 || count === events.length) {
+      console.log(`Re-embedded ${count}/${events.length} events using ${EMBEDDING_MODEL}.`);
+    }
   }
-  console.log(`RAG setup complete. Processed ${count} location events.`);
+
+  console.log(`RAG setup complete. Processed ${count} location events with ${EMBEDDING_MODEL}.`);
   await mongoose.disconnect();
 }
 
