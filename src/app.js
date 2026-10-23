@@ -6,7 +6,7 @@ const authRoutes = require("./routes/authRoutes");
 const trackerRoutes = require("./routes/trackerRoutes");
 
 const app = express();
-app.use(cors());
+app.use(cors({ origin: process.env.CLIENT_ORIGIN || `http://localhost:${process.env.PORT || 3000}` }));
 app.use(express.json({ limit: "20kb" }));
 app.use(morgan("dev"));
 app.use(express.urlencoded({ extended: true }));
