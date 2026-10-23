@@ -10,118 +10,116 @@ function asPlace(record) {
     longitude: Number(record.longitude),
     name: record.name,
     state: record.state || null,
-    country: record.country || "India"
+    country: record.country || null
   };
 }
 
+const COUNTRY_ALIASES = [
+  { aliases: ["india"], country: "india", code: "in" },
+  { aliases: ["united states", "usa", "america", "us"], country: "united states", code: "us" },
+  { aliases: ["united kingdom", "great britain", "britain", "uk"], country: "united kingdom", code: "gb" },
+  { aliases: ["canada"], country: "canada", code: "ca" },
+  { aliases: ["australia"], country: "australia", code: "au" },
+  { aliases: ["malaysia"], country: "malaysia", code: "my" },
+  { aliases: ["singapore"], country: "singapore", code: "sg" },
+  { aliases: ["indonesia"], country: "indonesia", code: "id" },
+  { aliases: ["thailand"], country: "thailand", code: "th" },
+  { aliases: ["japan"], country: "japan", code: "jp" },
+  { aliases: ["china"], country: "china", code: "cn" },
+  { aliases: ["france"], country: "france", code: "fr" },
+  { aliases: ["germany"], country: "germany", code: "de" },
+  { aliases: ["italy"], country: "italy", code: "it" },
+  { aliases: ["spain"], country: "spain", code: "es" },
+  { aliases: ["brazil"], country: "brazil", code: "br" },
+  { aliases: ["mexico"], country: "mexico", code: "mx" },
+  { aliases: ["russia"], country: "russia", code: "ru" },
+  { aliases: ["pakistan"], country: "pakistan", code: "pk" },
+  { aliases: ["nepal"], country: "nepal", code: "np" },
+  { aliases: ["sri lanka"], country: "sri lanka", code: "lk" }
+];
+
+function detectCountry(query) {
+  const normalized = normalizeQuery(query);
+  for (const entry of COUNTRY_ALIASES) {
+    for (const alias of entry.aliases) {
+      if (normalized.includes(alias)) return { ...entry, matchedAlias: alias };
+    }
+  }
+  return null;
+}
+
+function removeCountry(query, countryMatch) {
+  if (!countryMatch) return String(query || "").trim();
+  const lower = query.toLocaleLowerCase("en-IN");
+  const index = lower.indexOf(countryMatch.matchedAlias);
+  if (index < 0) return String(query || "").trim();
+  return (query.slice(0, index) + " " + query.slice(index + countryMatch.matchedAlias.length))
+    .replace(/[,;\s]+/g, " ").trim();
+}
+
+function placeMatches(item, placeQuery, countryMatch) {
+  const address = item.address || {};
+  const settlement = normalizeQuery(
+    address.city || address.town || address.village || address.municipality ||
+    address.hamlet || item.name || ""
+  );
+  const searchable = normalizeQuery([
+    settlement, item.name, item.display_name, address.state
+  ].filter(Boolean).join(" "));
+  const tokens = normalizeQuery(placeQuery).split(/\s+/).filter(Boolean);
+  if (!tokens.length || !tokens.every(token => searchable.includes(token))) return false;
+  if (countryMatch && normalizeQuery(address.country) !== countryMatch.country) return false;
+  return true;
+}
+
 /**
- * Resolve any Indian city/town/village/place through OpenStreetMap Nominatim.
- * Successful lookups are cached in MongoDB to reduce repeat requests and
- * avoid relying on a hardcoded list of cities.
+ * Resolve a place globally with OpenStreetMap Nominatim. If a country is
+ * explicitly named, constrain the lookup to that country. Reject unrelated
+ * provider results rather than returning a plausible-looking wrong distance.
  */
 async function geocodePlace(input) {
   const query = String(input || "").trim();
   const normalizedQuery = normalizeQuery(query);
   if (!normalizedQuery) return null;
 
+  const countryMatch = detectCountry(query);
+  const placeQuery = removeCountry(query, countryMatch) || query;
+
+  // Do not reuse old cache entries if their name/country doesn't match this query.
   const cached = await GeocodedPlace.findOne({ normalizedQuery }).lean();
-  // Older versions could cache an unrelated provider result under this query.
-  // Reuse a cache entry only when its resolved place still matches the query.
   if (cached) {
     const cachedName = normalizeQuery(cached.name);
-    const requestedPlace = normalizeQuery(
-      query.replace(/\b(india|usa|america|united states|uk|united kingdom|canada|australia|malaysia|singapore|indonesia|thailand|japan|china|france|germany|italy|spain|brazil|mexico|russia|pakistan|nepal|sri lanka)\b/ig, "").replace(/[,\s]+/g, " ").trim()
+    const requestedName = normalizeQuery(placeQuery);
+    const nameMatches = requestedName && (
+      cachedName === requestedName ||
+      requestedName.split(/\s+/).every(token => cachedName.includes(token))
     );
-    if (requestedPlace && (cachedName === requestedPlace || cachedName.includes(requestedPlace) || requestedPlace.includes(cachedName))) {
-      if (!countryMatch || normalizeQuery(cached.country) === countryMatch.country) return asPlace(cached);
-    }
+    const countryMatches = !countryMatch || normalizeQuery(cached.country) === countryMatch.country;
+    if (nameMatches && countryMatches) return asPlace(cached);
   }
-
-  // Detect an explicit country in the user's query; otherwise search globally.
-  const countryAliases = [
-    { aliases: ["india"], country: "india", code: "in" },
-    { aliases: ["united states"], country: "united states", code: "us" },
-    { aliases: ["usa"], country: "united states", code: "us" },
-    { aliases: ["america"], country: "united states", code: "us" },
-    { aliases: ["united kingdom"], country: "united kingdom", code: "gb" },
-    { aliases: ["uk"], country: "united kingdom", code: "gb" },
-    { aliases: ["canada"], country: "canada", code: "ca" },
-    { aliases: ["australia"], country: "australia", code: "au" },
-    { aliases: ["malaysia"], country: "malaysia", code: "my" },
-    { aliases: ["singapore"], country: "singapore", code: "sg" },
-    { aliases: ["indonesia"], country: "indonesia", code: "id" },
-    { aliases: ["thailand"], country: "thailand", code: "th" },
-    { aliases: ["japan"], country: "japan", code: "jp" },
-    { aliases: ["china"], country: "china", code: "cn" },
-    { aliases: ["france"], country: "france", code: "fr" },
-    { aliases: ["germany"], country: "germany", code: "de" },
-    { aliases: ["italy"], country: "italy", code: "it" },
-    { aliases: ["spain"], country: "spain", code: "es" },
-    { aliases: ["brazil"], country: "brazil", code: "br" },
-    { aliases: ["mexico"], country: "mexico", code: "mx" },
-    { aliases: ["russia"], country: "russia", code: "ru" },
-    { aliases: ["pakistan"], country: "pakistan", code: "pk" },
-    { aliases: ["nepal"], country: "nepal", code: "np" },
-    { aliases: ["sri lanka"], country: "sri lanka", code: "lk" }
-  ];
-  const normalizedInput = normalizeQuery(query);
-  const countryMatch = countryAliases.find(entry =>
-    entry.aliases.some(alias => normalizedInput.includes(alias))
-  ) || null;
-  const placeQuery = countryMatch
-    ? query.replace(new RegExp(countryMatch.aliases[0].replace(/[.*+?^${}()|[\]\\]/g, "\\  const url = new URL("https://nominatim.openstreetmap.org/search");
-  url.searchParams.set("format", "jsonv2");
-  url.searchParams.set("q", query + ", India");
-  url.searchParams.set("countrycodes", "in");
-  url.searchParams.set("addressdetails", "1");
-  url.searchParams.set("limit", "5");"), "i"), "").replace(/[,\s]+$/g, "").trim()
-    : query;
-  const searchQuery = placeQuery || query;
 
   const url = new URL("https://nominatim.openstreetmap.org/search");
   url.searchParams.set("format", "jsonv2");
-  url.searchParams.set("q", searchQuery);
+  url.searchParams.set("q", placeQuery);
   if (countryMatch) url.searchParams.set("countrycodes", countryMatch.code);
   url.searchParams.set("addressdetails", "1");
   url.searchParams.set("limit", "10");
 
   const response = await fetch(url, {
-    headers: {
-      "User-Agent": "PrivacyAwareLocationTracker/1.0 (place geocoding)"
-    },
+    headers: { "User-Agent": "PrivacyAwareLocationTracker/1.0 (place geocoding)" },
     signal: AbortSignal.timeout(10000)
   });
-
-  if (!response.ok) {
-    throw new Error("Geocoding provider returned HTTP " + response.status);
-  }
+  if (!response.ok) throw new Error("Geocoding provider returned HTTP " + response.status);
 
   const results = await response.json();
   if (!Array.isArray(results) || results.length === 0) return null;
 
-  // Reject unrelated search results instead of silently calculating a distance
-  // to a different island/region when the provider's top result is a poor match.
-  const requestedPlace = normalizeQuery(searchQuery)
-    .replace(/\b(india|usa|america|united states|uk|united kingdom|canada|australia|malaysia|singapore|indonesia|thailand|japan|china|france|germany|italy|spain|brazil|mexico|russia|pakistan|nepal|sri lanka)\b/ig, "")
-    .replace(/[,\s]+/g, " ").trim();
-  const tokens = requestedPlace.split(/\s+/).filter(Boolean);
-  const matching = results.filter(item => {
-    const address = item.address || {};
-    const country = normalizeQuery(address.country || "");
-    const settlement = normalizeQuery(
-      address.city || address.town || address.village || address.municipality ||
-      address.hamlet || address.county || item.name || ""
-    );
-    const searchable = normalizeQuery([settlement, item.name, item.display_name, address.state].filter(Boolean).join(" "));
-    const tokenMatch = tokens.length > 0 && tokens.every(token => searchable.includes(token));
-    const countryMatchOk = !countryMatch || country === countryMatch.country;
-    return tokenMatch && countryMatchOk;
-  });
+  const matching = results.filter(item => placeMatches(item, placeQuery, countryMatch));
   const result = matching.find(item => {
     const address = item.address || {};
     const settlement = address.city || address.town || address.village ||
       address.municipality || address.hamlet || item.name;
-    return normalizeQuery(settlement) === requestedPlace;
+    return normalizeQuery(settlement) === normalizeQuery(placeQuery);
   }) || matching[0];
 
   if (!result) {
@@ -143,9 +141,9 @@ async function geocodePlace(input) {
     normalizedQuery,
     query,
     name: address.city || address.town || address.village ||
-      address.municipality || address.hamlet || result.name || searchQuery,
+      address.municipality || address.hamlet || result.name || placeQuery,
     state: address.state || null,
-    country: address.country || "India",
+    country: address.country ? normalizeQuery(address.country) : null,
     latitude,
     longitude,
     provider: "nominatim",
@@ -160,7 +158,6 @@ async function geocodePlace(input) {
       { upsert: true, runValidators: true }
     );
   } catch (error) {
-    // Concurrent requests can race on the unique normalizedQuery index.
     if (error.code !== 11000) console.warn("[Geocoding] Cache write failed:", error.message);
   }
 
