@@ -12,10 +12,12 @@ const locationEventSchema = new mongoose.Schema({
   recordedAt: { type: Date, default: Date.now, index: true },
   durationMinutes: { type: Number, min: 0 },
   summary: { type: String, required: true },
-  eventKey: { type: String, required: true }
+  eventKey: { type: String, required: true },
+  embedding: { type: [Number], select: false },
+  embeddingModel: { type: String, select: false },
+  embeddingUpdatedAt: { type: Date, select: false }
 }, { timestamps: true });
 
 locationEventSchema.index({ userId: 1, recordedAt: -1 });
-// Keep legacy raw-point documents out of this unique index during migration.
 locationEventSchema.index({ eventKey: 1 }, { unique: true, partialFilterExpression: { eventKey: { $type: "string" } } });
 module.exports = mongoose.model("LocationEvent", locationEventSchema);
