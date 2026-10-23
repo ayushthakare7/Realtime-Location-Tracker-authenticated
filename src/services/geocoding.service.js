@@ -10,18 +10,21 @@ function asPlace(record) {
     longitude: Number(record.longitude),
     name: record.name,
     state: record.state || null,
-    country: record.country || "India"
+    country: record.country || null
   };
 }
 
 /**
- * Resolve any Indian city/town/village/place through OpenStreetMap Nominatim.
- * Successful lookups are cached in MongoDB to reduce repeat requests and
- * avoid relying on a hardcoded list of cities.
+ * Resolve a place anywhere in the world through OpenStreetMap Nominatim.
+ * Successful lookups are cached in MongoDB to reduce repeat requests.
  */
 async function geocodePlace(input) {
   const query = String(input || "").trim();
   const normalizedQuery = normalizeQuery(query);
+  // "America" is commonly used to mean the United States in conversational queries.
+  const searchQuery = /^(america|usa|u\.s\.a\.?|us)$/i.test(query)
+    ? "United States of America"
+    : query;
   if (!normalizedQuery) return null;
 
   const cached = await GeocodedPlace.findOne({ normalizedQuery }).lean();
@@ -29,8 +32,7 @@ async function geocodePlace(input) {
 
   const url = new URL("https://nominatim.openstreetmap.org/search");
   url.searchParams.set("format", "jsonv2");
-  url.searchParams.set("q", query + ", India");
-  url.searchParams.set("countrycodes", "in");
+  url.searchParams.set("q", searchQuery);
   url.searchParams.set("addressdetails", "1");
   url.searchParams.set("limit", "5");
 
@@ -48,17 +50,13 @@ async function geocodePlace(input) {
   const results = await response.json();
   if (!Array.isArray(results) || results.length === 0) return null;
 
-  // Prefer settlement matches for city/town/village names; otherwise use the
-  // provider's highest-ranked result. Country restriction is also checked.
+  // Prefer exact settlement or country matches, then use Nominatim's ranked result.
   const result = results.find(item => {
     const address = item.address || {};
     const settlement = address.city || address.town || address.village ||
-      address.municipality || address.hamlet;
-    return settlement && normalizeQuery(settlement) === normalizedQuery &&
-      (!address.country_code || address.country_code.toLowerCase() === "in");
-  }) || results.find(item =>
-    !item.address?.country_code || item.address.country_code.toLowerCase() === "in"
-  );
+      address.municipality || address.hamlet || address.country;
+    return settlement && normalizeQuery(settlement) === normalizeQuery(searchQuery);
+  }) || results[0];
 
   if (!result) return null;
 
@@ -78,7 +76,7 @@ async function geocodePlace(input) {
     name: address.city || address.town || address.village ||
       address.municipality || address.hamlet || result.name || query,
     state: address.state || null,
-    country: address.country || "India",
+    country: address.country || null,
     latitude,
     longitude,
     provider: "nominatim",
