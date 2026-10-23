@@ -139,7 +139,7 @@ def retrieve_node(state: GraphState) -> GraphState:
     if not ids:
         return {"events": []}
     query_vector = embeddings().embed_query(state["question"])
-    vector_filter: dict[str, Any] = {"userId": {"$in": ids}, "embedding": {"$exists": True}}
+    vector_filter: dict[str, Any] = {"userId": {"$in": ids}}
     q = state["question"].lower()
     now = datetime.utcnow()
     if "yesterday" in q:
