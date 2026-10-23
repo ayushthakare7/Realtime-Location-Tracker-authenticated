@@ -1,5 +1,6 @@
 const LocationVisit = require("../models/LocationVisit");
 const LocationEvent = require("../models/LocationEvent");
+const { indexLocationEvent } = require("./ragClient.service");
 
 const VISIT_RADIUS_METERS = Number(process.env.VISIT_RADIUS_METERS) || 150;
 const MIN_STAY_MINUTES = Number(process.env.MIN_STAY_MINUTES) || 15;
@@ -90,6 +91,10 @@ async function saveEvent({ userId, username, eventType, placeName, latitude, lon
     { $set: { userId, username, eventType, placeName, latitude, longitude, startAt, endAt, recordedAt, durationMinutes: duration, summary, eventKey } },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
+  // Index asynchronously: a temporary Python outage must not block location tracking.
+  void indexLocationEvent(event._id).catch(error => {
+    console.error("Python RAG event indexing failed:", error.message);
+  });
   return event;
 }
 
