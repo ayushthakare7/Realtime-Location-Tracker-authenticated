@@ -103,7 +103,7 @@ async function setSharing(enabled) {
       }, error => setStatus("Location permission/error: " + error.message), { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 });
       setStatus("Sharing enabled. Your browser may ask for location permission.");
     } else {
-      setStatus("Sharing stopped. Your saved latest location and history were cleared.");
+      setStatus("Sharing stopped. Your latest location was removed; your private history is retained.");
       markers.forEach((marker, id) => { if (id === "me") removeMarker(id); });
     }
     await loadFriends();
