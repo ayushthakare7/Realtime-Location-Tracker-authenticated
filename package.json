@@ -8,14 +8,14 @@
     "dev": "nodemon server.js",
     "rag:setup": "node scripts/setup-rag.js",
     "history:regeocode": "node scripts/regeocode-history.js",
-    "test": "node --test"
+    "test": "node --test",
+    "rag:start": "python -m uvicorn main:app --app-dir rag_service --host 127.0.0.1 --port 8001"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@huggingface/transformers": "^4.3.1",
     "bcryptjs": "^3.0.3",
     "body-parser": "^2.3.0",
     "cors": "^2.8.6",
