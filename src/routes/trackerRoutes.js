@@ -1,0 +1,11 @@
+const express = require('express');
+const auth = require('../middleware/authMiddleware');
+const controller = require('../controllers/trackerController');
+const router = express.Router();
+router.use(auth);
+router.get('/friends', controller.listFriends);
+router.post('/friends/request', controller.sendFriendRequest);
+router.post('/friends/requests/:id/respond', controller.respondToRequest);
+router.patch('/sharing', controller.setSharing);
+router.post('/ask', controller.askMap);
+module.exports = router;
