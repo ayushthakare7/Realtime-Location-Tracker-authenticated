@@ -1,41 +1,51 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
-<meta charset="UTF-8">
-
-<meta
-name="viewport"
-content="width=device-width, initial-scale=1.0"
->
-
-<title>
-Real Time Tracker
-</title>
-
-<link
-rel="stylesheet"
-href="/css/style.css"
->
-
-<link
-rel="stylesheet"
-href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
-/>
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Private Location Tracker</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <style>
+    body{margin:0;font-family:system-ui,sans-serif;background:#f4f7fb;color:#172033}
+    header{padding:16px 20px;background:#15263d;color:white;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+    main{display:grid;grid-template-columns:minmax(260px,340px) 1fr;gap:14px;padding:14px}
+    .panel{background:white;border:1px solid #dce4ee;border-radius:14px;padding:16px;margin-bottom:12px}
+    input,textarea,button{font:inherit;padding:10px;border:1px solid #c8d3e0;border-radius:8px;max-width:100%;box-sizing:border-box}
+    input,textarea{width:100%;margin:5px 0 8px} button{cursor:pointer;background:#1c5bd6;color:white;border:0;margin:3px 0} button.secondary{background:#e7edf6;color:#172033}
+    #map{height:calc(100vh - 110px);min-height:420px;border-radius:14px;overflow:hidden}
+    .muted{font-size:13px;color:#5e6b7d}.friend{padding:9px 0;border-bottom:1px solid #edf0f5}
+    #status{font-size:13px;color:#5e6b7d;white-space:pre-wrap} #answer{white-space:pre-wrap}
+    @media(max-width:850px){main{grid-template-columns:1fr}#map{height:55vh;min-height:350px}}
+  </style>
 </head>
-
 <body>
-
-<div id="map"></div>
-
+<header><strong>Private Location Tracker</strong><button id="logout" class="secondary">Log out</button></header>
+<main>
+  <aside>
+    <section class="panel">
+      <h3>Location sharing</h3>
+      <p class="muted">Your location is off by default. Turn it on only when you want accepted friends to see your live location.</p>
+      <button id="start">Start sharing</button> <button id="stop" class="secondary">Stop sharing</button>
+      <div id="status">Sharing is off until you opt in.</div>
+    </section>
+    <section class="panel">
+      <h3>Add a friend</h3>
+      <form id="friendForm"><input id="friendUsername" placeholder="Friend's exact username" required><button>Send request</button></form>
+      <div id="requests"></div>
+      <h3>Friends</h3><div id="friends">Loading friends…</div>
+    </section>
+    <section class="panel">
+      <h3>Ask My Map</h3>
+      <p class="muted">Answers use your latest location, location history, and only accepted friends who enabled sharing. Coordinates may be sensitive.</p>
+      <form id="askForm"><textarea id="question" rows="3" maxlength="500" placeholder="Example: What was the latest location shared with me?" required></textarea><button>Ask Gemini</button></form>
+      <p id="answer"></p>
+    </section>
+  </aside>
+  <div id="map"></div>
+</main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-
 <script src="/socket.io/socket.io.js"></script>
-
 <script src="/js/script.js"></script>
-
 </body>
-
 </html>
