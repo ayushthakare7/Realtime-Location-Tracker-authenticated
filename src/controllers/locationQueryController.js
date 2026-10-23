@@ -246,19 +246,22 @@ exports.ask = async (req, res) => {
   }
 
   let parsed = null;
+
+  // First try the fast local planner. Common distance and comparison questions
+  // should not depend on an external LLM being reachable or returning valid JSON.
   try {
-    // The LLM maps natural language to structured endpoints; calculations remain deterministic.
-    parsed = await understandLocationQuestion(question);
+    parsed = await fallbackParseDistanceQuestion(req, question);
   } catch (error) {
-    console.error("Location question understanding failed:", error.message);
+    console.error("Local location-question planning failed:", error.message);
   }
 
-  // Prefer exact authorized usernames detected locally when available, even if the
-  // LLM returned a distance intent with the wrong endpoints.
-  try {
-    parsed = await fallbackParseDistanceQuestion(req, question) || parsed;
-  } catch (error) {
-    console.error("Local distance intent fallback failed:", error.message);
+  // Use the LLM only when local rules cannot safely identify the question's plan.
+  if (!parsed) {
+    try {
+      parsed = await understandLocationQuestion(question);
+    } catch (error) {
+      console.error("Location question understanding failed:", error.message);
+    }
   }
 
   if (parsed?.intent === "compare_places") {
