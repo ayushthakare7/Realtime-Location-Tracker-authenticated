@@ -3,6 +3,7 @@ const Location = require("../models/Location");
 const LocationEvent = require("../models/LocationEvent");
 const Friendship = require("../models/Friendship");
 const { askGemini } = require("../services/gemini.service");
+const { retrieveLocationEvents } = require("../services/locationRag.service");
 
 exports.setSharing = async (req, res) => {
   try {
@@ -53,30 +54,61 @@ exports.listFriends = async (req, res) => {
     res.json({ success: true, friends, requests: requests.map(f => ({ id: String(f._id), username: f.requester.username })), sharingEnabled: Boolean(me && me.sharingEnabled) });
   } catch { res.status(500).json({ success: false, message: "Could not load friends." }); }
 };
+function distanceKm(aLat, aLon, bLat, bLon) {
+  const rad = value => value * Math.PI / 180;
+  const dLat = rad(bLat - aLat);
+  const dLon = rad(bLon - aLon);
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(rad(aLat)) * Math.cos(rad(bLat)) * Math.sin(dLon / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 exports.askMap = async (req, res) => {
   try {
     const question = String(req.body.question || "").trim();
     if (!question || question.length > 500) return res.status(400).json({ success: false, message: "Question must be 1-500 characters." });
-    if (req.body.aiConsent !== true) return res.status(400).json({ success: false, message: "Consent is required before sending location records to Gemini." });
+    if (req.body.aiConsent !== true) return res.status(400).json({ success: false, message: "Consent is required before sending location records to the assistant." });
+
     const uid = req.user.userId;
     const links = await Friendship.find({ status: "accepted", $or: [{ requester: uid }, { recipient: uid }] }).lean();
-    const ids = links.map(f => String(f.requester) === String(uid) ? f.recipient : f.requester);
-    const users = await User.find({ _id: { $in: ids }, sharingEnabled: true }).select("_id username").lean();
+    const friendIds = links.map(f => String(f.requester) === String(uid) ? f.recipient : f.requester);
+    const users = await User.find({ _id: { $in: friendIds }, sharingEnabled: true }).select("_id username").lean();
     const names = new Map(users.map(u => [String(u._id), u.username]));
     const visibleIds = users.map(u => u._id);
-    const [mine, others, history] = await Promise.all([
+
+    const [mine, others, events] = await Promise.all([
       Location.findOne({ userId: uid }).lean(),
       visibleIds.length ? Location.find({ userId: { $in: visibleIds } }).lean() : [],
-      LocationEvent.find({ $or: [{ userId: uid }, { userId: { $in: visibleIds } }] }).sort({ recordedAt: -1 }).limit(20).lean()
+      retrieveLocationEvents({ userIds: [uid, ...visibleIds], question, limit: 12 })
     ]);
-    const records = [];
-    if (mine) records.push({ owner: "you", latitude: mine.latitude, longitude: mine.longitude, at: mine.lastSeen });
-    for (const p of others) records.push({ owner: names.get(String(p.userId)), latitude: p.latitude, longitude: p.longitude, at: p.lastSeen });
-    for (const p of history) records.push({ owner: String(p.userId) === String(uid) ? "you" : names.get(String(p.userId)), latitude: p.latitude, longitude: p.longitude, at: p.recordedAt });
-    const prompt = "Answer the question only from this retrieved JSON. Do not infer addresses or routes from coordinates. Note missing or stale information.\nDATA=" + JSON.stringify(records) + "\nQUESTION=" + question;
+
+    // Exact distance is calculated by the backend; the assistant is not asked to infer it from raw coordinates.
+    const distances = [];
+    if (mine) {
+      for (const friend of others) {
+        const km = distanceKm(mine.latitude, mine.longitude, friend.latitude, friend.longitude);
+        distances.push({
+          username: names.get(String(friend.userId)) || friend.username,
+          distanceKm: Number(km.toFixed(2)),
+          measuredAt: friend.lastSeen,
+          meaning: "straight-line distance, not road distance"
+        });
+      }
+    }
+
+    const data = {
+      currentLocations: [
+        ...(mine ? [{ username: "you", lastSeen: mine.lastSeen }] : []),
+        ...others.map(p => ({ username: names.get(String(p.userId)) || p.username, lastSeen: p.lastSeen }))
+      ],
+      calculatedDistances: distances,
+      retrievedLocationEvents: events
+    };
+    const prompt = "You are Reva, a helpful location-history assistant. Answer only from the supplied data. Prefer retrieved location events for visit/history questions and calculatedDistances for distance questions. Distances are straight-line, not driving distance. Never invent a place name, event, time, or route. If evidence is missing, say so. Respect timestamps as recorded.\nDATA=" + JSON.stringify(data) + "\nQUESTION=" + question;
     const answer = await askGemini(prompt);
-    res.json({ success: true, answer: answer || "No answer from available records." });
+    res.json({ success: true, answer: answer || "I couldn't find enough information in the shared location history to answer that yet." });
   } catch (e) {
-    res.status(e.status === 429 ? 429 : 502).json({ success: false, message: "Ask My Map failed. Check Gemini API key and quota." });
+    console.error("Reva assistant error:", e);
+    res.status(e.status === 429 ? 429 : 502).json({ success: false, message: "Reva couldn't answer right now. Please try again." });
   }
 };
