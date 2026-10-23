@@ -4,6 +4,7 @@ const Friendship = require("../models/Friendship");
 const { askMap } = require("./trackerController");
 const { understandLocationQuestion } = require("../services/gemini.service");
 const { geocodePlace } = require("../services/geocoding.service");
+const { planDistanceQuestion } = require("../services/locationQueryPlanner.service");
 
 function distanceKm(aLat, aLon, bLat, bLon) {
   const rad = value => value * Math.PI / 180;
@@ -72,80 +73,67 @@ async function getCurrentLocation(userId) {
   return Location.findOne({ userId }).lean();
 }
 
+async function resolveEndpoint(req, type, name) {
+  if (type === "person" && name === "me") {
+    const location = await getCurrentLocation(req.user.userId);
+    return location ? { location, label: "you" } : { error: "I don't have your latest location." };
+  }
+  if (type === "person") {
+    const person = await resolveAuthorizedPerson(req.user.userId, name);
+    if (!person) return { error: `I couldn't find an accepted friend matching ${name || "that person"}.` };
+    if (String(person._id) !== String(req.user.userId) && !person.sharingEnabled) {
+      return { error: `${person.username} is not currently sharing their location.` };
+    }
+    const location = await getCurrentLocation(person._id);
+    if (!location) return { error: `I don't have a latest shared location for ${person.username}.` };
+    return { location, label: person.username };
+  }
+  if (type === "place" && name) {
+    const location = await geocodeCity(name);
+    if (!location) return { error: `I couldn't resolve "${name}" to a specific place. Try adding a country or region.` };
+    const region = [location.state, location.country].filter(Boolean).join(", ");
+    return { location, label: [location.name, region].filter(Boolean).join(", ") };
+  }
+  return { error: "I couldn't identify both endpoints. Please name the people or places." };
+}
+
 async function answerDistanceQuestion(req, parsed) {
-  let fromLocation;
-  let fromLabel;
-  let toLocation;
-  let toLabel;
+  const originType = parsed.originType || (parsed.origin === "place" ? "place" : "person");
+  const originName = parsed.origin === "me" ? "me" : (parsed.origin === "place" ? parsed.originPlace || parsed.originPerson : parsed.originPerson);
+  const origin = originType === "person" && parsed.origin === "me"
+    ? await resolveEndpoint(req, "person", "me")
+    : await resolveEndpoint(req, originType, originName);
+  if (origin.error) return origin.error;
 
-  if (parsed.origin === "me") {
-    fromLocation = await getCurrentLocation(req.user.userId);
-    fromLabel = "you";
-  } else if (parsed.origin === "friend") {
-    const friend = await resolveAuthorizedPerson(req.user.userId, parsed.originPerson);
-    if (!friend) return `I couldn't find an accepted friend matching ${parsed.originPerson || "that person"}.`;
-    if (!friend.sharingEnabled) return `${friend.username} is not currently sharing their location.`;
-    fromLocation = await getCurrentLocation(friend._id);
-    fromLabel = friend.username;
-  } else {
-    return null;
-  }
-
-  if (!fromLocation) {
-    return `I don't have a latest shared location for ${fromLabel}.`;
-  }
-
-  if (parsed.destinationType === "person") {
-    const person = await resolveAuthorizedPerson(req.user.userId, parsed.destination);
-    if (!person) return `I couldn't find an accepted friend matching ${parsed.destination || "that person"}.`;
-    if (!person.sharingEnabled) return `${person.username} is not currently sharing their location.`;
-    toLocation = await getCurrentLocation(person._id);
-    toLabel = person.username;
-    if (!toLocation) return `I don't have a latest shared location for ${toLabel}.`;
-  } else if (parsed.destinationType === "place" && parsed.destination) {
-    const destination = await geocodeCity(parsed.destination);
-    if (!destination) return `I couldn't resolve ${parsed.destination} to a specific place. Try adding a country or region, for example Colombo, Sri Lanka.`;
-    toLocation = destination;
-    toLabel = `${destination.name}${destination.state ? `, ${destination.state}` : ""}`;
-  } else {
-    return null;
-  }
+  const destinationType = parsed.destinationType || "person";
+  const destination = await resolveEndpoint(req, destinationType, parsed.destination);
+  if (destination.error) return destination.error;
 
   const straightLineKm = distanceKm(
-    fromLocation.latitude,
-    fromLocation.longitude,
-    toLocation.latitude,
-    toLocation.longitude
+    origin.location.latitude,
+    origin.location.longitude,
+    destination.location.latitude,
+    destination.location.longitude
   );
 
   try {
     const route = await getRoadRoute(
-      fromLocation.latitude,
-      fromLocation.longitude,
-      toLocation.latitude,
-      toLocation.longitude
+      origin.location.latitude,
+      origin.location.longitude,
+      destination.location.latitude,
+      destination.location.longitude
     );
-    return `${toLabel} is approximately ${route.distanceKm.toFixed(1)} km away from ${fromLabel} by road. Estimated driving time is about ${formatDuration(route.durationMinutes)}. Straight-line distance is ${straightLineKm.toFixed(1)} km.`;
+    return `${destination.label} is approximately ${route.distanceKm.toFixed(1)} km away from ${origin.label} by road. Estimated driving time is about ${formatDuration(route.durationMinutes)}. Straight-line distance is ${straightLineKm.toFixed(1)} km.`;
   } catch (error) {
     console.error("Road routing failed:", error.message);
-    return `${toLabel} is approximately ${straightLineKm.toFixed(2)} km away from ${fromLabel} in a straight line. I couldn't get a road route right now.`;
+    return `${destination.label} is approximately ${straightLineKm.toFixed(2)} km away from ${origin.label} in a straight line. I couldn't get a road route right now.`;
   }
 }
 
 
-function containsUsername(question, username) {
-  const normalizedQuestion = " " + String(question).toLowerCase().replace(/[^a-z0-9_]+/g, " ") + " ";
-  const normalizedUsername = " " + String(username).toLowerCase().replace(/[^a-z0-9_]+/g, " ") + " ";
-  return normalizedQuestion.includes(normalizedUsername);
-}
-
-// Resilient local fallback for when the language-model parser is unavailable.
-// Only accepted friends with sharing enabled are candidate people; execution
-// checks friendship and sharing permissions again before reading coordinates.
+// Local planning is a resilient fallback when the hosted language model is
+// unavailable or returns endpoints that do not match the user's words.
 async function fallbackParseDistanceQuestion(req, question) {
-  const distanceLike = /\b(distance|how far|far away|away from|separate|separation|closer|closest|nearest|nearer|nearby|kilomet(?:er|re)s?|miles?|met(?:er|re)s?)\b/i.test(question);
-  if (!distanceLike) return null;
-
   const links = await Friendship.find({
     status: "accepted",
     $or: [{ requester: req.user.userId }, { recipient: req.user.userId }]
@@ -153,52 +141,12 @@ async function fallbackParseDistanceQuestion(req, question) {
   const friendIds = links.map(link =>
     String(link.requester) === String(req.user.userId) ? link.recipient : link.requester
   );
-  const friends = await User.find({ _id: { $in: friendIds }, sharingEnabled: true })
-    .select("_id username")
-    .lean();
+  const friends = await User.find({
+    _id: { $in: friendIds },
+    sharingEnabled: true
+  }).select("_id username").lean();
 
-  const matchedFriends = friends
-    .filter(friend => containsUsername(question, friend.username))
-    .sort((a, b) => question.toLowerCase().indexOf(a.username.toLowerCase()) - question.toLowerCase().indexOf(b.username.toLowerCase()));
-
-  if (matchedFriends.length >= 2) {
-    return {
-      intent: "distance",
-      origin: "friend",
-      originPerson: matchedFriends[0].username,
-      destination: matchedFriends[1].username,
-      destinationType: "person"
-    };
-  }
-
-  const mentionsSelf = /\b(me|myself|my location|where i am|where am i)\b/i.test(question);
-  if (matchedFriends.length === 1) {
-    const friend = matchedFriends[0];
-    const withoutFriend = question.toLowerCase().split(friend.username.toLowerCase()).join(" ");
-    const place = withoutFriend
-      .replace(/\b(?:how|far|is|are|the|distance|between|from|to|of|for|me|myself|my|location|current|right|now|please|calculate|work|out|tell|what|would|be|in|at|and|away|separate|separation|closer|closest|nearest|nearer|nearby|kilometers?|kilometres?|kms?|miles?|meters?|metres?)\b/gi, " ")
-      .replace(/[?!,.;:]+/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-
-    if (mentionsSelf && !place) {
-      return { intent: "distance", origin: "me", originPerson: null, destination: friend.username, destinationType: "person" };
-    }
-    if (place) {
-      return { intent: "distance", origin: "friend", originPerson: friend.username, destination: place, destinationType: "place" };
-    }
-  }
-
-  if (mentionsSelf) {
-    const place = question
-      .replace(/\b(?:me|myself|my|i|am|where|how|far|is|are|the|distance|between|from|to|of|for|location|current|right|now|please|calculate|work|out|tell|what|would|be|in|at|and|away|kilometers?|kilometres?|kms?|miles?|meters?|metres?)\b/gi, " ")
-      .replace(/[?!,.;:]+/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    if (place) return { intent: "distance", origin: "me", originPerson: null, destination: place, destinationType: "place" };
-  }
-
-  return null;
+  return planDistanceQuestion(question, friends.map(friend => friend.username));
 }
 
 exports.ask = async (req, res) => {
