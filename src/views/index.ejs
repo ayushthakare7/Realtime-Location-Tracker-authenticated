@@ -21,9 +21,7 @@
     .reva-prompts{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 10px}.reva-prompts button{background:#eee8ff;color:#4b2b87;border:1px solid #d9ccff;border-radius:999px;font-size:12px;padding:7px 10px}
     #askForm button[type=submit]{background:linear-gradient(90deg,#6d28d9,#a21caf);font-weight:650;padding:11px 15px}
     #answer{margin-top:12px;padding:10px 0;line-height:1.55;white-space:pre-wrap}
-    .timeline-item{padding:10px 8px;border-bottom:1px solid #edf0f5;cursor:pointer;border-radius:8px}.timeline-item:hover{background:#f7f9fc}
     .switch-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0}.switch-row input{width:auto;margin:0}
-    .stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}.stat{padding:10px;border:1px solid #e4e9f0;border-radius:10px;background:#fafbfd}.stat strong{display:block;font-size:18px}
     @media(max-width:850px){main{grid-template-columns:1fr}#map{height:55vh;min-height:350px}}
   </style>
 </head>
@@ -47,12 +45,6 @@
       <div class="switch-row"><span>Store location history</span><input id="historyToggle" type="checkbox" checked></div>
       <p class="muted">When disabled, new GPS history points and semantic location events are not stored. Live sharing can still work.</p>
       <button id="deleteHistory" class="secondary">Delete my location history</button>
-    </section>
-    <section class="panel">
-      <h3>Movement summary</h3>
-      <div class="stats"><div class="stat"><strong id="dailySummary">—</strong><span class="muted">today</span></div><div class="stat"><strong id="timelineCount">Timeline</strong><span class="muted">click an event to locate it</span></div></div>
-      <button id="playTimeline">▶ Replay movement</button>
-      <div id="timeline" style="margin-top:8px">Loading timeline…</div>
     </section>
     <section class="panel reva-card">
       <div class="reva-brand"><h3 class="reva-title">Meet Reva</h3><div class="reva-subtitle">Your little guide to the places and moments that matter.</div></div>
