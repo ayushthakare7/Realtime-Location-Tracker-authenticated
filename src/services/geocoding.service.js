@@ -35,7 +35,7 @@ const COUNTRY_ALIASES = [
   { aliases: ["russia"], country: "russia", code: "ru" },
   { aliases: ["pakistan"], country: "pakistan", code: "pk" },
   { aliases: ["nepal"], country: "nepal", code: "np" },
-  { aliases: ["sri lanka"], country: "sri lanka", code: "lk" }
+  { aliases: ["sri lanka", "srilanka"], country: "sri lanka", code: "lk" }
 ];
 
 function detectCountry(query) {
