@@ -72,30 +72,30 @@ async function geocodePlace(input) {
   const placeTokens = queryTokens.filter(token => !countryWords.has(token));
   const requiredTokens = placeTokens.length ? placeTokens : queryTokens;
   const countryAliases = [
-    { aliases: ["india"], country: "india" },
-    { aliases: ["america", "american", "usa", "us", "united", "states"], country: "united states" },
-    { aliases: ["uk", "united", "kingdom", "britain", "great"], country: "united kingdom" },
-    { aliases: ["canada"], country: "canada" },
-    { aliases: ["australia"], country: "australia" },
-    { aliases: ["malaysia"], country: "malaysia" },
-    { aliases: ["singapore"], country: "singapore" },
-    { aliases: ["indonesia"], country: "indonesia" },
-    { aliases: ["thailand"], country: "thailand" },
-    { aliases: ["japan"], country: "japan" },
-    { aliases: ["china"], country: "china" },
-    { aliases: ["france"], country: "france" },
-    { aliases: ["germany"], country: "germany" },
-    { aliases: ["italy"], country: "italy" },
-    { aliases: ["spain"], country: "spain" },
-    { aliases: ["brazil"], country: "brazil" },
-    { aliases: ["mexico"], country: "mexico" },
-    { aliases: ["russia"], country: "russia" },
-    { aliases: ["pakistan"], country: "pakistan" },
-    { aliases: ["nepal"], country: "nepal" },
-    { aliases: ["sri", "lanka"], country: "sri lanka" }
+    { variants: [["india"]], country: "india" },
+    { variants: [["america"], ["american"], ["usa"], ["us"], ["united", "states"]], country: "united states" },
+    { variants: [["uk"], ["britain"], ["great", "britain"], ["united", "kingdom"]], country: "united kingdom" },
+    { variants: [["canada"]], country: "canada" },
+    { variants: [["australia"]], country: "australia" },
+    { variants: [["malaysia"]], country: "malaysia" },
+    { variants: [["singapore"]], country: "singapore" },
+    { variants: [["indonesia"]], country: "indonesia" },
+    { variants: [["thailand"]], country: "thailand" },
+    { variants: [["japan"]], country: "japan" },
+    { variants: [["china"]], country: "china" },
+    { variants: [["france"]], country: "france" },
+    { variants: [["germany"]], country: "germany" },
+    { variants: [["italy"]], country: "italy" },
+    { variants: [["spain"]], country: "spain" },
+    { variants: [["brazil"]], country: "brazil" },
+    { variants: [["mexico"]], country: "mexico" },
+    { variants: [["russia"]], country: "russia" },
+    { variants: [["pakistan"]], country: "pakistan" },
+    { variants: [["nepal"]], country: "nepal" },
+    { variants: [["sri", "lanka"]], country: "sri lanka" }
   ];
   const expectedCountry = countryAliases.find(entry =>
-    entry.aliases.every(token => queryTokens.includes(token))
+    entry.variants.some(variant => variant.every(token => queryTokens.includes(token)))
   )?.country || null;
   const resultText = item => {
     const address = item.address || {};
