@@ -1,7 +1,9 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const Location = require("../models/Location");
-const LocationEvent = require("../models/LocationEvent");
+const LocationPoint = require("../models/LocationPoint");
+const LocationVisit = require("../models/LocationVisit");
+const { processLocationEvent } = require("../services/locationEvents.service");
 const Friendship = require("../models/Friendship");
 
 module.exports = (io) => {
@@ -40,7 +42,8 @@ module.exports = (io) => {
         if (!user || !user.sharingEnabled) return;
         const now = new Date();
         await Location.findOneAndUpdate({ userId }, { userId, username: user.username || username, latitude, longitude, lastSeen: now }, { upsert: true, new: true });
-        await LocationEvent.create({ userId, username: user.username || username, latitude, longitude, recordedAt: now });
+        await LocationPoint.create({ userId, username: user.username || username, latitude, longitude, recordedAt: now });
+        await processLocationEvent({ userId, username: user.username || username, latitude, longitude, recordedAt: now });
         const links = await Friendship.find({ status: "accepted", $or: [{ requester: userId }, { recipient: userId }] }).lean();
         const friendIds = links.map(f => String(f.requester) === String(userId) ? f.recipient : f.requester);
         const recipients = await User.find({ _id: { $in: friendIds }, sharingEnabled: true }).select("_id").lean();
