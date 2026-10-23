@@ -9,7 +9,7 @@
     "rag:setup": "node scripts/setup-rag.js",
     "history:regeocode": "node scripts/regeocode-history.js",
     "test": "node --test",
-    "rag:start": "python -m uvicorn main:app --app-dir rag_service --host 127.0.0.1 --port 8001"
+    "rag:start": "python rag_service/main.py"
   },
   "keywords": [],
   "author": "",
