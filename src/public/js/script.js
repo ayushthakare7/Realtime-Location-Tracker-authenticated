@@ -41,10 +41,14 @@ function connectSocket() {
   socket.on("sharing-status", data => { if (!sharing) setStatus(data.enabled ? "Your sharing is enabled on this account." : "Sharing is off until you opt in."); });
   socket.on("receive-location", data => upsertMarker(data));
   socket.on("sharing-stopped", data => { if (data && data.userId) removeMarker(data.userId); });
+  socket.on("friend-request-received", data => {
+    if (data && data.username) setStatus("New friend request from " + data.username + ".");
+    loadFriends();
+  });
 }
 connectSocket();
 
-async function loadFriends() {
+async function loadFriends({ quiet = false } = {}) {
   try {
     const data = await api("/friends");
     const friendRoot = document.getElementById("friends");
@@ -86,8 +90,8 @@ async function loadFriends() {
       });
     }
     sharing = Boolean(data.sharingEnabled);
-    setStatus(sharing ? "Sharing is enabled. Accepted friends can see your latest location." : "Sharing is off. Your location is not being broadcast.");
-  } catch (e) { setStatus(e.message); }
+    if (!quiet) setStatus(sharing ? "Sharing is enabled. Accepted friends can see your latest location." : "Sharing is off. Your location is not being broadcast.");
+  } catch (e) { if (!quiet) setStatus(e.message); }
 }
 
 async function setSharing(enabled) {
@@ -137,3 +141,5 @@ document.getElementById("askForm").addEventListener("submit", async event => {
   } catch (e) { answer.textContent = e.message; }
 });
 loadFriends();
+// Fallback refresh for missed socket events and updated friend locations.
+setInterval(() => loadFriends({ quiet: true }), 15000);
