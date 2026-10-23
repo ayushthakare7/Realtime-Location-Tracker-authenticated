@@ -221,6 +221,10 @@ async function answerNearestPerson(req, parsed) {
 // Local planning is a resilient fallback when the hosted language model is
 // unavailable or returns endpoints that do not match the user's words.
 async function fallbackParseDistanceQuestion(req, question) {
+  if (!/\\b(distance|how far|far away|away from|separation|separate|closer|closest|nearest|nearer|nearby|farthest|furthest|kilomet(?:er|re)s?|kms?|miles?|met(?:er|re)s?)\\b/i.test(question)) {
+    return null;
+  }
+
   const links = await Friendship.find({
     status: "accepted",
     $or: [{ requester: req.user.userId }, { recipient: req.user.userId }]
