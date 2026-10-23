@@ -3,6 +3,7 @@ const User = require("../models/User");
 const Friendship = require("../models/Friendship");
 const { askMap } = require("./trackerController");
 const { understandLocationQuestion } = require("../services/gemini.service");
+const { geocodePlace } = require("../services/geocoding.service");
 
 function distanceKm(aLat, aLon, bLat, bLon) {
   const rad = value => value * Math.PI / 180;
@@ -13,125 +14,10 @@ function distanceKm(aLat, aLon, bLat, bLon) {
 }
 
 async function geocodeCity(city) {
-  const place = String(city || "").trim();
-  if (!place) {
-    console.warn("[Geocoding] Empty destination received.");
-    return null;
-  }
-
-  // Common-city fallback coordinates keep distance questions working if the
-  // public geocoding service is unavailable. Coordinates are approximate city centers.
-  const cityFallbacks = {
-    "nagpur": { latitude: 21.1458, longitude: 79.0882, name: "Nagpur", state: "Maharashtra" },
-    "pune": { latitude: 18.5204, longitude: 73.8567, name: "Pune", state: "Maharashtra" },
-    "mumbai": { latitude: 19.0760, longitude: 72.8777, name: "Mumbai", state: "Maharashtra" },
-    "delhi": { latitude: 28.6139, longitude: 77.2090, name: "Delhi", state: "Delhi" },
-    "new delhi": { latitude: 28.6139, longitude: 77.2090, name: "New Delhi", state: "Delhi" },
-    "bengaluru": { latitude: 12.9716, longitude: 77.5946, name: "Bengaluru", state: "Karnataka" },
-    "bangalore": { latitude: 12.9716, longitude: 77.5946, name: "Bengaluru", state: "Karnataka" },
-    "hyderabad": { latitude: 17.3850, longitude: 78.4867, name: "Hyderabad", state: "Telangana" },
-    "chennai": { latitude: 13.0827, longitude: 80.2707, name: "Chennai", state: "Tamil Nadu" },
-    "kolkata": { latitude: 22.5726, longitude: 88.3639, name: "Kolkata", state: "West Bengal" },
-    "ahmedabad": { latitude: 23.0225, longitude: 72.5714, name: "Ahmedabad", state: "Gujarat" },
-    "jaipur": { latitude: 26.9124, longitude: 75.7873, name: "Jaipur", state: "Rajasthan" },
-    "bhopal": { latitude: 23.2599, longitude: 77.4126, name: "Bhopal", state: "Madhya Pradesh" },
-    "raipur": { latitude: 21.2514, longitude: 81.6296, name: "Raipur", state: "Chhattisgarh" }
-  };
-  const fallback = cityFallbacks[place.toLocaleLowerCase("en-IN")];
-
   try {
-    const url = new URL("https://nominatim.openstreetmap.org/search");
-    url.searchParams.set("format", "jsonv2");
-    url.searchParams.set("q", `${place}, India`);
-    url.searchParams.set("countrycodes", "in");
-    url.searchParams.set("limit", "5");
-    url.searchParams.set("addressdetails", "1");
-
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "PrivacyAwareLocationTracker/1.0 (city geocoding)"
-      },
-      signal: AbortSignal.timeout(10000)
-    });
-
-    if (!response.ok) {
-      console.error(
-        "[Geocoding] Nominatim returned HTTP",
-        response.status,
-        response.statusText
-      );
-      return fallback ? { ...fallback, country: "India" } : null;
-    }
-
-    const results = await response.json();
-    if (!Array.isArray(results) || results.length === 0) {
-      console.warn("[Geocoding] No India results for destination:", place);
-      return fallback ? { ...fallback, country: "India" } : null;
-    }
-
-    // Prefer a city/town/municipality match when Nominatim returns several results.
-    const normalizedPlace = place.toLocaleLowerCase("en-IN");
-    const result = results.find(item => {
-      const address = item.address || {};
-      const names = [
-        address.city,
-        address.town,
-        address.municipality,
-        address.village,
-        item.name,
-        item.display_name?.split(",")[0]
-      ].filter(Boolean).map(value => String(value).toLocaleLowerCase("en-IN"));
-      return names.includes(normalizedPlace);
-    }) || results[0];
-
-    const latitude = Number(result.lat);
-    const longitude = Number(result.lon);
-    if (
-      !Number.isFinite(latitude) ||
-      !Number.isFinite(longitude) ||
-      latitude < -90 || latitude > 90 ||
-      longitude < -180 || longitude > 180
-    ) {
-      console.error("[Geocoding] Invalid coordinates returned for:", place);
-      return null;
-    }
-
-    const address = result.address || {};
-    const resolvedName =
-      address.city ||
-      address.town ||
-      address.municipality ||
-      address.village ||
-      result.name ||
-      place;
-
-    console.info(
-      "[Geocoding] Resolved destination:",
-      place,
-      "->",
-      resolvedName,
-      latitude,
-      longitude
-    );
-
-    return {
-      latitude,
-      longitude,
-      name: resolvedName,
-      state: address.state || null,
-      country: address.country || "India"
-    };
+    return await geocodePlace(city);
   } catch (error) {
-    console.error(
-      "[Geocoding] Request failed for",
-      place,
-      "-",
-      error.message
-    );
-    if (fallback) {
-      console.warn("[Geocoding] Using built-in city coordinates for:", place);
-      return { ...fallback, country: "India" };
-    }
+    console.error("[Geocoding] Failed to resolve destination:", error.message);
     return null;
   }
 }
