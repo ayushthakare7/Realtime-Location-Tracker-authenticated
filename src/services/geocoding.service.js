@@ -20,13 +20,17 @@ function asPlace(record) {
  */
 async function geocodePlace(input) {
   const query = String(input || "").trim();
-  // "America" is commonly used to mean the United States in conversational queries.
-  const searchQuery = /^(america|usa|u\.s\.a\.?|us)$/i.test(query)
-    ? "United States of America"
-    : query;
-  // Cache by the normalized search target, not the raw alias. This prevents
-  // stale "america" entries from the former India-only search returning an Indian city.
-  const normalizedQuery = normalizeQuery(searchQuery);
+  // Normalize common country aliases so Nominatim gets an unambiguous global query.
+  let searchQuery = query
+    .replace(/\bU\.S\.A\.?\b/ig, "United States")
+    .replace(/\bUSA\b/ig, "United States")
+    .replace(/\bU\.S\.?\b/ig, "United States")
+    .replace(/\bUK\b/ig, "United Kingdom");
+  if (/^(america|usa|u\.s\.a\.?|us)$/i.test(query)) {
+    searchQuery = "United States of America";
+  }
+  // Version the cache key so old India-only cached coordinates cannot be reused.
+  const normalizedQuery = "world-v2:" + normalizeQuery(searchQuery);
   if (!normalizedQuery) return null;
 
   const cached = await GeocodedPlace.findOne({ normalizedQuery }).lean();
