@@ -42,17 +42,9 @@ function detectCountry(query) {
   const normalized = normalizeQuery(query);
   for (const entry of COUNTRY_ALIASES) {
     for (const alias of entry.aliases) {
-      // Match whole words only: "us" must not be inferred from "user2".
-      const escaped = alias.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\function detectCountry(query) {
-  const normalized = normalizeQuery(query);
-  for (const entry of COUNTRY_ALIASES) {
-    for (const alias of entry.aliases) {
-      if (normalized.includes(alias)) return { ...entry, matchedAlias: alias };
-    }
-  }
-  return null;
-}");
-      if (new RegExp("\\\\b" + escaped + "\\\\b", "i").test(normalized)) {
+      // Whole-word matching prevents "us" from matching the username "user2".
+      const pattern = "(^|[^a-z])" + alias.split(" ").join("\\s+") + "([^a-z]|$)";
+      if (new RegExp(pattern, "i").test(normalized)) {
         return { ...entry, matchedAlias: alias };
       }
     }
@@ -62,11 +54,8 @@ function detectCountry(query) {
 
 function removeCountry(query, countryMatch) {
   if (!countryMatch) return String(query || "").trim();
-  const lower = query.toLocaleLowerCase("en-IN");
-  const index = lower.indexOf(countryMatch.matchedAlias);
-  if (index < 0) return String(query || "").trim();
-  return (query.slice(0, index) + " " + query.slice(index + countryMatch.matchedAlias.length))
-    .replace(/[,;\s]+/g, " ").trim();
+  const pattern = "(^|[^a-z])" + countryMatch.matchedAlias.split(" ").join("\\s+") + "([^a-z]|$)";
+  return String(query || "").replace(new RegExp(pattern, "i"), " ").replace(/[,;\s]+/g, " ").trim();
 }
 
 function placeMatches(item, placeQuery, countryMatch) {
@@ -85,9 +74,8 @@ function placeMatches(item, placeQuery, countryMatch) {
 }
 
 /**
- * Resolve a place globally with OpenStreetMap Nominatim. If a country is
- * explicitly named, constrain the lookup to that country. Reject unrelated
- * provider results rather than returning a plausible-looking wrong distance.
+ * Resolve a place globally with OpenStreetMap Nominatim. An explicitly named
+ * country constrains the lookup; unrelated provider results are rejected.
  */
 async function geocodePlace(input) {
   const query = String(input || "").trim();
@@ -97,15 +85,12 @@ async function geocodePlace(input) {
   const countryMatch = detectCountry(query);
   const placeQuery = removeCountry(query, countryMatch) || query;
 
-  // Do not reuse old cache entries if their name/country doesn't match this query.
+  // Validate cache entries too; older versions may have cached a wrong place.
   const cached = await GeocodedPlace.findOne({ normalizedQuery }).lean();
   if (cached) {
     const cachedName = normalizeQuery(cached.name);
     const requestedName = normalizeQuery(placeQuery);
-    const nameMatches = requestedName && (
-      cachedName === requestedName ||
-      requestedName.split(/\s+/).every(token => cachedName.includes(token))
-    );
+    const nameMatches = requestedName && requestedName.split(/\s+/).every(token => cachedName.includes(token));
     const countryMatches = !countryMatch || normalizeQuery(cached.country) === countryMatch.country;
     if (nameMatches && countryMatches) return asPlace(cached);
   }
