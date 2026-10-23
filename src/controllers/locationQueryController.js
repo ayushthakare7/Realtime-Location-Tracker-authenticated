@@ -133,6 +133,50 @@ async function answerDistanceQuestion(req, parsed) {
   }
 }
 
+async function inferFriendPlaceDistanceIntent(question, currentUserId) {
+  const q = String(question || "").trim();
+  if (!/\\b(distance|far|apart|kilomet(?:er|re)s?|miles?|how long|travel time|drive|driving)\\b/i.test(q)) return null;
+
+  const friendships = await Friendship.find({
+    status: "accepted",
+    $or: [{ requester: currentUserId }, { recipient: currentUserId }]
+  }).select("requester recipient").lean();
+  const ids = friendships.map(f => String(f.requester) === String(currentUserId) ? f.recipient : f.requester);
+  const friends = await User.find({ _id: { $in: ids } }).select("_id username").lean();
+  const lower = q.toLocaleLowerCase("en");
+  const matches = friends
+    .filter(person => {
+      const name = String(person.username || "");
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\function inferPlaceDistanceIntent(question) {");
+      return new RegExp("(^|[^a-z0-9_])" + escaped + "([^a-z0-9_]|$)", "i").test(q);
+    })
+    .sort((a, b) => lower.indexOf(a.username.toLocaleLowerCase("en")) - lower.indexOf(b.username.toLocaleLowerCase("en")));
+  if (matches.length !== 1) return null;
+
+  const friend = matches[0];
+  const name = friend.username;
+  const index = lower.indexOf(name.toLocaleLowerCase("en"));
+  const before = q.slice(0, index).trim();
+  const after = q.slice(index + name.length).trim();
+  const cleanPlace = value => value
+    .replace(/^[\\s,;:.-]*(?:(?:how\\s+far\\s+is|how\\s+far|how\\s+long\\s+is|what\\s+is\\s+the\\s+distance|distance\\s+between|distance\\s+from|calculate\\s+(?:the\\s+)?distance|tell\\s+me\\s+the\\s+distance)\\s+)?/i, "")
+    .replace(/^[\\s,;:.-]*(?:from|to|and|of|in)\\s+/i, "")
+    .replace(/\\s+(?:from|to|away|by\\s+road|in\\s+a\\s+straight\\s+line)\\s*$/i, "")
+    .replace(/[?.!,;:]+$/g, "")
+    .trim();
+  const placeBefore = cleanPlace(before);
+  const placeAfter = cleanPlace(after);
+  const candidate = placeBefore || placeAfter;
+  if (!candidate || /^(me|myself|you|user)$/i.test(candidate)) return null;
+  return {
+    intent: "distance",
+    origin: "friend",
+    originPerson: name,
+    destination: candidate,
+    destinationType: "place"
+  };
+}
+
 function inferPlaceDistanceIntent(question) {
   const q = String(question || "").trim().replace(/[?.!]+$/g, "");
   if (!/\b(distance|far|apart|kilomet(?:er|re)s?|miles?|how long|travel time|drive|driving)\b/i.test(q)) return null;
@@ -157,6 +201,7 @@ exports.ask = async (req, res) => {
     // LLM understands the open-ended question; deterministic code then performs
     // authorization, coordinate resolution, Haversine distance, and road routing.
     const parsed = inferPlaceDistanceIntent(question)
+      || await inferFriendPlaceDistanceIntent(question, req.user.userId)
       || await inferPersonDistanceIntent(question, req.user.userId)
       || await understandLocationQuestion(question);
 
