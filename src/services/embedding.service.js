@@ -1,5 +1,3 @@
-const { pipeline } = require("@huggingface/transformers");
-
 const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || "Xenova/all-MiniLM-L6-v2";
 const EMBEDDING_DIMENSIONS = 384;
 
@@ -7,9 +5,9 @@ let extractorPromise;
 
 async function getExtractor() {
   if (!extractorPromise) {
-    extractorPromise = pipeline("feature-extraction", EMBEDDING_MODEL, {
-      dtype: "fp32"
-    });
+    extractorPromise = import("@huggingface/transformers").then(({ pipeline }) =>
+      pipeline("feature-extraction", EMBEDDING_MODEL, { dtype: "fp32" })
+    );
   }
   return extractorPromise;
 }
