@@ -58,4 +58,4 @@ Examples:
   return parsed;
 }
 
-module.exports = { understandLocationQuestion };
+module.exports = { understandLocationQuestion, groqChat };
