@@ -193,6 +193,6 @@ setInterval(() => { if (historyEnabled) loadTimeline(); }, 30000);
 document.querySelectorAll("[data-question]").forEach(button => button.addEventListener("click", () => { document.getElementById("question").value = button.dataset.question; document.getElementById("question").focus(); }));
 
 document.getElementById("currentLocationPrompt").addEventListener("click", () => {
-  document.getElementById("question").value = "Where am I currently?";
+  document.getElementById("question").value = "Where is you currently?";
   document.getElementById("question").focus();
 });
