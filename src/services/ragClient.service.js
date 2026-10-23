@@ -1,15 +1,15 @@
 const RAG_SERVICE_URL = (process.env.RAG_SERVICE_URL || "http://127.0.0.1:8001").replace(/\/$/, "");
 
-async function askRagService({ question, userIds, context }) {
+async function requestRag(path, body = {}) {
   const token = process.env.RAG_SERVICE_TOKEN;
   if (!token) throw new Error("RAG_SERVICE_TOKEN is missing");
-  const response = await fetch(`${RAG_SERVICE_URL}/ask`, {
+  const response = await fetch(`${RAG_SERVICE_URL}${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`
     },
-    body: JSON.stringify({ question, authorizedUserIds: userIds.map(String), context }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(Number(process.env.RAG_SERVICE_TIMEOUT_MS) || 30000)
   });
   const payload = await response.json().catch(() => ({}));
@@ -21,4 +21,16 @@ async function askRagService({ question, userIds, context }) {
   return payload;
 }
 
-module.exports = { askRagService };
+async function askRagService({ question, userIds, context }) {
+  return requestRag("/ask", { question, authorizedUserIds: userIds.map(String), context });
+}
+
+async function indexLocationEvent(eventId) {
+  return requestRag("/index-event", { eventId: String(eventId) });
+}
+
+async function reindexLocationEvents() {
+  return requestRag("/reindex");
+}
+
+module.exports = { askRagService, indexLocationEvent, reindexLocationEvents };
