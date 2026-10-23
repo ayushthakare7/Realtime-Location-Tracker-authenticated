@@ -24,15 +24,25 @@ function extractCityDistanceTarget(question) {
 }
 
 function extractCityDistanceFromFriend(question) {
-  const match = String(question || "").match(/\bhow\s+far\s+is\s+(.+?)\s+from\s+(?:my\s+)?friend\s+([a-z0-9_]+)\b/i);
-  if (!match) return null;
-  const city = match[1]
-    .replace(/\b(?:the|city)\b/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  const username = match[2].trim();
-  if (!city || city.length > 80 || !username) return null;
-  return { city, username };
+  const text = String(question || "").trim();
+  const patterns = [
+    /\bhow\s+far\s+is\s+(.+?)\s+from\s+(?:my\s+)?friend\s+([a-z0-9_]+)\b/i,
+    /\bhow\s+much\s+distance\s+is\s+(.+?)\s+from\s+(?:my\s+)?(?:friend\s+)?([a-z0-9_]+)\b/i,
+    /\bdistance\s+(?:is\s+)?(.+?)\s+from\s+(?:my\s+)?(?:friend\s+)?([a-z0-9_]+)\b/i,
+    /\bhow\s+many\s*(?:km|kilometers?|kilometres?|miles?)\s+(?:is|are)\s+(.+?)\s+from\s+(?:my\s+)?(?:friend\s+)?([a-z0-9_]+)\b/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (!match) continue;
+    const city = match[1]
+      .replace(/\b(?:the|city)\b/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const username = match[2].trim();
+    if (city && city.length <= 80 && username) return { city, username };
+  }
+  return null;
 }
 
 async function geocodeCity(city) {
