@@ -249,6 +249,11 @@ exports.ask = async (req, res) => {
     return res.status(400).json({ success: false, message: "Consent is required before sending location records to the assistant." });
   }
 
+  // Reva history and general questions belong to the Python RAG microservice.
+  // Keep Node's LLM-based parsing limited to distance questions that the local planner cannot parse.
+  const distanceIntent = /\b(distance|how far|far away|away from|separation|separate|closer|closest|nearest|nearer|nearby|farthest|furthest|kilomet(?:er|re)s?|kms?|miles?|met(?:er|re)s?)\b/i.test(question);
+  if (!distanceIntent) return askMap(req, res);
+
   let parsed = null;
 
   // First try the fast local planner. Common distance and comparison questions
