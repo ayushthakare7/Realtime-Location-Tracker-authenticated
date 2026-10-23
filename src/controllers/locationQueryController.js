@@ -133,8 +133,10 @@ async function answerDistanceQuestion(req, parsed) {
 }
 
 
-function escapeRegex(value) {
-  return String(value).replace(/[.*+?^$()|[\]\\]/g, "\\exports.ask = async (req, res) => {");
+function containsUsername(question, username) {
+  const normalizedQuestion = " " + String(question).toLowerCase().replace(/[^a-z0-9_]+/g, " ") + " ";
+  const normalizedUsername = " " + String(username).toLowerCase().replace(/[^a-z0-9_]+/g, " ") + " ";
+  return normalizedQuestion.includes(normalizedUsername);
 }
 
 // Resilient local fallback for when the language-model parser is unavailable.
@@ -156,7 +158,7 @@ async function fallbackParseDistanceQuestion(req, question) {
     .lean();
 
   const matchedFriends = friends
-    .filter(friend => new RegExp("(^|[^a-z0-9_])" + escapeRegex(friend.username) + "([^a-z0-9_]|$)", "i").test(question))
+    .filter(friend => containsUsername(question, friend.username))
     .sort((a, b) => question.toLowerCase().indexOf(a.username.toLowerCase()) - question.toLowerCase().indexOf(b.username.toLowerCase()));
 
   if (matchedFriends.length >= 2) {
@@ -172,7 +174,7 @@ async function fallbackParseDistanceQuestion(req, question) {
   const mentionsSelf = /\b(me|myself|my location|where i am|where am i)\b/i.test(question);
   if (matchedFriends.length === 1) {
     const friend = matchedFriends[0];
-    const withoutFriend = question.replace(new RegExp(escapeRegex(friend.username), "ig"), " ");
+    const withoutFriend = question.toLowerCase().split(friend.username.toLowerCase()).join(" ");
     const place = withoutFriend
       .replace(/\b(?:how|far|is|are|the|distance|between|from|to|of|for|me|myself|my|location|current|right|now|please|calculate|work|out|tell|what|would|be|in|at|and|away|separate|separation|closer|closest|nearest|nearer|nearby|kilometers?|kilometres?|kms?|miles?|meters?|metres?)\b/gi, " ")
       .replace(/[?!,.;:]+/g, " ")
