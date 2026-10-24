@@ -115,7 +115,7 @@ exports.appendEvents = async (req, res) => {
         await notifyJourneyRecipients({
           io,
           journey,
-          recipients: journey.sharedWith,
+          recipients: journey.sharingEnabled ? journey.sharedWith : [],
           type: "journey_arrived",
           title: "Your friend has arrived",
           body: journey.travellerUsername + " has arrived at " + (journey.destination?.label || journey.destinationText) + ".",
@@ -126,7 +126,7 @@ exports.appendEvents = async (req, res) => {
         await notifyJourneyRecipients({
           io,
           journey,
-          recipients: journey.sharedWith,
+          recipients: journey.sharingEnabled ? journey.sharedWith : [],
           type: "journey_safe_followup",
           title: "Your friend checked in",
           body: journey.travellerUsername + " has responded to the safety check-in. Their journey may still be in progress.",
@@ -151,7 +151,7 @@ exports.appendEvents = async (req, res) => {
         locationFreshness: result.body.locationFreshness,
         arrivedAt: journey.arrivedAt
       };
-      for (const recipientId of journey.sharedWith || []) {
+      for (const recipientId of (journey.sharingEnabled ? journey.sharedWith : []) || []) {
         io?.to("user:" + recipientId).emit("journey-update", payload);
         if (journey.status === "ARRIVED") io?.to("user:" + recipientId).emit("journey-arrived", {
           journeyId: String(journey._id),
@@ -215,13 +215,13 @@ exports.cancelJourney = async (req, res) => {
     journey.cancelledAt = new Date();
     await journey.save();
     await notifyJourneyRecipients({
-      io: req.app.get("io"), journey, recipients: journey.sharedWith,
+      io: req.app.get("io"), journey, recipients: journey.sharingEnabled ? journey.sharedWith : [],
       type: "journey_cancelled", title: "Journey cancelled",
       body: journey.travellerUsername + " cancelled their shared journey.",
       payload: { journeyId: String(journey._id), status: journey.status }, keySuffix: "cancelled"
     });
     const io = req.app.get("io");
-    for (const recipientId of journey.sharedWith || []) {
+    for (const recipientId of (journey.sharingEnabled ? journey.sharedWith : []) || []) {
       io?.to("user:" + recipientId).emit("journey-update", {
         journeyId: String(journey._id),
         travellerId: String(journey.travellerId),
@@ -241,8 +241,7 @@ exports.cancelJourney = async (req, res) => {
 exports.listMine = async (req, res) => {
   try {
     const journeys = await SafetyJourney.find({
-      $or: [{ travellerId: req.user.userId }, { sharedWith: req.user.userId }],
-      sharingEnabled: true
+      $or: [{ travellerId: req.user.userId }, { sharedWith: req.user.userId, sharingEnabled: true }]
     }).sort({ createdAt: -1 }).limit(100).lean();
     return res.json({
       success: true,
@@ -269,7 +268,7 @@ exports.listMine = async (req, res) => {
 exports.getOne = async (req, res) => {
   try {
     const journey = await getJourneyForViewer(req.params.id, req.user.userId);
-    if (!journey || !journey.sharingEnabled) {
+    if (!journey || (!journey.sharingEnabled && journey.travellerId !== String(req.user.userId))) {
       return res.status(404).json({ success: false, message: "Journey not found or not shared with you." });
     }
     return res.json({ success: true, journey });
