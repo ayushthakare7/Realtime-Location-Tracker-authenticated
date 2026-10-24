@@ -1018,3 +1018,15 @@ body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.3
 .safety-travel-link { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; margin-top: 14px; padding: 12px 15px; border-radius: 12px; background: var(--sage-dark); color: #fff; text-decoration: none; font-weight: 700; box-shadow: 0 6px 16px rgba(49,87,72,.13); transition: transform .18s ease, background .18s ease; }
 .safety-travel-link:hover { background: #264a3b; transform: translateY(-1px); }
 .safety-entry-note { margin: 10px 0 0; color: #8a958b; font-size: 11px; }
+
+
+/* Shared Safety Travel journeys on the existing friend radar */
+.shared-journeys-panel{margin-bottom:18px}
+.shared-journeys-list{display:grid;gap:10px}
+.shared-journey-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 0;border-top:1px solid #e8ece7}
+.shared-journey-row strong{display:block;color:#263c30;font-size:13px}
+.shared-journey-row p{margin:4px 0 0;color:#68776d;font-size:12px;line-height:1.5}
+.shared-journey-view{flex:0 0 auto;padding:8px 11px;font-size:12px}
+.reva-journey-pin{display:grid;place-items:center;width:30px;height:30px;border:2px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#6b5bd2;color:#fff;box-shadow:0 2px 10px #1e2b2440;font-size:16px}
+.reva-journey-pin::first-letter{transform:rotate(45deg)}
+@media(max-width:560px){.shared-journey-row{align-items:flex-start;flex-wrap:wrap}.shared-journey-view{margin-left:auto}}
