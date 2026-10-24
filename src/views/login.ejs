@@ -97,31 +97,57 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
     }).addTo(authMap);
     setTimeout(() => authMap.invalidateSize(false), 100);
 
-    // Gentle, alternating map drift adds life without distracting from the form.
+    // Continuous, low-speed world-map drift with no stop/start animation cycles.
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    if (!reducedMotion.matches) {
-      let driftForward = true;
-      let driftTimer;
-      const drift = () => {
-        if (document.hidden || reducedMotion.matches) {
-          driftTimer = setTimeout(drift, 3000);
-          return;
-        }
-        authMap.panBy(driftForward ? [150, 58] : [-150, -58], {
-          animate: true,
-          duration: 12
-        });
-        driftForward = !driftForward;
-        driftTimer = setTimeout(drift, 14500);
-      };
-      driftTimer = setTimeout(drift, 1800);
-      document.addEventListener("visibilitychange", () => {
-        if (document.hidden) clearTimeout(driftTimer);
-      });
-      reducedMotion.addEventListener?.("change", event => {
-        if (event.matches) clearTimeout(driftTimer);
-      });
-    }
+    let animationFrame = null;
+    let previousFrame = 0;
+    let horizontalCarry = 0;
+    let verticalCarry = 0;
+
+    const animateWorldMap = (timestamp) => {
+      if (reducedMotion.matches || document.hidden) {
+        animationFrame = null;
+        previousFrame = 0;
+        return;
+      }
+      if (!previousFrame) previousFrame = timestamp;
+      const elapsed = Math.min(timestamp - previousFrame, 50);
+      previousFrame = timestamp;
+
+      // Move at a steady pace; fractional pixels are accumulated to avoid jitter.
+      horizontalCarry += elapsed * 0.018;
+      verticalCarry += elapsed * 0.003;
+      const dx = Math.trunc(horizontalCarry);
+      const dy = Math.trunc(verticalCarry);
+      if (dx !== 0 || dy !== 0) {
+        horizontalCarry -= dx;
+        verticalCarry -= dy;
+        authMap.panBy([dx, dy], { animate: false, noMoveStart: true });
+      }
+      animationFrame = window.requestAnimationFrame(animateWorldMap);
+    };
+
+    const startMapMotion = () => {
+      if (!reducedMotion.matches && !document.hidden && animationFrame === null) {
+        previousFrame = 0;
+        animationFrame = window.requestAnimationFrame(animateWorldMap);
+      }
+    };
+    const stopMapMotion = () => {
+      if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
+      animationFrame = null;
+      previousFrame = 0;
+    };
+
+    startMapMotion();
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) stopMapMotion();
+      else startMapMotion();
+    });
+    reducedMotion.addEventListener?.("change", () => {
+      if (reducedMotion.matches) stopMapMotion();
+      else startMapMotion();
+    });
 
   })();
 </script>
