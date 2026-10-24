@@ -88,20 +88,24 @@ window.RevaSafetyTravelOffline = Object.freeze({
   },
   async recordLocation(journeyId, position) {
     if (!position || !position.coords) throw new Error("A valid GPS position is required.");
+    const recordedAt = new Date(position.timestamp || Date.now()).toISOString();
+    try { localStorage.setItem("reva-safety-travel-last-gps-at", recordedAt); } catch (_) {}
+    updateLastGpsStatus();
     return this.recordEvent(journeyId, {
       type: "location",
       latitude: position.coords.latitude,
       longitude: position.coords.longitude,
       accuracyMeters: position.coords.accuracy,
-      recordedAt: new Date(position.timestamp || Date.now()).toISOString()
+      recordedAt
     });
   },
   async recordConnection(journeyId, online) {
     return this.recordEvent(journeyId, { type: online ? "online" : "offline", recordedAt: new Date().toISOString() });
   },
-  startTracking(journeyId) {
+  startTracking(journeyId, approval) {
     if (!navigator.geolocation) throw new Error("GPS is not supported by this browser.");
-    if (!/^[a-f\\d]{24}$/i.test(String(journeyId || ""))) throw new Error("Start tracking only after the backend confirms an approved journey.");
+    if (!approval || approval.approved !== true || approval.consent !== true) throw new Error("Explicit user consent and backend route approval are required before GPS tracking.");
+    if (!/^[a-f\d]{24}$/i.test(String(journeyId || ""))) throw new Error("Start tracking only after the backend confirms an approved journey.");
     if (gpsWatchId !== null) navigator.geolocation.clearWatch(gpsWatchId);
     trackingJourneyId = String(journeyId);
     void this.recordConnection(trackingJourneyId, navigator.onLine).catch(() => {});
