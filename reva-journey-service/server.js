@@ -7,7 +7,7 @@ const { startWorker } = require("./worker");
 
 const app = express();
 app.disable("x-powered-by");
-app.use(cors({ origin: process.env.JOURNEY_CLIENT_ORIGIN || process.env.CLIENT_ORIGIN || true }));
+app.use(cors({ origin: process.env.JOURNEY_CLIENT_ORIGIN || process.env.CLIENT_ORIGIN || "http://localhost:3000" }));
 app.use(express.json({ limit: "100kb" }));
 app.get("/health", (req, res) => res.json({ success: true, service: "reva-journey-service", status: "ok" }));
 app.use("/api/journeys", (req, res, next) => {
