@@ -2,6 +2,7 @@ const Friendship = require("../models/Friendship");
 const SafetyJourney = require("../models/SafetyJourney");
 const User = require("../models/User");
 const { resolveTravelMode } = require("./travelMode.service");
+const { resolveAndRoute } = require("./journeyRouting.service");
 
 function validateJourneyDraft(input = {}) {
   const originText = String(input.originText || "").trim();
@@ -50,10 +51,8 @@ async function validateShareRecipients(travellerId, recipientIds = []) {
   const acceptedIds = new Set(links.map(link =>
     String(link.requester) === String(travellerId) ? String(link.recipient) : String(link.requester)
   ));
-  const users = await User.find({ _id: { $in: uniqueIds }, sharingEnabled: true }).select("_id").lean();
-  const eligibleIds = new Set(users.map(user => String(user._id)));
-  const invalid = uniqueIds.filter(id => !acceptedIds.has(id) || !eligibleIds.has(id));
-  if (invalid.length) return { error: "Every recipient must be an accepted friend who currently allows location sharing." };
+  const invalid = uniqueIds.filter(id => !acceptedIds.has(id));
+  if (invalid.length) return { error: "Every recipient must be an accepted friend." };
   return { ids: uniqueIds };
 }
 
@@ -115,6 +114,113 @@ async function createJourneyDraft({ travellerId, travellerUsername, input }) {
   };
 }
 
+
+async function prepareRouteOptions({ journeyId, travellerId }) {
+  if (!/^[a-f\\d]{24}$/i.test(String(journeyId || ""))) {
+    return { status: 400, body: { success: false, message: "Invalid journey ID." } };
+  }
+  const journey = await SafetyJourney.findOne({ _id: journeyId, travellerId });
+  if (!journey) return { status: 404, body: { success: false, message: "Journey not found." } };
+  if (!["AWAITING_ROUTE_APPROVAL", "DRAFT"].includes(journey.status)) {
+    return { status: 409, body: { success: false, message: "Routes can only be changed before the journey starts." } };
+  }
+
+  const result = await resolveAndRoute({
+    originText: journey.originText,
+    destinationText: journey.destinationText,
+    modeId: journey.transportModeId
+  });
+  journey.origin = result.origin;
+  journey.destination = result.destination;
+  journey.routeOptions = result.routes.map(route => ({
+    optionId: route.optionId,
+    routeLabels: route.routeLabels,
+    provider: route.provider,
+    providerRouteId: route.providerRouteId,
+    distanceMeters: route.distanceMeters,
+    durationSeconds: route.durationSeconds,
+    encodedPolyline: route.encodedPolyline,
+    approvedAt: null
+  }));
+  journey.status = "AWAITING_ROUTE_APPROVAL";
+  await journey.save();
+
+  return {
+    status: 200,
+    body: {
+      success: true,
+      journeyId: String(journey._id),
+      status: journey.status,
+      origin: journey.origin,
+      destination: journey.destination,
+      transportModeId: journey.transportModeId,
+      avatarKey: journey.avatarKey,
+      routes: journey.routeOptions.map(route => ({
+        optionId: route.optionId,
+        provider: route.provider,
+        distanceMeters: route.distanceMeters,
+        durationSeconds: route.durationSeconds,
+        routeLabels: route.routeLabels,
+        encodedPolyline: route.encodedPolyline
+      })),
+      requiresApproval: true
+    }
+  };
+}
+
+async function approveJourneyRoute({ journeyId, travellerId, optionId }) {
+  if (!/^[a-f\\d]{24}$/i.test(String(journeyId || ""))) {
+    return { status: 400, body: { success: false, message: "Invalid journey ID." } };
+  }
+  if (!optionId || typeof optionId !== "string" || optionId.length > 100) {
+    return { status: 400, body: { success: false, message: "Select a route option returned by Reva." } };
+  }
+  const journey = await SafetyJourney.findOne({ _id: journeyId, travellerId });
+  if (!journey) return { status: 404, body: { success: false, message: "Journey not found." } };
+  if (journey.status !== "AWAITING_ROUTE_APPROVAL") {
+    return { status: 409, body: { success: false, message: "This journey is not awaiting route approval." } };
+  }
+  const selected = journey.routeOptions.find(route => route.optionId === optionId);
+  if (!selected || !journey.origin || !journey.destination || !selected.durationSeconds || !selected.distanceMeters) {
+    return { status: 400, body: { success: false, message: "That route is unavailable. Request routes again and choose one of the returned options." } };
+  }
+
+  const now = new Date();
+  journey.route = {
+    optionId: selected.optionId,
+    provider: selected.provider,
+    providerRouteId: selected.providerRouteId,
+    distanceMeters: selected.distanceMeters,
+    durationSeconds: selected.durationSeconds,
+    encodedPolyline: selected.encodedPolyline,
+    routeLabels: selected.routeLabels,
+    approvedAt: now
+  };
+  journey.routeOptions = [];
+  journey.expectedArrivalAt = new Date(now.getTime() + selected.durationSeconds * 1000);
+  journey.status = "ACTIVE";
+  await journey.save();
+
+  return {
+    status: 200,
+    body: {
+      success: true,
+      journey: {
+        id: String(journey._id),
+        status: journey.status,
+        transportModeId: journey.transportModeId,
+        avatarKey: journey.avatarKey,
+        origin: journey.origin,
+        destination: journey.destination,
+        route: journey.route,
+        expectedArrivalAt: journey.expectedArrivalAt,
+        gracePeriodMinutes: journey.gracePeriodMinutes,
+        message: "Route approved. Journey monitoring is now active."
+      }
+    }
+  };
+}
+
 async function getJourneyForViewer(journeyId, viewerId) {
   if (!/^[a-f\d]{24}$/i.test(String(journeyId || ""))) return null;
   const journey = await SafetyJourney.findOne({
@@ -141,4 +247,4 @@ async function getJourneyForViewer(journeyId, viewerId) {
   };
 }
 
-module.exports = { createJourneyDraft, getJourneyForViewer, validateJourneyDraft, validateShareRecipients };
+module.exports = { approveJourneyRoute, createJourneyDraft, getJourneyForViewer, prepareRouteOptions, validateJourneyDraft, validateShareRecipients };
