@@ -23,7 +23,7 @@ module.exports = (io) => {
     socket.join("user:" + userId);
 
     try {
-      const activeJourneys = await SafetyJourney.find({ travellerId: userId, status: { $in: ["ACTIVE", "OVERDUE_UNCONFIRMED", "ALERT_SENT"] }, sharingEnabled: true });
+      const activeJourneys = await SafetyJourney.find({ travellerId: userId, status: { $in: ["ACTIVE", "OVERDUE_UNCONFIRMED", "ALERT_SENT", "EMERGENCY_ALERTED"] }, sharingEnabled: true });
       for (const journey of activeJourneys) {
         journey.connectionStatus = "online";
         await journey.save();
