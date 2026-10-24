@@ -83,7 +83,7 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
     zoomControl: false, scrollWheelZoom: false, dragging: false, doubleClickZoom: false,
     touchZoom: false, keyboard: false, attributionControl: true, zoomAnimation: true,
     fadeAnimation: true
-  }).setView([22.8, 79.0], 5);
+  }).setView([22.8, 79.0], 4.6);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 18, minZoom: 4, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
   }).addTo(map);
@@ -103,32 +103,65 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
       interactive:false
     }).addTo(map);
   });
-  // Slowly drift across India; keep the movement continuous and cinematic.
-  // A continuous, gentle camera drift across India, beginning as soon as the page opens.
-  const views = [
-    {center:[23.2,77.4],zoom:5.05},
-    {center:[21.0,74.6],zoom:5.15},
-    {center:[17.8,77.8],zoom:5.15},
-    {center:[20.7,82.2],zoom:5.1},
-    {center:[24.8,84.0],zoom:5.15},
-    {center:[26.0,79.0],zoom:5.1}
+  // Cinematic journey: broad India-wide sweeps, then a smooth zoom-in on an
+  // anonymous inland point, followed by a pull-back and another sweep.
+  const sweepViews = [
+    [25.2, 75.0],
+    [20.5, 72.9],
+    [15.8, 78.0],
+    [20.0, 84.2],
+    [27.0, 82.0],
+    [23.2, 77.4]
   ];
-  let index=0;
-  const move = () => {
-    const view=views[index];
-    map.flyTo(view.center,view.zoom,{
-      animate:true,
-      duration:18,
-      easeLinearity:0.08,
-      noMoveStart:false
-    });
-    index=(index+1)%views.length;
-  };
-  // Start immediately; keep a little overlap between each slow glide.
-  requestAnimationFrame(() => {
-    move();
-    window.setInterval(move,20000);
+  // Inland coordinates only: these are generic visual targets, not user locations.
+  const randomTargets = [
+    [31.1048, 77.1734], [29.0588, 76.0856], [24.5854, 73.7125],
+    [21.1458, 79.0882], [18.5204, 73.8567], [16.5062, 80.6480],
+    [11.0168, 76.9558], [15.8497, 74.4977], [23.2599, 77.4126],
+    [25.5941, 85.1376], [26.1445, 91.7362], [22.7196, 75.8577],
+    [17.6868, 83.2185], [30.7333, 76.7794], [19.9975, 73.7898],
+    [20.2961, 85.8245], [10.8505, 76.2711], [26.2389, 73.0243]
+  ];
+  const wait = (ms) => new Promise(resolve => window.setTimeout(resolve, ms));
+  const glide = (center, zoom, duration) => new Promise(resolve => {
+    let finished = false;
+    const done = () => {
+      if (finished) return;
+      finished = true;
+      map.off("moveend", done);
+      resolve();
+    };
+    map.once("moveend", done);
+    map.flyTo(center, zoom, { animate:true, duration, easeLinearity:0.12 });
+    // Safety fallback in case a browser suppresses a moveend event.
+    window.setTimeout(done, duration * 1000 + 1800);
   });
+  const cinematicJourney = async () => {
+    let sweepIndex = 0;
+    let previousTarget = -1;
+    while (host.isConnected) {
+      // Slow, wide sweeps create the feeling of a rotating world map.
+      for (let i=0; i<sweepViews.length; i++) {
+        const view = sweepViews[sweepIndex % sweepViews.length];
+        sweepIndex++;
+        await glide(view, 4.55, 11.5);
+      }
+      // Pull back before choosing a new anonymous point, then explore it.
+      await glide([22.8,79.0], 4.25, 5.5);
+      let targetIndex;
+      do {
+        targetIndex = Math.floor(Math.random() * randomTargets.length);
+      } while (targetIndex === previousTarget);
+      previousTarget = targetIndex;
+      const target = randomTargets[targetIndex];
+      await glide(target, 7.1, 7.5);
+      await wait(1800);
+      await glide(target, 5.0, 5.8);
+      await wait(700);
+    }
+  };
+  // Begin on page open; each movement waits for the previous one to finish.
+  requestAnimationFrame(() => { cinematicJourney(); });
   window.addEventListener("resize",()=>map.invalidateSize({pan:false}));
 })();
 </script>\n</body>
