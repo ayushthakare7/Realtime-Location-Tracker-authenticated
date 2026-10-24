@@ -184,7 +184,6 @@ async function createJourney() {
   const transportModeId = document.getElementById("travelMode").value;
   if (!originText || !destinationText) throw new Error("Enter both a starting point and destination.");
   if (!transportModeId) throw new Error("Choose your travel mode so Reva can calculate the right route.");
-  if (document.getElementById("safetyLevel").value === "trusted" && selectedFriendIds().length === 0) throw new Error("Select at least one accepted friend to share this journey, or choose private sharing.");
   setFeedback("Creating your private journey draft…");
   const body = await api("/api/journeys", { method: "POST", body: JSON.stringify({
     originText, destinationText, transportModeId, sharedWith: selectedFriendIds(),
@@ -208,7 +207,9 @@ async function createJourney() {
 async function approveJourney() {
   if (!preparedJourney) throw new Error("Prepare a route first.");
   if (!document.getElementById("approveJourney").checked) throw new Error("Check the approval box after reviewing the route.");
-  const body = await api("/api/journeys/" + encodeURIComponent(preparedJourney.id) + "/approve", { method: "POST", body: JSON.stringify({}) });
+  const recipients = selectedFriendIds();
+  if (document.getElementById("safetyLevel").value === "trusted" && recipients.length === 0) throw new Error("Select at least one accepted friend before approving this shared journey.");
+  const body = await api("/api/journeys/" + encodeURIComponent(preparedJourney.id) + "/approve", { method: "POST", body: JSON.stringify({ sharedWith: recipients }) });
   activeJourney = body.journey;
   review.hidden = true; activeControls.hidden = false;
   activeJourneyStatus();
@@ -261,6 +262,11 @@ if (queueReady) {
   refreshQueueStatus();
   if (navigator.onLine) offlineQueue.flush().then(refreshQueueStatus).catch(() => {});
 }
+setInterval(() => {
+  if (trackingJourneyId && navigator.onLine && offlineQueue) {
+    offlineQueue.flush().then(refreshQueueStatus).catch(() => {});
+  }
+}, 10000);
 window.addEventListener("online", () => {
   setConnectionStatus(); refreshServerLocationStatus();
   if (trackingJourneyId) void window.RevaSafetyTravelOffline.recordConnection(trackingJourneyId, true).catch(() => {});
