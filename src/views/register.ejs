@@ -117,20 +117,23 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
   // World-wide camera journey: quick global sweeps, then a slower close-up.
   // Globe-like motion: rapidly sweep longitudes around the whole Earth, then
   // slow down at a random destination for a gentle zoom-in and zoom-out.
+  // Random destinations span all continents and latitudes, not just India.
   const randomTargets = [
-    [28.6139,77.2090], [19.0760,72.8777], [12.9716,77.5946],
-    [51.5072,-0.1276], [48.8566,2.3522], [40.7128,-74.0060],
-    [34.0522,-118.2437], [19.4326,-99.1332], [-23.5505,-46.6333],
-    [-34.6037,-58.3816], [1.3521,103.8198], [35.6762,139.6503],
-    [37.5665,126.9780], [13.7563,100.5018], [-1.2921,36.8219],
-    [-26.2041,28.0473], [30.0444,31.2357], [41.0082,28.9784],
-    [25.2048,55.2708], [-33.8688,151.2093], [43.6532,-79.3832],
-    [59.3293,18.0686], [14.5995,120.9842], [-36.8485,174.7633],
-    [35.6895,139.6917], [45.4642,9.1900], [22.3193,114.1694],
-    [6.5244,3.3792], [39.9042,116.4074], [50.1109,8.6821]
+    [64.1466,-21.9426], [40.7128,-74.0060], [19.4326,-99.1332],
+    [-23.5505,-46.6333], [-34.6037,-58.3816], [37.7749,-122.4194],
+    [49.2827,-123.1207], [51.5072,-0.1276], [64.9631,-19.0208],
+    [48.8566,2.3522], [30.0444,31.2357], [-1.2921,36.8219],
+    [27.9881,86.9250], [25.2048,55.2708], [-33.8688,151.2093],
+    [35.6762,139.6503], [37.5665,126.9780], [-41.2865,174.7762],
+    [61.2181,-149.9003], [43.6532,-79.3832], [55.7558,37.6173],
+    [59.3293,18.0686], [6.5244,3.3792], [-26.2041,28.0473],
+    [-22.9068,-43.1729], [-12.0464,-77.0428], [21.3099,-157.8581],
+    [13.7563,100.5018], [39.9042,116.4074], [35.6895,139.6917],
+    [28.6139,77.2090], [19.0760,72.8777], [-36.8485,174.7633],
+    [64.2008,-149.4937], [46.8523,-121.7603], [-3.0674,37.3556]
   ];
   const wait = ms => new Promise(resolve => window.setTimeout(resolve, ms));
-  const travel = (center, zoom, duration, easing=0.2) => new Promise(resolve => {
+  const travel = (center, zoom, duration, easing=0.28) => new Promise(resolve => {
     let finished = false;
     const done = () => {
       if (finished) return;
@@ -140,22 +143,22 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
     };
     map.once("moveend", done);
     map.flyTo(center, zoom, { animate:true, duration, easeLinearity:easing });
-    window.setTimeout(done, duration * 1000 + 1400);
+    window.setTimeout(done, duration * 1000 + 1000);
   });
   const cinematicJourney = async () => {
-    let longitude = -180 + Math.random() * 120;
+    let longitude = -180 + Math.random() * 360;
+    let latitude = -55 + Math.random() * 110;
     let previousTarget = -1;
     while (host.isConnected) {
-      // Rapid eastward longitude sweeps create the feeling of Earth rotating.
-      // Longitudes beyond +/-180 intentionally wrap around the world map.
-      const rotationHops = 8 + Math.floor(Math.random() * 5);
+      // Continuous, quick global sweep with varied latitude; never return to an India-only band.
+      const rotationHops = 10 + Math.floor(Math.random() * 7);
       for (let i=0; i<rotationHops; i++) {
-        longitude += 42 + Math.random() * 24;
-        const latitude = 8 + Math.random() * 14;
-        await travel([latitude, longitude], 2.35, 0.8 + Math.random() * 0.25, 0.3);
+        longitude += 35 + Math.random() * 30;
+        latitude = Math.max(-58, Math.min(68, latitude + (Math.random() - 0.5) * 26));
+        await travel([latitude, longitude], 2.35, 0.48 + Math.random() * 0.16, 0.32);
       }
 
-      // Brake at a randomly chosen world location and make the close-up deliberate.
+      // Choose a globally distributed destination; no adjacent repeats.
       let targetIndex;
       do {
         targetIndex = Math.floor(Math.random() * randomTargets.length);
@@ -163,13 +166,14 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
       previousTarget = targetIndex;
       const target = randomTargets[targetIndex];
 
-      await travel([target[0], target[1]], 2.35, 0.75, 0.28);
-      await wait(250);
-      await travel(target, 5.8, 3.4, 0.1);
-      await wait(700);
-      await travel([target[0], target[1]], 2.35, 2.25, 0.12);
-      await wait(200);
-      // Continue the longitude sweep, like the next turn of a rotating globe.
+      // Quick settle, slow enough to read the close-up, then pull back and resume rotation.
+      await travel(target, 2.35, 0.55, 0.3);
+      await travel(target, 5.8, 2.7, 0.12);
+      await wait(350);
+      await travel(target, 2.35, 1.7, 0.14);
+      // No extra pause after zoom-out: the next fast sweep starts immediately.
+      longitude = target[1];
+      latitude = target[0];
     }
   };
   requestAnimationFrame(() => { cinematicJourney(); });
