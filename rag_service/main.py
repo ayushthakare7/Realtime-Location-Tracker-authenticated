@@ -310,6 +310,7 @@ class RevaRAGHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        print(f"[Reva RAG] POST {path} received; checking authorization", flush=True)
         try:
             check_token(self.headers.get("Authorization"))
             length = int(self.headers.get("Content-Length", "0"))
@@ -351,6 +352,7 @@ class RevaRAGHandler(BaseHTTPRequestHandler):
                 return
 
             if path == "/ask":
+                print("[Reva RAG] /ask payload validated; starting RAG workflow", flush=True)
                 question = payload.get("question")
                 user_ids = payload.get("authorizedUserIds")
                 context = payload.get("context", {})
@@ -363,11 +365,13 @@ class RevaRAGHandler(BaseHTTPRequestHandler):
                 if not isinstance(context, dict):
                     raise RequestError(400, "context must be an object")
                 try:
+                    print("[Reva RAG] /ask invoking LangGraph workflow", flush=True)
                     result = workflow.invoke({
                         "question": question.strip(),
                         "authorized_user_ids": user_ids,
                         "context": context,
                     })
+                    print("[Reva RAG] /ask workflow completed; sending response", flush=True)
                     response = {
                         "success": True,
                         "answer": result.get("answer", ""),
