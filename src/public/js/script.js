@@ -11,6 +11,15 @@ const api = async (path, options = {}) => {
   return data;
 };
 
+async function journeyApi(path) {
+  const response = await fetch("/api/journeys" + path, {
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.success === false) throw new Error(data.message || "Could not load shared journeys.");
+  return data;
+}
+
 const map = L.map("map").setView([20.5937, 78.9629], 5);
 const baseTiles = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap contributors" }).addTo(map);
 
@@ -91,6 +100,101 @@ function createRadarIcon(isMe) {
     iconSize: [28, 28],
     iconAnchor: [14, 14]
   });
+}
+
+const sharedJourneyMarkers = new Map();
+function createJourneyIcon() {
+  return L.divIcon({
+    className: "reva-marker-shell",
+    html: '<span class="reva-journey-pin" aria-label="Shared Safety Travel journey">➤</span>',
+    iconSize: [32, 32],
+    iconAnchor: [16, 16]
+  });
+}
+function journeyStatusLabel(status) {
+  return ({
+    ACTIVE: "In progress",
+    OVERDUE_UNCONFIRMED: "Overdue — check-in needed",
+    ALERT_SENT: "Check-in requested",
+    EMERGENCY_ALERTED: "Emergency alert sent",
+    ARRIVED: "Arrived"
+  })[status] || String(status || "Status unavailable").replaceAll("_", " ").toLowerCase();
+}
+function focusSharedJourney(id) {
+  const marker = sharedJourneyMarkers.get(String(id));
+  if (!marker) return;
+  map.flyTo(marker.getLatLng(), Math.max(map.getZoom(), 13), {
+    duration: window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 1.2
+  });
+  marker.openPopup();
+}
+async function loadSharedJourneys() {
+  const status = document.getElementById("sharedJourneysStatus");
+  const list = document.getElementById("sharedJourneysList");
+  if (!status || !list) return;
+  try {
+    const body = await journeyApi("/shared");
+    const journeys = Array.isArray(body.journeys) ? body.journeys : [];
+    const visibleIds = new Set(journeys.map(journey => String(journey.id)));
+    for (const [id, marker] of sharedJourneyMarkers) {
+      if (!visibleIds.has(id)) { map.removeLayer(marker); sharedJourneyMarkers.delete(id); }
+    }
+    list.replaceChildren();
+    if (!journeys.length) {
+      status.textContent = "No friends are sharing an active Safety Travel journey with you right now.";
+      return;
+    }
+    let locationsAvailable = 0;
+    for (const journey of journeys) {
+      const id = String(journey.id);
+      const point = journey.lastConfirmedLocation;
+      const hasPoint = point && Number.isFinite(Number(point.latitude)) && Number.isFinite(Number(point.longitude));
+      const name = String(journey.travellerUsername || "A friend");
+      const state = journeyStatusLabel(journey.status);
+      const updatedAt = point && point.recordedAt && Number.isFinite(Date.parse(point.recordedAt))
+        ? new Date(point.recordedAt).toLocaleString()
+        : null;
+      const row = document.createElement("div");
+      row.className = "shared-journey-row";
+      const details = document.createElement("div");
+      const title = document.createElement("strong");
+      title.textContent = name + " · " + state;
+      const meta = document.createElement("p");
+      meta.textContent = updatedAt ? "Last location update: " + updatedAt : "Waiting for the first GPS location to sync.";
+      details.append(title, meta);
+      row.append(details);
+      if (hasPoint) {
+        locationsAvailable++;
+        const popup = document.createElement("div");
+        const popupTitle = document.createElement("strong");
+        popupTitle.textContent = name + " · " + state;
+        const popupTime = document.createElement("div");
+        popupTime.textContent = updatedAt ? "Location updated " + updatedAt : "Location time unavailable";
+        popup.append(popupTitle, popupTime);
+        let marker = sharedJourneyMarkers.get(id);
+        if (marker) marker.setLatLng([Number(point.latitude), Number(point.longitude)]);
+        else {
+          marker = L.marker([Number(point.latitude), Number(point.longitude)], { icon: createJourneyIcon(), zIndexOffset: 700 })
+            .addTo(map);
+          sharedJourneyMarkers.set(id, marker);
+        }
+        marker.bindPopup(popup);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "secondary shared-journey-view";
+        button.textContent = "View on map";
+        button.addEventListener("click", () => focusSharedJourney(id));
+        row.append(button);
+      } else if (sharedJourneyMarkers.has(id)) {
+        map.removeLayer(sharedJourneyMarkers.get(id));
+        sharedJourneyMarkers.delete(id);
+      }
+      list.append(row);
+    }
+    status.textContent = journeys.length + " shared journey" + (journeys.length === 1 ? "" : "s") + " · " + locationsAvailable + " with a confirmed GPS location. Refreshes every 10 seconds.";
+  } catch (error) {
+    status.textContent = error.message || "Could not load journeys shared with you.";
+  }
 }
 
 function upsertMarker(data, accuracy) {
@@ -289,6 +393,13 @@ async function setSharing(enabled) {
       removeMarker("me");
     }
     await loadFriends();
+loadSharedJourneys();
+setInterval(() => {
+  if (document.visibilityState !== "hidden") loadSharedJourneys();
+}, 10000);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") loadSharedJourneys();
+});
   } catch (e) { setStatus(e.message); }
 }
 
