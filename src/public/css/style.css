@@ -494,3 +494,147 @@ body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.3
   .dashboard-grid .map-stage .map-heading { gap:2px; }
   .dashboard-grid .map-stage .map-frame { aspect-ratio:1.32 / 1; }
 }
+
+
+/* Consistent alignment and spacing for the three control cards */
+.dashboard-grid > aside > .sharing-panel,
+.dashboard-grid > aside > .friends-panel,
+.dashboard-grid > aside > .privacy-panel {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: left;
+  gap: 12px;
+  min-width: 0;
+}
+.dashboard-grid > aside .section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  text-align: left;
+}
+.dashboard-grid > aside .section-heading > div {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+}
+.dashboard-grid > aside .section-heading .eyebrow,
+.dashboard-grid > aside .section-heading h2 {
+  margin-left: 0;
+  margin-right: 0;
+  text-align: left;
+}
+.dashboard-grid > aside .section-heading h2 {
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.dashboard-grid > aside .muted {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  text-align: left;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.dashboard-grid > aside .sharing-panel > button,
+.dashboard-grid > aside .privacy-panel > button {
+  align-self: stretch;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+}
+.dashboard-grid > aside #status {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  margin: 0;
+  padding: 10px 12px;
+  text-align: left;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.dashboard-grid > aside #friendForm {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 9px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+.dashboard-grid > aside #friendForm input,
+.dashboard-grid > aside #friendForm button {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+}
+.dashboard-grid > aside #requests,
+.dashboard-grid > aside #friends {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 0;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.dashboard-grid > aside .friend {
+  box-sizing: border-box;
+  padding: 11px 0;
+  text-align: left;
+  justify-content: flex-start;
+  align-items: center;
+}
+.dashboard-grid > aside .friend strong {
+  line-height: 1.4;
+  text-align: left;
+}
+.dashboard-grid > aside .switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  text-align: left;
+}
+.dashboard-grid > aside .switch-row span {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.dashboard-grid > aside .switch-row input {
+  flex: 0 0 auto;
+  margin: 0;
+}
+.dashboard-grid > aside .privacy-panel #deleteHistory {
+  margin-top: auto;
+}
+@media (min-width:781px) {
+  .dashboard-grid > aside > .sharing-panel,
+  .dashboard-grid > aside > .friends-panel,
+  .dashboard-grid > aside > .privacy-panel {
+    padding: 17px 18px;
+  }
+}
+@media (max-width:780px) {
+  .dashboard-grid > aside > .sharing-panel,
+  .dashboard-grid > aside > .friends-panel,
+  .dashboard-grid > aside > .privacy-panel {
+    gap: 10px;
+  }
+  .dashboard-grid > aside > .privacy-panel #deleteHistory {
+    margin-top: 0;
+  }
+}
