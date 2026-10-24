@@ -89,6 +89,33 @@ exports.approveRoute = async (req, res) => {
       travellerId: req.user.userId,
       optionId: req.body?.optionId
     });
+    if (result.status === 200) {
+      const journey = await SafetyJourney.findOne({ _id: req.params.id, travellerId: req.user.userId }).lean();
+      if (journey && journey.sharingEnabled && journey.sharedWith?.length) {
+        await notifyJourneyRecipients({
+          io: req.app.get("io"),
+          journey,
+          recipients: journey.sharedWith,
+          type: "journey_shared",
+          title: "A friend is sharing a Safety Travel journey",
+          body: journey.travellerUsername + " started a shared journey to " + (journey.destination?.label || journey.destinationText) + ". Open Safety Travel to follow the approved route.",
+          payload: { journeyId: String(journey._id), status: journey.status, destination: journey.destination?.label || journey.destinationText, expectedArrivalAt: journey.expectedArrivalAt },
+          keySuffix: "shared"
+        });
+        for (const recipientId of journey.sharedWith) {
+          req.app.get("io")?.to("user:" + recipientId).emit("journey-shared", {
+            journeyId: String(journey._id),
+            travellerId: String(journey.travellerId),
+            travellerUsername: journey.travellerUsername,
+            status: journey.status,
+            avatarKey: journey.avatarKey,
+            transportModeId: journey.transportModeId,
+            destination: journey.destination,
+            expectedArrivalAt: journey.expectedArrivalAt
+          });
+        }
+      }
+    }
     return res.status(result.status).json(result.body);
   } catch (error) {
     console.error("Approve safety journey route failed:", error.message);
