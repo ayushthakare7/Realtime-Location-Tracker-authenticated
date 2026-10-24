@@ -25,8 +25,6 @@ async function requestRag(path, body = {}) {
     body: JSON.stringify(body)
   };
 
-  // A sleeping upstream may briefly return a proxy error while it starts.
-  // Retry only transient gateway statuses; don't repeat application-level 4xx/5xx errors.
   for (let attempt = 0; attempt < 2; attempt += 1) {
     let response;
     try {
@@ -43,15 +41,23 @@ async function requestRag(path, body = {}) {
     }
 
     console.info(`[Reva RAG] ${path} returned HTTP ${response.status}`);
+    const rawBody = await response.text();
+    let payload = {};
+    try { payload = rawBody ? JSON.parse(rawBody) : {}; } catch {}
 
-    if ([502, 503, 504].includes(response.status) && attempt === 0) {
-      await response.arrayBuffer().catch(() => {});
-      console.warn(`[Reva RAG] Transient HTTP ${response.status}; retrying once after startup grace period`);
+    // Retry only likely platform gateway failures, not JSON application errors
+    // such as "RAG processing failed", which should be diagnosed rather than replayed.
+    const looksLikePlatformGatewayError =
+      !payload || Object.keys(payload).length === 0 || !payload.detail && !payload.message;
+    const retryable = response.status === 503 || response.status === 504 ||
+      (response.status === 502 && looksLikePlatformGatewayError);
+
+    if (retryable && attempt === 0) {
+      console.warn(`[Reva RAG] Transient gateway HTTP ${response.status}; retrying once after 1.2 seconds`);
       await delay(1200);
       continue;
     }
 
-    const payload = await response.json().catch(() => ({}));
     if (!response.ok || payload.success !== true) {
       const error = new Error(payload.detail || payload.message || `RAG service returned HTTP ${response.status}`);
       error.status = response.status;
