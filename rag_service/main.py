@@ -386,6 +386,7 @@ class RevaRAGHandler(BaseHTTPRequestHandler):
 
             self.send_json(404, {"success": False, "detail": "Not found"})
         except RequestError as exc:
+            print(f"[Reva RAG] request rejected with HTTP {exc.status}: {exc}", flush=True)
             self.send_json(exc.status, {"success": False, "detail": str(exc)})
         except Exception as exc:
             print(f"[Reva RAG] HTTP handler failed: {type(exc).__name__}: {exc}", flush=True)
