@@ -22,7 +22,7 @@ const journeyEventSchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ["location", "check_in", "arrival", "offline", "online", "overdue", "alert_sent", "cancelled"]
+    enum: ["location", "check_in", "arrival", "offline", "online", "overdue", "alert_sent", "emergency", "cancelled"]
   },
   recordedAt: { type: Date, required: true },
   receivedAt: { type: Date, required: true, default: Date.now },
