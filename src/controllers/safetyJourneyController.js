@@ -279,7 +279,10 @@ exports.cancelJourney = async (req, res) => {
 exports.listMine = async (req, res) => {
   try {
     const journeys = await SafetyJourney.find({
-      $or: [{ travellerId: req.user.userId }, { sharedWith: req.user.userId, sharingEnabled: true }]
+      $or: [
+        { travellerId: req.user.userId },
+        { sharedWith: req.user.userId, sharingEnabled: true, status: { $in: ["ACTIVE", "OVERDUE_UNCONFIRMED", "ALERT_SENT", "EMERGENCY_ALERTED", "ARRIVED"] } }
+      ]
     }).sort({ createdAt: -1 }).limit(100).lean();
     return res.json({
       success: true,
