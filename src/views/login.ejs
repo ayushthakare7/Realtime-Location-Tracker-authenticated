@@ -84,12 +84,16 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
       subdomains: "abc", maxZoom: 19, noWrap: false
     }).addTo(map);
 
-    // Restore the previous continuous, quiet world-map drift—without route overlays or pulsing pins.
+    // Smooth 10-second speed cycle: fast for the first half, slow for the second.
+    // Cosine easing blends between speeds without a sudden acceleration or pause.
     let frame = null;
     let last = 0;
-    let verticalTime = 0;
+    let cycleTime = 0;
     let horizontalCarry = 0;
     let verticalCarry = 0;
+    const cycleDuration = 10000;
+    const slowSpeed = 0.018; // pixels per millisecond
+    const fastSpeed = 0.14;  // pixels per millisecond
 
     const animate = (timestamp) => {
       if (document.hidden || reducedMotion.matches) {
@@ -100,10 +104,13 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
       if (!last) last = timestamp;
       const dt = Math.min(timestamp - last, 40);
       last = timestamp;
-      verticalTime += dt;
+      cycleTime = (cycleTime + dt) % cycleDuration;
 
-      horizontalCarry += dt * 0.018;
-      verticalCarry += Math.sin(verticalTime / 7000) * dt * 0.003;
+      // Speed eases from fast -> slow over 5 seconds, then slow -> fast over 5 seconds.
+      const fastWeight = (1 + Math.cos((2 * Math.PI * cycleTime) / cycleDuration)) / 2;
+      const speed = slowSpeed + (fastSpeed - slowSpeed) * fastWeight;
+      horizontalCarry += dt * speed;
+      verticalCarry += Math.sin(cycleTime / 1500) * dt * speed * 0.12;
       const dx = Math.trunc(horizontalCarry);
       const dy = Math.trunc(verticalCarry);
       if (dx || dy) {
