@@ -135,7 +135,7 @@ router.post("/:id/sync", async (req, res) => {
   if (!validId(req.params.id)) return res.status(400).json({ success: false, message: "Invalid journey ID." });
   const j = await Journey.findOne({ _id: req.params.id, travellerId: req.authUser.id });
   if (!j) return res.status(404).json({ success: false, message: "Journey not found." });
-  if (!Array.isArray(req.body?.events) || req.body.events.length < 1 || req.body.events.length > 100) return res.status(400).json({ success: false, message: "events must contain between 1 and 100 items." });
+  if (!Array.isArray(req.body?.events) || req.body.events.length < 1 || req.body.events.length > 100) return res.status(400).json({ success: false, message: "events must contain between 1 and 100 items." });\n  if (j.status === "DRAFT" && req.body.events.some(e => e.type !== "cancelled")) return res.status(409).json({ success: false, message: "Calculate and explicitly approve the route before tracking events." });\n  if (terminal.includes(j.status) && req.body.events.some(e => !known.has(e?.eventId))) return res.status(409).json({ success: false, message: "A completed journey cannot accept new events." });
   const known = new Set(j.eventIds); let acceptedCount = 0;
   for (const event of req.body.events) {
     if (!event || typeof event.eventId !== "string" || !event.eventId.trim() || event.eventId.length > 128 || !["location","check_in","arrival","offline","online","emergency","cancelled"].includes(event.type)) return res.status(400).json({ success: false, message: "Each event needs an eventId and supported type." });
@@ -153,7 +153,7 @@ router.post("/:id/sync", async (req, res) => {
     if (event.type === "arrival" && !terminal.includes(j.status)) { j.status = "ARRIVED"; j.arrivedAt = recordedAt; j.sharingEnabled = false; }
     else if (event.type === "emergency" && !terminal.includes(j.status)) { j.status = "EMERGENCY_ALERTED"; j.emergencyAt = recordedAt; }
     else if (event.type === "cancelled" && !terminal.includes(j.status)) { j.status = "CANCELLED"; j.cancelledAt = recordedAt; j.sharingEnabled = false; }
-    else if (event.type === "check_in" && ["OVERDUE_UNCONFIRMED","ALERT_SENT"].includes(j.status)) j.status = "ACTIVE";
+    else if (event.type === "check_in" && ["OVERDUE_UNCONFIRMED","ALERT_SENT"].includes(j.status)) { j.status = "ACTIVE"; j.expectedArrivalAt = null; }
   }
   await j.save();
   if (acceptedCount) {
@@ -165,6 +165,17 @@ router.post("/:id/sync", async (req, res) => {
     }
   }
   res.json({ success: true, acceptedCount, duplicateCount: req.body.events.length - acceptedCount, journey: view(j) });
+});
+
+router.patch("/:id/eta", async (req, res) => {
+  if (!validId(req.params.id)) return res.status(400).json({ success: false, message: "Invalid journey ID." });
+  const eta = new Date(req.body?.expectedArrivalAt);
+  if (!req.body?.expectedArrivalAt || !Number.isFinite(eta.getTime()) || eta.getTime() <= Date.now()) return res.status(400).json({ success: false, message: "expectedArrivalAt must be a valid future date." });
+  const j = await Journey.findOne({ _id: req.params.id, travellerId: req.authUser.id });
+  if (!j) return res.status(404).json({ success: false, message: "Journey not found." });
+  if (!["ACTIVE", "OVERDUE_UNCONFIRMED", "ALERT_SENT"].includes(j.status)) return res.status(409).json({ success: false, message: "ETA can only be updated for an ongoing journey." });
+  j.expectedArrivalAt = eta; j.status = "ACTIVE"; await j.save();
+  res.json({ success: true, expectedArrivalAt: j.expectedArrivalAt, status: j.status });
 });
 
 router.patch("/:id/sharing", async (req, res) => {
