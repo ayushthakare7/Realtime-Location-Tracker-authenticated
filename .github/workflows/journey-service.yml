@@ -5,6 +5,11 @@ on:
     branches: [feature/reva-journey-service]
     paths:
       - "reva-journey-service/**"
+      - "src/public/js/safety-travel.js"
+      - "src/public/js/journey-offline-queue.js"
+      - "src/views/safety-travel.ejs"
+      - "src/public/css/safety-travel.css"
+      - "test/journeyOfflineQueue.test.js"
       - ".github/workflows/journey-service.yml"
   pull_request:
     paths:
@@ -26,4 +31,4 @@ jobs:
           cache-dependency-path: reva-journey-service/package.json
       - run: npm install --no-audit --no-fund
       - run: npm test
-      - run: node --check server.js && node --check auth.js && node --check routes.js && node --check proxy.js && node --check routing.js && node --check worker.js && node --check models/Journey.js && node --check models/Friendship.js && node --check models/Notification.js
+      - run: node --check server.js && node --check auth.js && node --check routes.js && node --check proxy.js && node --check routing.js && node --check worker.js && node --check models/Journey.js && node --check models/Friendship.js && node --check models/Notification.js && node --check ../src/public/js/safety-travel.js && node --check ../src/public/js/journey-offline-queue.js
