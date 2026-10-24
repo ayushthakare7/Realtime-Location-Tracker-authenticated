@@ -993,3 +993,19 @@ body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.3
 .auth-map-background .leaflet-container {
   background: #dce5df !important;
 }
+
+
+/* Keep friend actions clear and aligned within each friend row. */
+.friends-panel .friend-remove {
+  margin-left: 8px;
+  border: 1px solid #e2d9d5;
+  background: #faf4f1;
+  color: #895b53;
+}
+.friends-panel .friend-remove:hover {
+  background: #f2e7e2;
+}
+.friends-panel .friend-remove:disabled {
+  opacity: .6;
+  cursor: wait;
+}
