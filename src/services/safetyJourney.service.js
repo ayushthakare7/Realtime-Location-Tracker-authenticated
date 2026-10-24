@@ -321,10 +321,15 @@ async function appendJourneyEvents({ journeyId, travellerId, events }) {
           placeLabel: null
         };
       }
-    } else if (event.type === "offline") {
-      journey.connectionStatus = "offline";
-    } else if (event.type === "online") {
-      journey.connectionStatus = "online";
+    } else if (event.type === "offline" || event.type === "online") {
+      // Queued offline events can arrive out of order. Preserve the state
+      // belonging to the newest recorded event rather than request order.
+      const previousConnectionAt = journey.connectionStatusUpdatedAt
+        ? new Date(journey.connectionStatusUpdatedAt).getTime() : -Infinity;
+      if (event.recordedAt.getTime() >= previousConnectionAt) {
+        journey.connectionStatus = event.type;
+        journey.connectionStatusUpdatedAt = event.recordedAt;
+      }
     } else if (event.type === "check_in") {
       if (["OVERDUE_UNCONFIRMED", "ALERT_SENT", "EMERGENCY_ALERTED"].includes(journey.status)) journey.status = "ACTIVE";
       journey.checkInRequestedAt = null;
@@ -401,6 +406,7 @@ async function getJourneyForViewer(journeyId, viewerId) {
     lastConfirmedLocation: journey.lastConfirmedLocation,
     sharingEnabled: journey.sharingEnabled,
     connectionStatus: journey.connectionStatus || "unknown",
+    connectionStatusUpdatedAt: journey.connectionStatusUpdatedAt || null,
     remainingDistanceMeters,
     locationFreshness: lastLocation?.recordedAt
       ? (Date.now() - new Date(lastLocation.recordedAt).getTime() > 2 * 60 * 1000 ? "stale" : "recent")
