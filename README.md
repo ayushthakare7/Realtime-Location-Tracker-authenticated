@@ -208,6 +208,30 @@ Configure the app's existing required environment variables, including `MONGO_UR
 
 Deploy the Python service before the Node service. Then test sign-in, live location sharing, and a Reva question on the public web app. If either service has auto-deploy enabled, pushing a commit to the connected branch triggers a deployment; otherwise use Render's **Manual Deploy → Deploy latest commit**.
 
+
+## Safety Travel backend API
+
+All endpoints below require the existing JWT bearer authentication.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/journeys/modes` | Canonical travel-mode catalogue, including exact `avatarKey` values |
+| `POST /api/journeys` | Create a draft with `originText`, `destinationText`, `transportModeId` or explicit `travelModeText`, and optional accepted-friend IDs in `sharedWith` |
+| `POST /api/journeys/:id/routes` | Resolve origin/destination and request real route alternatives |
+| `POST /api/journeys/:id/approve` | Approve a returned `optionId`; only then does the journey become active |
+| `GET /api/journeys` | List the current user's journeys and active journeys shared by friends |
+| `GET /api/journeys/:id` | Read a journey if the caller owns it or has valid, active sharing permission |
+| `POST /api/journeys/:id/events` | Submit one event or an `events` batch for location, check-in, arrival, connectivity, or explicit emergency |
+| `POST /api/journeys/:id/sync` | Alias for the event endpoint, suitable for queued offline batches |
+| `POST /api/journeys/:id/cancel` | Cancel a journey |
+| `PATCH /api/journeys/:id/sharing` | Explicitly stop or resume sharing for a journey |
+| `GET /api/journeys/notifications` | Read persisted in-app safety notifications |
+| `PATCH /api/journeys/notifications/:notificationId/read` | Mark a notification as read |
+
+The route provider uses the server-only `GOOGLE_MAPS_API_KEY` setting. Enable the Google Routes API and billing for the key before testing route resolution. Unsupported transport types return an explicit error; Reva does not fabricate a route. The catalogue's avatar keys are exact identifiers (for example, `bicycle` stays `bicycle`, and natural-language walking maps to `walking`).
+
+Offline event batches are idempotent by `eventId`, accept up to 100 events per request, and preserve the most recent recorded location by timestamp. Friend map updates include location freshness and remaining distance along the approved route when route geometry is available. Overdue checks run in a persistent database-backed polling worker; the app sends a check-in prompt after ETA plus the configured journey grace period, then alerts shared friends if there is still no response. Explicit emergency events follow a separate alert path. Notifications are persisted and emitted over Socket.IO; native/background push delivery still requires a push subscription/provider integration before claiming alerts can reach a fully closed app.
+
 ## Environment variables
 
 | Variable | Purpose |
