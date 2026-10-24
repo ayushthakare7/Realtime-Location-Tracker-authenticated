@@ -5,6 +5,7 @@ const LocationPoint = require("../models/LocationPoint");
 const LocationVisit = require("../models/LocationVisit");
 const { processLocationEvent } = require("../services/locationEvents.service");
 const Friendship = require("../models/Friendship");
+const SafetyJourney = require("../models/SafetyJourney");
 
 module.exports = (io) => {
   io.use((socket, next) => {
@@ -22,6 +23,20 @@ module.exports = (io) => {
     socket.join("user:" + userId);
 
     try {
+      const activeJourneys = await SafetyJourney.find({ travellerId: userId, status: { $in: ["ACTIVE", "OVERDUE_UNCONFIRMED", "ALERT_SENT"] }, sharingEnabled: true });
+      for (const journey of activeJourneys) {
+        journey.connectionStatus = "online";
+        await journey.save();
+        for (const recipientId of journey.sharedWith || []) {
+          io.to("user:" + recipientId).emit("journey-update", {
+            journeyId: String(journey._id), travellerId: String(userId),
+            travellerUsername: journey.travellerUsername, status: journey.status,
+            avatarKey: journey.avatarKey, connectionStatus: "online",
+            lastConfirmedLocation: journey.lastConfirmedLocation,
+            expectedArrivalAt: journey.expectedArrivalAt
+          });
+        }
+      }
       const user = await User.findById(userId).select("sharingEnabled historyEnabled");
       const links = await Friendship.find({ status: "accepted", $or: [{ requester: userId }, { recipient: userId }] }).lean();
       const friendIds = links.map(f => String(f.requester) === String(userId) ? f.recipient : f.requester);
@@ -54,6 +69,32 @@ module.exports = (io) => {
       } catch (e) { console.error("Location update failed:", e.message); }
     });
 
-    socket.on("disconnect", () => console.log("Socket disconnected:", socket.id));
+    socket.on("disconnect", async () => {
+      console.log("Socket disconnected:", socket.id);
+      try {
+        const remainingSockets = await io.in("user:" + userId).fetchSockets();
+        if (remainingSockets.length > 0) return;
+        const activeJourneys = await SafetyJourney.find({
+          travellerId: userId,
+          status: { $in: ["ACTIVE", "OVERDUE_UNCONFIRMED", "ALERT_SENT"] },
+          sharingEnabled: true
+        });
+        for (const journey of activeJourneys) {
+          journey.connectionStatus = "offline";
+          await journey.save();
+          for (const recipientId of journey.sharedWith || []) {
+            io.to("user:" + recipientId).emit("journey-update", {
+              journeyId: String(journey._id), travellerId: String(userId),
+              travellerUsername: journey.travellerUsername, status: journey.status,
+              avatarKey: journey.avatarKey, connectionStatus: "offline",
+              lastConfirmedLocation: journey.lastConfirmedLocation,
+              expectedArrivalAt: journey.expectedArrivalAt
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Journey connection state update failed:", error.message);
+      }
+    });
   });
 };
