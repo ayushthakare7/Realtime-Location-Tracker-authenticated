@@ -7,7 +7,7 @@ const safetyNotificationSchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ["journey_arrived", "journey_overdue_checkin", "journey_overdue_alert", "journey_safe_followup", "journey_cancelled"]
+    enum: ["journey_arrived", "journey_overdue_checkin", "journey_overdue_alert", "journey_safe_followup", "journey_cancelled", "journey_emergency"]
   },
   title: { type: String, required: true, maxlength: 160 },
   body: { type: String, required: true, maxlength: 1000 },
