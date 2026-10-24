@@ -26,4 +26,4 @@ jobs:
           cache-dependency-path: reva-journey-service/package.json
       - run: npm install --no-audit --no-fund
       - run: npm test
-      - run: node --check server.js && node --check auth.js && node --check routes.js && node --check models/Journey.js
+      - run: node --check server.js && node --check auth.js && node --check routes.js && node --check proxy.js && node --check routing.js && node --check worker.js && node --check models/Journey.js && node --check models/Friendship.js && node --check models/Notification.js
