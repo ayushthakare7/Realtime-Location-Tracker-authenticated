@@ -183,7 +183,7 @@ async function createJourney() {
   const destinationText = document.getElementById("destinationText").value.trim();
   const transportModeId = document.getElementById("travelMode").value || "walking";
   if (!originText || !destinationText) throw new Error("Enter both a starting point and destination.");
-  if (document.getElementById("safetyLevel").value === "trusted" && acceptedFriends.length === 0) throw new Error("No accepted friends are available. Choose 'Ask me before sharing' or add a friend first.");
+  if (document.getElementById("safetyLevel").value === "trusted" && selectedFriendIds().length === 0) throw new Error("Select at least one accepted friend to share this journey, or choose private sharing.");
   setFeedback("Creating your private journey draft…");
   const body = await api("/api/journeys", { method: "POST", body: JSON.stringify({
     originText, destinationText, transportModeId, sharedWith: selectedFriendIds(),
