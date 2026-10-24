@@ -3,6 +3,7 @@ const SafetyJourney = require("../models/SafetyJourney");
 const User = require("../models/User");
 const { resolveTravelMode } = require("./travelMode.service");
 const { resolveAndRoute } = require("./journeyRouting.service");
+const { calculateRemainingDistanceMeters } = require("./routeProgress.service");
 
 function validateJourneyDraft(input = {}) {
   const originText = String(input.originText || "").trim();
@@ -221,6 +222,128 @@ async function approveJourneyRoute({ journeyId, travellerId, optionId }) {
   };
 }
 
+
+async function appendJourneyEvents({ journeyId, travellerId, events }) {
+  if (!/^[a-f\\d]{24}$/i.test(String(journeyId || ""))) {
+    return { status: 400, body: { success: false, message: "Invalid journey ID." } };
+  }
+  if (!Array.isArray(events) || events.length < 1 || events.length > 100) {
+    return { status: 400, body: { success: false, message: "Send between 1 and 100 journey events per sync request." } };
+  }
+  const journey = await SafetyJourney.findOne({ _id: journeyId, travellerId });
+  if (!journey) return { status: 404, body: { success: false, message: "Journey not found." } };
+  if (["CANCELLED", "COMPLETED", "ARRIVED"].includes(journey.status)) {
+    return { status: 409, body: { success: false, message: "This journey no longer accepts progress events." } };
+  }
+
+  const allowedTypes = new Set(["location", "check_in", "arrival", "offline", "online"]);
+  const now = new Date();
+  const accepted = [];
+  const duplicates = [];
+  for (const input of events) {
+    if (!input || typeof input.eventId !== "string" || !input.eventId.trim() || input.eventId.length > 128) {
+      return { status: 400, body: { success: false, message: "Each event needs a unique eventId of at most 128 characters." } };
+    }
+    const eventId = input.eventId.trim();
+    if (journey.eventIds.includes(eventId) || accepted.some(event => event.eventId === eventId)) {
+      duplicates.push(eventId);
+      continue;
+    }
+    if (!allowedTypes.has(input.type)) {
+      return { status: 400, body: { success: false, message: "Unsupported journey event type." } };
+    }
+    const recordedAt = input.recordedAt ? new Date(input.recordedAt) : null;
+    if (!recordedAt || Number.isNaN(recordedAt.getTime()) || recordedAt.getTime() > now.getTime() + 5 * 60 * 1000 || recordedAt.getTime() < now.getTime() - 7 * 24 * 60 * 60 * 1000) {
+      return { status: 400, body: { success: false, message: "Event timestamp must be valid, no more than 5 minutes in the future, and no older than 7 days." } };
+    }
+
+    let latitude = null;
+    let longitude = null;
+    let accuracyMeters = null;
+    if (input.type === "location") {
+      latitude = Number(input.latitude);
+      longitude = Number(input.longitude);
+      accuracyMeters = input.accuracyMeters == null ? null : Number(input.accuracyMeters);
+      if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180 ||
+          (accuracyMeters !== null && (!Number.isFinite(accuracyMeters) || accuracyMeters < 0 || accuracyMeters > 10000))) {
+        return { status: 400, body: { success: false, message: "Location event needs valid coordinates and optional accuracy from 0 to 10000 metres." } };
+      }
+    }
+    accepted.push({
+      eventId,
+      type: input.type,
+      recordedAt,
+      receivedAt: now,
+      latitude,
+      longitude,
+      accuracyMeters,
+      note: input.note == null ? null : String(input.note).slice(0, 500),
+      source: "device"
+    });
+  }
+
+  if (!accepted.length) {
+    return {
+      status: 200,
+      body: { success: true, acceptedCount: 0, duplicateEventIds: duplicates, status: journey.status, lastConfirmedLocation: journey.lastConfirmedLocation }
+    };
+  }
+
+  for (const event of accepted) {
+    journey.events.push(event);
+    journey.eventIds.push(event.eventId);
+    if (event.type === "location") {
+      const currentRecordedAt = journey.lastConfirmedLocation?.recordedAt ? new Date(journey.lastConfirmedLocation.recordedAt).getTime() : -Infinity;
+      if (event.recordedAt.getTime() >= currentRecordedAt) {
+        journey.lastConfirmedLocation = {
+          latitude: event.latitude,
+          longitude: event.longitude,
+          recordedAt: event.recordedAt,
+          receivedAt: now,
+          accuracyMeters: event.accuracyMeters,
+          placeLabel: null
+        };
+      }
+    } else if (event.type === "offline") {
+      journey.connectionStatus = "offline";
+    } else if (event.type === "online") {
+      journey.connectionStatus = "online";
+    } else if (event.type === "check_in") {
+      if (["OVERDUE_UNCONFIRMED", "ALERT_SENT"].includes(journey.status)) journey.status = "ACTIVE";
+      journey.checkInRequestedAt = null;
+    } else if (event.type === "arrival") {
+      journey.status = "ARRIVED";
+      journey.arrivedAt = event.recordedAt;
+    }
+  }
+
+  // Bound document growth while keeping a recent deduplication window for offline retries.
+  if (journey.events.length > 1000) journey.events = journey.events.slice(-1000);
+  if (journey.eventIds.length > 2000) journey.eventIds = journey.eventIds.slice(-2000);
+  await journey.save();
+
+  const last = journey.lastConfirmedLocation;
+  const remainingDistanceMeters = last && journey.route?.encodedPolyline
+    ? calculateRemainingDistanceMeters(journey.route.encodedPolyline, last.latitude, last.longitude)
+    : null;
+  return {
+    status: 200,
+    body: {
+      success: true,
+      acceptedCount: accepted.length,
+      duplicateEventIds: duplicates,
+      status: journey.status,
+      connectionStatus: journey.connectionStatus,
+      arrivedAt: journey.arrivedAt,
+      lastConfirmedLocation: journey.lastConfirmedLocation,
+      remainingDistanceMeters,
+      locationFreshness: last?.recordedAt
+        ? (now.getTime() - new Date(last.recordedAt).getTime() > 2 * 60 * 1000 ? "stale" : "recent")
+        : "unavailable"
+    }
+  };
+}
+
 async function getJourneyForViewer(journeyId, viewerId) {
   if (!/^[a-f\d]{24}$/i.test(String(journeyId || ""))) return null;
   const journey = await SafetyJourney.findOne({
@@ -228,6 +351,10 @@ async function getJourneyForViewer(journeyId, viewerId) {
     $or: [{ travellerId: viewerId }, { sharedWith: viewerId }]
   }).lean();
   if (!journey) return null;
+  const lastLocation = journey.lastConfirmedLocation;
+  const remainingDistanceMeters = lastLocation && journey.route?.encodedPolyline
+    ? calculateRemainingDistanceMeters(journey.route.encodedPolyline, lastLocation.latitude, lastLocation.longitude)
+    : null;
   return {
     id: String(journey._id),
     travellerId: String(journey.travellerId),
@@ -242,9 +369,14 @@ async function getJourneyForViewer(journeyId, viewerId) {
     gracePeriodMinutes: journey.gracePeriodMinutes,
     lastConfirmedLocation: journey.lastConfirmedLocation,
     sharingEnabled: journey.sharingEnabled,
+    connectionStatus: journey.connectionStatus || "unknown",
+    remainingDistanceMeters,
+    locationFreshness: lastLocation?.recordedAt
+      ? (Date.now() - new Date(lastLocation.recordedAt).getTime() > 2 * 60 * 1000 ? "stale" : "recent")
+      : "unavailable",
     arrivedAt: journey.arrivedAt,
     updatedAt: journey.updatedAt
   };
 }
 
-module.exports = { approveJourneyRoute, createJourneyDraft, getJourneyForViewer, prepareRouteOptions, validateJourneyDraft, validateShareRecipients };
+module.exports = { appendJourneyEvents, approveJourneyRoute, createJourneyDraft, getJourneyForViewer, prepareRouteOptions, validateJourneyDraft, validateShareRecipients };
