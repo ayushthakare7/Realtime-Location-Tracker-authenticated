@@ -249,27 +249,21 @@ exports.ask = async (req, res) => {
     return res.status(400).json({ success: false, message: "Consent is required before sending location records to the assistant." });
   }
 
-  // Reva history and general questions belong to the Python RAG microservice.
-  // Keep Node's LLM-based parsing limited to distance questions that the local planner cannot parse.
-  const distanceIntent = /\b(distance|how far|far away|away from|separation|separate|closer|closest|nearest|nearer|nearby|farthest|furthest|kilomet(?:er|re)s?|kms?|miles?|met(?:er|re)s?)\b/i.test(question);
-  if (!distanceIntent) return askMap(req, res);
-
+  // The semantic planner is the primary router for every question. It interprets
+  // intent and entities; only this controller executes trusted tools or invokes RAG.
   let parsed = null;
-
-  // First try the fast local planner. Common distance and comparison questions
-  // should not depend on an external LLM being reachable or returning valid JSON.
   try {
-    parsed = await fallbackParseDistanceQuestion(req, question);
+    parsed = await understandLocationQuestion(question);
   } catch (error) {
-    console.error("Local location-question planning failed:", error.message);
+    console.error("Semantic query planning failed:", error.message);
   }
 
-  // Use the LLM only when local rules cannot safely identify the question's plan.
+  // Keep a deterministic fallback for distance questions if the LLM is unavailable.
   if (!parsed) {
     try {
-      parsed = await understandLocationQuestion(question);
+      parsed = await fallbackParseDistanceQuestion(req, question);
     } catch (error) {
-      console.error("Location question understanding failed:", error.message);
+      console.error("Fallback location-question planning failed:", error.message);
     }
   }
 
@@ -303,5 +297,6 @@ exports.ask = async (req, res) => {
     }
   }
 
+  // History, events, and ordinary conversational questions are delegated to Python RAG.
   return askMap(req, res);
 };
