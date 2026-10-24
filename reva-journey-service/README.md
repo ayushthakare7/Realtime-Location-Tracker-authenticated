@@ -19,7 +19,8 @@ Health check: `GET http://localhost:3001/health`. All `/api/journeys` endpoints 
 - `GET /api/journeys/modes` — supported transport modes and matching avatar keys.
 - `POST /api/journeys` — create a draft from coordinates or place text; shared recipients must be accepted Reva friends in the shared MongoDB.
 - `POST /api/journeys/:id/routes` — calculate a route with the free public OpenStreetMap-based Valhalla service. Public endpoint has rate limits/no SLA; no API key or paid routing account is required.
-- `POST /api/journeys/:id/approve` — explicitly approve the route before sharing/tracking begins.\n- `PATCH /api/journeys/:id/eta` — set a new ETA after a safety check-in.
+- `POST /api/journeys/:id/approve` — explicitly approve the route before sharing/tracking begins.
+- `PATCH /api/journeys/:id/eta` — set a new ETA after a safety check-in.
 - `POST /api/journeys/:id/sync` — idempotently ingest 1–100 location, offline/online, check-in, arrival, emergency, or cancellation events; event IDs prevent duplicate sync.
 - `GET /api/journeys`, `GET /api/journeys/shared`, `GET /api/journeys/:id` — list own journeys, shared journeys, or a permitted journey.
 - `PATCH /api/journeys/:id/sharing`, `POST /api/journeys/:id/cancel` — stop sharing or cancel a journey.
