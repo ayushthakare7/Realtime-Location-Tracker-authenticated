@@ -6,6 +6,8 @@ const router = express.Router();
 router.use(auth);
 router.get("/modes", controller.listTravelModes);
 router.post("/", controller.createDraft);
+router.post("/:id/routes", controller.getRoutes);
+router.post("/:id/approve", controller.approveRoute);
 router.get("/", controller.listMine);
 router.get("/:id", controller.getOne);
 
