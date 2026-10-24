@@ -678,3 +678,165 @@ body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.3
     margin-bottom: 10px;
   }
 }
+
+
+/* Dark, game-inspired Reva theme */
+:root {
+  color-scheme: dark;
+  --canvas: #0b1118;
+  --surface: #121c25;
+  --ink: #e8f0ec;
+  --muted: #9aaba9;
+  --line: #263740;
+  --sage: #1c352d;
+  --sage-strong: #66d6a1;
+  --sage-dark: #237653;
+  --lavender: #28243d;
+  --shadow: 0 18px 48px rgba(0, 0, 0, .28);
+}
+html, body { background: #0b1118; color: #e8f0ec; }
+body {
+  background:
+    radial-gradient(ellipse at 14% 4%, rgba(43, 116, 91, .18), transparent 32rem),
+    radial-gradient(ellipse at 90% 15%, rgba(88, 76, 150, .16), transparent 35rem),
+    #0b1118;
+}
+.app-header {
+  background: rgba(13, 21, 29, .92);
+  border-bottom-color: #24343c;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .14);
+}
+.wordmark { color: #eef7f1; }
+.wordmark-mark {
+  background: linear-gradient(145deg, #203e32, #1b2b2e);
+  color: #7ce0ae;
+  border: 1px solid #315447;
+}
+.wordmark small { color: #8da39a; }
+.header-tagline { color: #e3f4e9; }
+.header-tagline em { color: #70dfa6; }
+.gps-pill {
+  color: #a8bab5;
+  background: #121e27;
+  border-color: #2b3c44;
+}
+.status-dot { background: #68dba0; }
+.logout-button, .secondary, #stop {
+  color: #c2d0cb;
+  background: #1a2830;
+  border-color: #30424a;
+}
+.logout-button:hover, .secondary:hover, #stop:hover { background: #22343b; }
+.page-intro h1 { color: #edf6f1; }
+.page-intro h1 em { color: #70dfa6; }
+.page-intro .eyebrow,
+.section-heading .eyebrow,
+.map-heading .eyebrow { color: #7eaa95; }
+.intro-copy, .muted { color: #9aaba9; }
+.privacy-note {
+  color: #9ce8bd;
+  background: rgba(39, 91, 67, .35);
+  border: 1px solid rgba(93, 169, 127, .25);
+}
+.panel {
+  color: #e5eee9;
+  background: linear-gradient(145deg, rgba(21, 32, 41, .98), rgba(16, 26, 35, .98));
+  border-color: #283a43;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, .22);
+}
+.section-icon {
+  color: #8be2b0;
+  background: linear-gradient(145deg, #203d32, #1a2c2e);
+}
+.friends-panel .section-icon {
+  color: #c7a9ff;
+  background: linear-gradient(145deg, #302a46, #242437);
+}
+.privacy-panel .section-icon {
+  color: #f0ca84;
+  background: linear-gradient(145deg, #3a3021, #2c2822);
+}
+input, textarea {
+  color: #e8f0ec;
+  background: #0d171f;
+  border-color: #30434b;
+}
+input::placeholder, textarea::placeholder { color: #6f8584; }
+input:focus, textarea:focus {
+  border-color: #5fbf91;
+  outline-color: rgba(95, 191, 145, .25);
+}
+#start, #friendForm button, #askForm button[type=submit] {
+  color: #071710;
+  background: linear-gradient(135deg, #79e3ae, #45bb86);
+  box-shadow: 0 7px 22px rgba(58, 187, 128, .15);
+}
+#start:hover, #friendForm button:hover, #askForm button[type=submit]:hover {
+  background: linear-gradient(135deg, #96edc0, #59cf98);
+}
+#status {
+  color: #a5b8af;
+  background: #0e191f;
+  border: 1px solid #253a3d;
+}
+.friend { border-bottom-color: #263740; }
+.friend strong { color: #e7f0eb; }
+.switch-row { color: #d4e1db; }
+.switch-row input { accent-color: #65d69d; }
+.map-heading h2 { color: #e5f1eb; }
+.map-caption { color: #8fa49c; }
+.map-frame {
+  border-color: #17252d;
+  box-shadow: 0 20px 55px rgba(0, 0, 0, .32);
+}
+.leaflet-container { background: #17262c; }
+.map-overlay {
+  background: rgba(14, 25, 31, .92);
+  border-color: rgba(104, 164, 135, .3);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, .25);
+}
+.map-overlay strong { color: #a0e5bd; }
+.map-overlay small { color: #9aaba9; }
+.radar-pulse { background: #71e2a7; }
+.radar-pulse:before, .radar-pulse:after { border-color: rgba(113, 226, 167, .5); }
+.map-hint {
+  color: #d2e1da;
+  background: rgba(12, 23, 29, .88);
+  border-color: rgba(120, 170, 145, .25);
+}
+.reva-card {
+  background: linear-gradient(135deg, #151f2b 0%, #211f32 100%);
+  border-color: #373448;
+}
+.reva-avatar {
+  color: #d4b9ff;
+  background: linear-gradient(145deg, #352b4c, #27263b);
+  border-color: #4a3d60;
+}
+.reva-subtitle { color: #b2a4ce; }
+.reva-prompts button {
+  color: #c7b8e8;
+  background: #1a1e2b;
+  border-color: #3a354e;
+}
+.reva-prompts button:hover {
+  color: #e4d9ff;
+  background: #29243b;
+  border-color: #615078;
+}
+#answer {
+  color: #c3d8cd;
+}
+#answer:not(:empty) {
+  background: rgba(10, 19, 26, .7);
+  border-color: #304149;
+}
+#askForm label { color: #9aaba9 !important; }
+#askForm label input { accent-color: #65d69d; }
+@media (prefers-reduced-motion: no-preference) {
+  .panel { transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease; }
+  .panel:hover {
+    border-color: #36544b;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, .28);
+  }
+}
