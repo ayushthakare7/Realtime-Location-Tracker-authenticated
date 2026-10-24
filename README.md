@@ -160,6 +160,48 @@ npm run rag:setup
 
 This can take time on the first run because the embedding model must be downloaded and existing events must be embedded. Ensure the vector index finishes building before testing semantic queries.
 
+## Deploy to Render
+
+This repository uses two separate Render web services. Deploy the Python RAG service first, then the Node.js app. Do not expose the Python service token in browser code.
+
+### Python RAG service
+
+Create or update a Render **Web Service** connected to this repository with:
+
+- **Root Directory:** `rag_service`
+- **Runtime:** Python
+- **Build Command:** `pip install -r requirements.txt`
+- **Start Command:** `python main.py`
+- **Health check path:** `/health` (use this if your Render plan/settings support health checks)
+
+Set these environment variables in Render (never commit their values):
+
+- `RAG_SERVICE_TOKEN`: a long random secret shared only with the Node service
+- `MONGO_URI`: the MongoDB Atlas connection string
+- `GROQ_API_KEY`: the Groq API key
+- Optional: `GROQ_MODEL`, `RAG_VECTOR_INDEX`, `RAG_TOP_K`, `EMBEDDING_MODEL`
+
+Render supplies `PORT` automatically. The service listens on that port in Render; for local development it defaults to port 8001.
+
+After deployment, verify `https://YOUR-RAG-SERVICE.onrender.com/health`. A healthy response should include `"success": true` and `"mongoConnected": true`.
+
+### Node.js web service
+
+Create or update a separate Render **Web Service** for the same repository with:
+
+- **Root Directory:** leave blank (repository root)
+- **Runtime:** Node
+- **Build Command:** `npm install`
+- **Start Command:** `npm start`
+
+Configure the app's existing required environment variables, including `MONGO_URI`, `JWT_SECRET`, and any mail/model provider keys used by the app, plus:
+
+- `RAG_SERVICE_URL`: the Python service base URL, for example `https://YOUR-RAG-SERVICE.onrender.com` (do not append `/ask`)
+- `RAG_SERVICE_TOKEN`: exactly the same secret as on the Python service
+- `CLIENT_ORIGIN`: the public URL of the web app if you need to set a specific CORS origin
+
+Deploy the Python service before the Node service. Then test sign-in, live location sharing, and a Reva question on the public web app. If either service has auto-deploy enabled, pushing a commit to the connected branch triggers a deployment; otherwise use Render's **Manual Deploy → Deploy latest commit**.
+
 ## Environment variables
 
 | Variable | Purpose |
