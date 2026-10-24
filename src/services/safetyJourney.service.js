@@ -372,7 +372,7 @@ async function getJourneyForViewer(journeyId, viewerId) {
   }).lean();
   if (!journey) return null;
   if (String(journey.travellerId) !== String(viewerId)) {
-    if (!journey.sharingEnabled) return null;
+    if (!journey.sharingEnabled || !["ACTIVE", "OVERDUE_UNCONFIRMED", "ALERT_SENT", "EMERGENCY_ALERTED", "ARRIVED"].includes(journey.status)) return null;
     const friendship = await Friendship.exists({
       status: "accepted",
       $or: [
