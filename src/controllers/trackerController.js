@@ -44,6 +44,32 @@ exports.respondToRequest = async (req, res) => {
   } catch { res.status(500).json({ success: false, message: "Could not respond." }); }
 };
 
+
+exports.removeFriend = async (req, res) => {
+  try {
+    const uid = String(req.user.userId);
+    const friendId = String(req.params.id || "");
+    if (!/^[a-f\\d]{24}$/i.test(friendId) || friendId === uid) {
+      return res.status(400).json({ success: false, message: "Invalid friend." });
+    }
+    const friendship = await Friendship.findOneAndDelete({
+      status: "accepted",
+      $or: [
+        { requester: uid, recipient: friendId },
+        { requester: friendId, recipient: uid }
+      ]
+    });
+    if (!friendship) {
+      return res.status(404).json({ success: false, message: "Friendship not found." });
+    }
+    req.app.get("io")?.to("user:" + friendId).emit("friend-removed", { userId: uid });
+    req.app.get("io")?.to("user:" + uid).emit("friend-removed", { userId: friendId });
+    res.json({ success: true, message: "Friend removed." });
+  } catch {
+    res.status(500).json({ success: false, message: "Could not remove friend." });
+  }
+};
+
 exports.setHistory = async (req, res) => {
   try {
     const enabled = req.body.enabled === true;
