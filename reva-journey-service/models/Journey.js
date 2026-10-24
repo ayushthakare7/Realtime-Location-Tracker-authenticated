@@ -17,7 +17,7 @@ const eventSchema = new mongoose.Schema({
   note: { type: String, trim: true, maxlength: 500, default: null }
 }, { _id: false });
 
-const journeySchema = new mongoose.Schema({
+const routeSchema = new mongoose.Schema({\n  provider: { type: String, default: null },\n  distanceMeters: { type: Number, min: 0, default: null },\n  durationSeconds: { type: Number, min: 0, default: null },\n  encodedPolyline: { type: String, maxlength: 200000, default: null },\n  routeLabels: { type: [String], default: [] },\n  approvedAt: { type: Date, default: null }\n}, { _id: false });\n\nconst journeySchema = new mongoose.Schema({
   travellerId: { type: String, required: true, index: true },
   travellerUsername: { type: String, trim: true, maxlength: 80, default: null },
   status: { type: String, enum: ["DRAFT", "ACTIVE", "OVERDUE_UNCONFIRMED", "ALERT_SENT", "EMERGENCY_ALERTED", "ARRIVED", "CANCELLED"], default: "DRAFT", index: true },
@@ -25,7 +25,7 @@ const journeySchema = new mongoose.Schema({
   destination: { type: pointSchema, required: true },
   transportModeId: { type: String, required: true, trim: true, maxlength: 64 },
   avatarKey: { type: String, required: true, trim: true, maxlength: 64 },
-  expectedArrivalAt: { type: Date, default: null, index: true },
+  expectedArrivalAt: { type: Date, default: null, index: true },\n  route: { type: routeSchema, default: null },
   sharingEnabled: { type: Boolean, default: false },
   sharedWith: { type: [String], default: [] },
   lastConfirmedLocation: {
