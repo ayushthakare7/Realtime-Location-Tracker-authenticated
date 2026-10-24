@@ -21,11 +21,24 @@ function cleanPlace(value, usernames = []) {
   for (const username of usernames) {
     result = result.replace(new RegExp(username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "ig"), " ");
   }
-  return result
+
+  const cleaned = result
     .replace(FILLER, " ")
     .replace(/[?!,.;:()]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+
+  // Collapse an entire place phrase repeated while the user rephrases a question.
+  // Examples: "Nagpur Nagpur" -> "Nagpur"; "New Delhi New Delhi" -> "New Delhi".
+  const words = cleaned.split(" ").filter(Boolean);
+  for (let phraseLength = 1; phraseLength <= Math.floor(words.length / 2); phraseLength++) {
+    if (words.length % phraseLength !== 0) continue;
+    const repeated = words.every((word, index) =>
+      word.toLowerCase() === words[index % phraseLength].toLowerCase()
+    );
+    if (repeated) return words.slice(0, phraseLength).join(" ");
+  }
+  return cleaned;
 }
 
 /**
