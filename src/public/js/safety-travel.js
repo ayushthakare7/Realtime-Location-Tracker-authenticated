@@ -65,6 +65,48 @@ async function loadFriends() {
 function selectedFriendIds() {
   return [...friendChoices.querySelectorAll('input[name="sharedWith"]:checked')].map(el => el.value);
 }
+async function loadFriendLiveJourneys() {
+  const status = document.getElementById("friendJourneysStatus");
+  const list = document.getElementById("friendJourneysList");
+  if (!status || !list) return;
+  try {
+    const body = await api("/api/journeys/shared");
+    const journeys = Array.isArray(body.journeys) ? body.journeys : [];
+    list.replaceChildren();
+    if (!journeys.length) {
+      status.textContent = "No friends are sharing an active Safety Travel journey with you right now.";
+      return;
+    }
+    for (const journey of journeys) {
+      const row = document.createElement("div");
+      row.className = "shared-journey-row";
+      const details = document.createElement("div");
+      const title = document.createElement("strong");
+      const state = String(journey.status || "STATUS_UNAVAILABLE").replaceAll("_", " ").toLowerCase();
+      title.textContent = String(journey.travellerUsername || "A friend") + " · " + state;
+      const meta = document.createElement("p");
+      const point = journey.lastConfirmedLocation;
+      meta.textContent = point && point.recordedAt && Number.isFinite(Date.parse(point.recordedAt))
+        ? "Last location update: " + new Date(point.recordedAt).toLocaleString()
+        : "Waiting for the first GPS location to sync.";
+      details.append(title, meta);
+      row.append(details);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "secondary shared-journey-view";
+      button.textContent = "Open this friend's live map";
+      button.addEventListener("click", () => {
+        window.location.href = "/tracker?journeyId=" + encodeURIComponent(String(journey.id));
+      });
+      row.append(button);
+      list.append(row);
+    }
+    status.textContent = journeys.length + " shared journey" + (journeys.length === 1 ? "" : "s") + ". Select a friend to open their map.";
+  } catch (error) {
+    status.textContent = error.message || "Could not load journeys shared with you.";
+  }
+}
+
 async function refreshServerLocationStatus() {
   const target = document.getElementById("serverLocationStatus");
   if (!target) return;
@@ -258,6 +300,8 @@ updateLastGpsStatus();
 refreshServerLocationStatus();
 refreshGpsPermission();
 loadFriends();
+loadFriendLiveJourneys();
+setInterval(loadFriendLiveJourneys, 10000);
 if (queueReady) {
   refreshQueueStatus();
   if (navigator.onLine) offlineQueue.flush().then(refreshQueueStatus).catch(() => {});
