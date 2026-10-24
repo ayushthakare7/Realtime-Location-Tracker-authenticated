@@ -29,7 +29,7 @@
     return points;
   }
   function validPoint(p) {
-    return p && Number.isFinite(Number(p.latitude)) && Number.isFinite(Number(p.longitude)) &&
+    return p && p.latitude != null && p.longitude != null && Number.isFinite(Number(p.latitude)) && Number.isFinite(Number(p.longitude)) &&
       Number(p.latitude)>=-90 && Number(p.latitude)<=90 && Number(p.longitude)>=-180 && Number(p.longitude)<=180;
   }
   function vehicleIcon(mode, heading=0) {
