@@ -83,7 +83,7 @@ router.post("/", async (req, res) => {
     origin: { latitude: Number(origin.latitude), longitude: Number(origin.longitude), label: origin.label || null },
     destination: { latitude: Number(destination.latitude), longitude: Number(destination.longitude), label: destination.label || null },
     transportModeId: b.transportModeId, avatarKey: b.transportModeId, expectedArrivalAt: b.expectedArrivalAt ? new Date(b.expectedArrivalAt) : null,
-    sharingEnabled: recipients.length > 0, sharedWith: recipients, status: "ACTIVE" });
+    sharingEnabled: false, sharedWith: recipients, status: "DRAFT" });
   if (journey.sharingEnabled) await notify(journey, "journey_shared", "A friend is sharing a Safety Travel journey",
     journey.travellerUsername + " started a shared journey.", "shared:" + journey._id);
   res.status(201).json({ success: true, journey: view(journey) });
@@ -93,12 +93,27 @@ router.post("/:id/routes", async (req, res) => {
   if (!validId(req.params.id)) return res.status(400).json({ success: false, message: "Invalid journey ID." });
   const journey = await Journey.findOne({ _id: req.params.id, travellerId: req.authUser.id });
   if (!journey) return res.status(404).json({ success: false, message: "Journey not found." });
-  if (!["DRAFT", "ACTIVE"].includes(journey.status) || journey.events.length) return res.status(409).json({ success: false, message: "Route cannot be changed after tracking events begin." });
+  if (journey.status !== "DRAFT" || journey.events.length) return res.status(409).json({ success: false, message: "Route cannot be changed after tracking events begin." });
   const route = await calculateRoute({ origin: journey.origin, destination: journey.destination, modeId: journey.transportModeId });
-  journey.route = { provider: route.provider, distanceMeters: route.distanceMeters, durationSeconds: route.durationSeconds, encodedPolyline: route.encodedPolyline, routeLabels: route.routeLabels, approvedAt: new Date() };
+  journey.route = { provider: route.provider, distanceMeters: route.distanceMeters, durationSeconds: route.durationSeconds, encodedPolyline: route.encodedPolyline, routeLabels: route.routeLabels, approvedAt: null };
   if (!journey.expectedArrivalAt) journey.expectedArrivalAt = new Date(Date.now() + route.durationSeconds * 1000);
   await journey.save();
   res.json({ success: true, route: journey.route, expectedArrivalAt: journey.expectedArrivalAt, requiresApproval: true });
+});
+
+router.post("/:id/approve", async (req, res) => {
+  if (!validId(req.params.id)) return res.status(400).json({ success: false, message: "Invalid journey ID." });
+  const j = await Journey.findOne({ _id: req.params.id, travellerId: req.authUser.id });
+  if (!j) return res.status(404).json({ success: false, message: "Journey not found." });
+  if (!j.route?.encodedPolyline) return res.status(409).json({ success: false, message: "Calculate a route before approving it." });
+  if (terminal.includes(j.status)) return res.status(409).json({ success: false, message: "A completed journey cannot be restarted." });
+  j.route.approvedAt = new Date();
+  j.status = "ACTIVE";
+  j.sharingEnabled = j.sharedWith.length > 0;
+  await j.save();
+  if (j.sharingEnabled) await notify(j, "journey_shared", "A friend is sharing a Safety Travel journey",
+    j.travellerUsername + " approved a route and started sharing a journey.", "shared:" + j._id);
+  res.json({ success: true, journey: view(j), routeApproved: true });
 });
 
 router.get("/", async (req, res) => {
@@ -146,7 +161,7 @@ router.post("/:id/sync", async (req, res) => {
     if (j.status === "EMERGENCY_ALERTED") await notify(j, "journey_emergency", "Emergency alert from your friend", j.travellerUsername + " explicitly requested help during Safety Travel. Try contacting them and contact local emergency services if needed.", "emergency:" + (j.emergencyAt?.toISOString() || j._id));
     if (j.status === "CANCELLED") await notify(j, "journey_cancelled", "Journey cancelled", j.travellerUsername + " cancelled their shared journey.", "cancelled:" + (j.cancelledAt?.toISOString() || j._id));
     if (req.body.events.some(e => e.type === "check_in")) {
-      await notify(j, "journey_arrived", "Safety check-in received", j.travellerUsername + " has checked in. Confirm their status directly if you are concerned.", "checkin:" + Date.now(), j.sharedWith);
+      await notify(j, "journey_safe_followup", "Safety check-in received", j.travellerUsername + " has checked in. Confirm their status directly if you are concerned.", "checkin:" + Date.now(), j.sharedWith);
     }
   }
   res.json({ success: true, acceptedCount, duplicateCount: req.body.events.length - acceptedCount, journey: view(j) });
@@ -165,7 +180,7 @@ router.post("/:id/cancel", async (req, res) => {
   if (!validId(req.params.id)) return res.status(400).json({ success: false, message: "Invalid journey ID." });
   const j = await Journey.findOne({ _id: req.params.id, travellerId: req.authUser.id });
   if (!j) return res.status(404).json({ success: false, message: "Journey not found." });
-  if (!terminal.includes(j.status)) { j.status = "CANCELLED"; j.cancelledAt = new Date(); j.sharingEnabled = false; await j.save(); }
+  if (!terminal.includes(j.status)) { j.status = "CANCELLED"; j.cancelledAt = new Date(); j.sharingEnabled = false; await j.save(); await notify(j, "journey_cancelled", "Journey cancelled", j.travellerUsername + " cancelled their shared journey.", "cancelled:" + j._id); }
   res.json({ success: true, journey: view(j) });
 });
 module.exports = router;
