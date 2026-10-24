@@ -1,5 +1,6 @@
 import os
 import hmac
+import threading
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
@@ -34,6 +35,8 @@ if MONGO_URI and not os.getenv("MONGO_DB_NAME"):
 mongo = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000) if MONGO_URI else None
 _embeddings = None
 _llm = None
+_embeddings_lock = threading.Lock()
+_llm_lock = threading.Lock()
 
 class GraphState(TypedDict, total=False):
     question: str
@@ -52,19 +55,31 @@ def collection():
 def embeddings():
     global _embeddings
     if _embeddings is None:
-        _embeddings = HuggingFaceEmbeddings(
-            model_name=EMBEDDING_MODEL,
-            model_kwargs={"device": "cpu"},
-            encode_kwargs={"normalize_embeddings": True},
-        )
+        with _embeddings_lock:
+            if _embeddings is None:
+                print(f"[Reva RAG] embedding model initialization started: {EMBEDDING_MODEL}", flush=True)
+                try:
+                    _embeddings = HuggingFaceEmbeddings(
+                        model_name=EMBEDDING_MODEL,
+                        model_kwargs={"device": "cpu"},
+                        encode_kwargs={"normalize_embeddings": True},
+                    )
+                    print("[Reva RAG] embedding model initialization completed", flush=True)
+                except Exception as exc:
+                    print(f"[Reva RAG] embedding model initialization failed: {type(exc).__name__}: {exc}", flush=True)
+                    raise
     return _embeddings
 
 def llm():
     global _llm
     if _llm is None:
-        if not GROQ_API_KEY:
-            raise RuntimeError("GROQ_API_KEY is missing")
-        _llm = ChatGroq(model=GROQ_MODEL, groq_api_key=GROQ_API_KEY, temperature=0)
+        with _llm_lock:
+            if _llm is None:
+                if not GROQ_API_KEY:
+                    raise RuntimeError("GROQ_API_KEY is missing")
+                print(f"[Reva RAG] Groq client initialization started: {GROQ_MODEL}", flush=True)
+                _llm = ChatGroq(model=GROQ_MODEL, groq_api_key=GROQ_API_KEY, temperature=0)
+                print("[Reva RAG] Groq client initialization completed", flush=True)
     return _llm
 
 def event_text(event: dict[str, Any]) -> str:
@@ -106,11 +121,14 @@ def index_event(event_id: str) -> bool:
     event = collection().find_one({"_id": ObjectId(event_id)})
     if not event:
         return False
+    print(f"[Reva RAG] indexing event {event_id}: embedding started", flush=True)
     vector = embeddings().embed_query(event_text(event))
+    print(f"[Reva RAG] indexing event {event_id}: embedding completed; MongoDB update starting", flush=True)
     collection().update_one(
         {"_id": event["_id"]},
         {"$set": {"embedding": vector, "embeddingModel": EMBEDDING_MODEL, "embeddingUpdatedAt": datetime.now(timezone.utc)}},
     )
+    print(f"[Reva RAG] indexing event {event_id}: completed", flush=True)
     return True
 
 def classify_node(state: GraphState) -> GraphState:
@@ -170,7 +188,9 @@ def retrieve_node(state: GraphState) -> GraphState:
     # Semantic retrieval is the primary path. It may fail if Atlas vector search
     # is not configured yet, or the vector index is still being built.
     try:
+        print("[Reva RAG] retrieve: embedding query started", flush=True)
         query_vector = embeddings().embed_query(state["question"])
+        print("[Reva RAG] retrieve: embedding query completed; vector search starting", flush=True)
         vector_filter: dict[str, Any] = {"userId": {"$in": ids}}
         if date_filter:
             vector_filter["recordedAt"] = date_filter
@@ -187,6 +207,7 @@ def retrieve_node(state: GraphState) -> GraphState:
             }},
         ]
         events = list(collection().aggregate(pipeline))
+        print(f"[Reva RAG] retrieve: vector search completed with {len(events)} events", flush=True)
         if events:
             print(f"[Reva RAG] semantic retrieval returned {len(events)} events", flush=True)
             return {"events": serialize(events)}
@@ -196,6 +217,7 @@ def retrieve_node(state: GraphState) -> GraphState:
 
     # Reliable non-vector fallback: query only authorized users and sort by time.
     # Include enough events to answer multi-place/stay-duration questions.
+    print("[Reva RAG] retrieve: MongoDB fallback query starting", flush=True)
     events = list(
         collection().find(base_query, fields)
         .sort([("startAt", -1)])
@@ -223,6 +245,7 @@ def generate_node(state: GraphState) -> GraphState:
         "currentLocations": context.get("currentLocations", []),
         "calculatedDistances": context.get("calculatedDistances", []),
     }
+    print("[Reva RAG] generate: Groq invocation starting", flush=True)
     response = llm().invoke([
         SystemMessage(content=(
             "You are Reva, a privacy-aware location assistant. Answer only from the authorized current context "
@@ -231,6 +254,7 @@ def generate_node(state: GraphState) -> GraphState:
         )),
         HumanMessage(content=f"Question: {state['question']}\nAuthorized current context: {safe_context}\nRetrieved history:\n{state.get('evidence', '')}"),
     ])
+    print("[Reva RAG] generate: Groq invocation completed", flush=True)
     return {"answer": str(response.content).strip()}
 
 def build_graph():
