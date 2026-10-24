@@ -113,9 +113,32 @@ router.post("/:id/approve", async (req, res) => {
   if (!j) return res.status(404).json({ success: false, message: "Journey not found." });
   if (!j.route?.encodedPolyline) return res.status(409).json({ success: false, message: "Calculate a route before approving it." });
   if (terminal.includes(j.status)) return res.status(409).json({ success: false, message: "A completed journey cannot be restarted." });
+
+  // Sharing choices are made on the route-review screen, after the draft exists.
+  // Accept the explicitly approved recipient list here instead of relying only on
+  // the draft's initial sharedWith value.
+  let recipients = j.sharedWith.map(String);
+  if (Object.hasOwn(req.body || {}, "sharedWith")) {
+    if (!Array.isArray(req.body.sharedWith)) return res.status(400).json({ success: false, message: "sharedWith must be an array of accepted friend IDs." });
+    recipients = [...new Set(req.body.sharedWith.map(String))];
+  }
+  if (recipients.length > 100 || recipients.some(id => !validId(id) || id === req.authUser.id)) {
+    return res.status(400).json({ success: false, message: "Invalid sharedWith list." });
+  }
+  if (recipients.length) {
+    const Friendship = require("./models/Friendship");
+    const links = await Friendship.find({ status: "accepted", $or: [
+      { requester: req.authUser.id, recipient: { $in: recipients } },
+      { recipient: req.authUser.id, requester: { $in: recipients } }
+    ] }).lean();
+    const accepted = new Set(links.map(f => String(f.requester) === req.authUser.id ? String(f.recipient) : String(f.requester)));
+    if (recipients.some(id => !accepted.has(id))) return res.status(403).json({ success: false, message: "Every shared recipient must be an accepted Reva friend." });
+  }
+
+  j.sharedWith = recipients;
   j.route.approvedAt = new Date();
   j.status = "ACTIVE";
-  j.sharingEnabled = j.sharedWith.length > 0;
+  j.sharingEnabled = recipients.length > 0;
   await j.save();
   if (j.sharingEnabled) await notify(j, "journey_shared", "A friend is sharing a Safety Travel journey",
     j.travellerUsername + " approved a route and started sharing a journey.", "shared:" + j._id);
