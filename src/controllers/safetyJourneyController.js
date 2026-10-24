@@ -111,7 +111,18 @@ exports.appendEvents = async (req, res) => {
     const journey = await SafetyJourney.findOne({ _id: req.params.id, travellerId: req.user.userId }).lean();
     if (journey && result.body.acceptedCount > 0) {
       const io = req.app.get("io");
-      if (journey.status === "ARRIVED") {
+      if (journey.status === "EMERGENCY_ALERTED" && incomingEvents.some(event => event?.type === "emergency")) {
+        await notifyJourneyRecipients({
+          io,
+          journey,
+          recipients: journey.sharingEnabled ? journey.sharedWith : [],
+          type: "journey_emergency",
+          title: "Emergency alert from your friend",
+          body: journey.travellerUsername + " explicitly requested help during their Safety Travel journey. Try contacting them and use local emergency services if appropriate.",
+          payload: { journeyId: String(journey._id), status: journey.status, alertSentAt: journey.alertSentAt },
+          keySuffix: "emergency"
+        });
+      } else if (journey.status === "ARRIVED") {
         await notifyJourneyRecipients({
           io,
           journey,
@@ -122,7 +133,7 @@ exports.appendEvents = async (req, res) => {
           payload: { journeyId: String(journey._id), status: journey.status, arrivedAt: journey.arrivedAt, destination: journey.destination?.label || journey.destinationText },
           keySuffix: "arrived"
         });
-      } else if (beforeJourney?.status === "ALERT_SENT" && incomingEvents.some(event => event?.type === "check_in")) {
+      } else if (["ALERT_SENT", "EMERGENCY_ALERTED"].includes(beforeJourney?.status) && incomingEvents.some(event => event?.type === "check_in")) {
         await notifyJourneyRecipients({
           io,
           journey,
