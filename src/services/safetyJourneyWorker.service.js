@@ -9,6 +9,7 @@ const POLL_INTERVAL_MS = Math.max(10000, Number(process.env.JOURNEY_WORKER_INTER
 async function processSafetyDeadlines(io, now = new Date()) {
   const active = await SafetyJourney.find({
     status: "ACTIVE",
+    sharingEnabled: true,
     expectedArrivalAt: { $ne: null, $lte: now }
   }).limit(500);
 
@@ -41,6 +42,7 @@ async function processSafetyDeadlines(io, now = new Date()) {
   const cutoff = new Date(now.getTime() - CHECK_IN_GRACE_MINUTES * 60000);
   const awaiting = await SafetyJourney.find({
     status: "OVERDUE_UNCONFIRMED",
+    sharingEnabled: true,
     checkInRequestedAt: { $ne: null, $lte: cutoff }
   }).limit(500);
 
