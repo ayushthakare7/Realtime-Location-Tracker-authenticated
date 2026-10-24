@@ -355,6 +355,17 @@ async function getJourneyForViewer(journeyId, viewerId) {
     $or: [{ travellerId: viewerId }, { sharedWith: viewerId }]
   }).lean();
   if (!journey) return null;
+  if (String(journey.travellerId) !== String(viewerId)) {
+    if (!journey.sharingEnabled) return null;
+    const friendship = await Friendship.exists({
+      status: "accepted",
+      $or: [
+        { requester: viewerId, recipient: journey.travellerId },
+        { requester: journey.travellerId, recipient: viewerId }
+      ]
+    });
+    if (!friendship) return null;
+  }
   const lastLocation = journey.lastConfirmedLocation;
   const remainingDistanceMeters = lastLocation && journey.route?.encodedPolyline
     ? calculateRemainingDistanceMeters(journey.route.encodedPolyline, lastLocation.latitude, lastLocation.longitude)
