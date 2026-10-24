@@ -284,10 +284,26 @@ class RevaRAGHandler(BaseHTTPRequestHandler):
             })
             return
         if path == "/health":
-            self.send_json(200, {
-                "success": True,
+            configured = bool(TOKEN and MONGO_URI and GROQ_API_KEY)
+            mongo_ok = False
+            mongo_error = None
+            try:
+                if mongo is None:
+                    raise RuntimeError("MONGO_URI is missing")
+                mongo.admin.command("ping")
+                mongo_ok = True
+            except Exception as exc:
+                mongo_error = type(exc).__name__
+            healthy = configured and mongo_ok
+            self.send_json(200 if healthy else 503, {
+                "success": healthy,
                 "service": "reva-rag",
-                "configured": bool(TOKEN and MONGO_URI and GROQ_API_KEY),
+                "configured": configured,
+                "mongoConnected": mongo_ok,
+                "mongoError": mongo_error,
+                "vectorIndex": VECTOR_INDEX,
+                "embeddingModel": EMBEDDING_MODEL,
+                "answerModelConfigured": bool(GROQ_API_KEY),
             })
             return
         self.send_json(404, {"success": False, "detail": "Not found"})
