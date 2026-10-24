@@ -56,3 +56,9 @@
 .travel-footer{display:flex;justify-content:space-between;gap:12px;padding:22px 4px 0;color:#899389;font-size:10px}
 @media(max-width:820px){.travel-hero{grid-template-columns:1fr;gap:10px}.travel-hero-art{min-height:190px}.travel-layout{grid-template-columns:1fr}.travel-side{display:grid;grid-template-columns:1fr 1fr;align-items:start}}
 @media(max-width:560px){.travel-header{padding:12px 15px}.travel-back{font-size:11px;padding:9px 11px}.travel-shell{padding:20px 13px}.travel-hero{padding:24px 19px;border-radius:22px}.travel-hero h1{letter-spacing:-1.4px}.travel-hero-art{min-height:170px}.travel-layout{gap:13px;margin-top:14px}.travel-main-card{padding:19px}.travel-card-heading h2{font-size:19px}.travel-form-grid{grid-template-columns:1fr}.travel-side{display:flex}.travel-side-card{padding:19px}.travel-footer{flex-direction:column;gap:4px}}
+
+/* Accessible live connection and offline-queue status */
+.travel-offline-card p[role="status"]{font-weight:750;color:#315748}
+.travel-offline-card p[data-state="offline"]{color:#96633c}
+.travel-offline-card p[data-state="online"]{color:#315748}
+.travel-offline-card .offline-disclaimer{margin-top:8px;padding-top:8px;border-top:1px solid #e5e0ed;font-size:10px}
