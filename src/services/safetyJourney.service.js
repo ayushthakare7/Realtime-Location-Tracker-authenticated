@@ -318,6 +318,9 @@ async function appendJourneyEvents({ journeyId, travellerId, events }) {
     } else if (event.type === "arrival") {
       journey.status = "ARRIVED";
       journey.arrivedAt = event.recordedAt;
+    } else if (event.type === "emergency") {
+      journey.status = "EMERGENCY_ALERTED";
+      journey.alertSentAt = now;
     }
   }
 
