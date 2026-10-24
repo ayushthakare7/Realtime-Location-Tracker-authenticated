@@ -6,7 +6,6 @@
   <meta name="theme-color" content="#f6f6f2">
   <title>Who's Out There? — Sign In</title>
   <link rel="stylesheet" href="/css/style.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <style>
     .auth-page{min-height:100vh;display:grid;place-items:center;padding:28px 16px;background:var(--canvas)}
     .auth-card{width:min(100%,440px);padding:clamp(25px,6vw,42px);border:1px solid var(--line);border-radius:25px;background:rgba(255,254,250,.94);box-shadow:0 24px 80px rgba(42,59,48,.09)}
@@ -67,85 +66,42 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
   }
 });
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://unpkg.com/globe.gl"></script>
 <script>
   (() => {
-    const mapElement = document.getElementById("authMap");
-    if (!mapElement || !window.L) return;
-    const authMap = L.map(mapElement, {
-      zoomControl: false,
-      attributionControl: false,
-      dragging: false,
-      touchZoom: false,
-      scrollWheelZoom: false,
-      doubleClickZoom: false,
-      boxZoom: false,
-      keyboard: false,
-      tap: false,
-      zoomAnimation: false,
-      fadeAnimation: false,
-      markerZoomAnimation: false,
-      inertia: false
-    }).setView([18, 0], 2);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "© OpenStreetMap contributors",
-      subdomains: "abc",
-      maxZoom: 19
-    }).addTo(authMap);
-    setTimeout(() => authMap.invalidateSize(false), 100);
+    const host = document.getElementById("authMap");
+    if (!host || typeof Globe !== "function") return;
 
-    // Continuous, low-speed world-map drift with no stop/start animation cycles.
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    let animationFrame = null;
-    let previousFrame = 0;
-    let horizontalCarry = 0;
-    let verticalCarry = 0;
+    const world = Globe()(host)
+      .globeImageUrl("https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg")
+      .bumpImageUrl("https://unpkg.com/three-globe/example/img/earth-topology.png")
+      .backgroundColor("rgba(0,0,0,0)")
+      .showAtmosphere(true)
+      .atmosphereColor("#a9c9d6")
+      .atmosphereAltitude(0.16)
+      .width(host.clientWidth || window.innerWidth)
+      .height(host.clientHeight || window.innerHeight);
 
-    const animateWorldMap = (timestamp) => {
-      if (reducedMotion.matches || document.hidden) {
-        animationFrame = null;
-        previousFrame = 0;
-        return;
-      }
-      if (!previousFrame) previousFrame = timestamp;
-      const elapsed = Math.min(timestamp - previousFrame, 50);
-      previousFrame = timestamp;
+    const controls = world.controls();
+    controls.enableZoom = false;
+    controls.enablePan = false;
+    controls.enableRotate = false;
+    controls.autoRotate = !reducedMotion.matches;
+    controls.autoRotateSpeed = 0.22;
+    world.pointOfView({ lat: 16, lng: 5, altitude: 2.15 }, 0);
 
-      // Move at a steady pace; fractional pixels are accumulated to avoid jitter.
-      horizontalCarry += elapsed * 0.018;
-      verticalCarry += elapsed * 0.003;
-      const dx = Math.trunc(horizontalCarry);
-      const dy = Math.trunc(verticalCarry);
-      if (dx !== 0 || dy !== 0) {
-        horizontalCarry -= dx;
-        verticalCarry -= dy;
-        authMap.panBy([dx, dy], { animate: false, noMoveStart: true });
-      }
-      animationFrame = window.requestAnimationFrame(animateWorldMap);
+    const resize = () => {
+      world.width(host.clientWidth || window.innerWidth)
+        .height(host.clientHeight || window.innerHeight);
     };
+    window.addEventListener("resize", resize, { passive: true });
 
-    const startMapMotion = () => {
-      if (!reducedMotion.matches && !document.hidden && animationFrame === null) {
-        previousFrame = 0;
-        animationFrame = window.requestAnimationFrame(animateWorldMap);
-      }
+    const syncMotion = () => {
+      controls.autoRotate = !reducedMotion.matches && !document.hidden;
     };
-    const stopMapMotion = () => {
-      if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
-      animationFrame = null;
-      previousFrame = 0;
-    };
-
-    startMapMotion();
-    document.addEventListener("visibilitychange", () => {
-      if (document.hidden) stopMapMotion();
-      else startMapMotion();
-    });
-    reducedMotion.addEventListener?.("change", () => {
-      if (reducedMotion.matches) stopMapMotion();
-      else startMapMotion();
-    });
-
+    document.addEventListener("visibilitychange", syncMotion);
+    reducedMotion.addEventListener?.("change", syncMotion);
   })();
 </script>
 
