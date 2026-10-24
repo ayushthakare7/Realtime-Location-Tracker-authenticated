@@ -12,6 +12,19 @@ let queueReady = false;
 let trackingJourneyId = null;
 let gpsWatchId = null;
 
+
+function updateLastGpsStatus() {
+  const lastGpsStatus = document.getElementById("lastGpsStatus");
+  if (!lastGpsStatus) return;
+  let value = null;
+  try { value = localStorage.getItem("reva-safety-travel-last-gps-at"); } catch (_) {}
+  if (!value || !Number.isFinite(Date.parse(value))) {
+    lastGpsStatus.textContent = "No GPS fix has been saved on this device yet.";
+    return;
+  }
+  lastGpsStatus.textContent = "Last GPS fix saved on this device: " + new Date(value).toLocaleString() + ". This is not proof that friends have received the location.";
+}
+
 function setConnectionStatus() {
   if (!connectionStatus) return;
   if (navigator.onLine) {
@@ -140,6 +153,7 @@ window.RevaSafetyTravelOffline = Object.freeze({
 });
 
 setConnectionStatus();
+updateLastGpsStatus();
 refreshGpsPermission();
 if (queueReady) {
   refreshQueueStatus();
