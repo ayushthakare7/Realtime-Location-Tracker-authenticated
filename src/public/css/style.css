@@ -191,3 +191,81 @@ textarea { margin: 0; }
 .reva-pin-friend:after{content:"";position:absolute;inset:-8px;border:1px solid rgba(139,121,168,.5);border-radius:50%;animation:reva-friend-ping 2s ease-out infinite}
 @keyframes reva-friend-ping{0%{transform:scale(.55);opacity:.8}100%{transform:scale(1.8);opacity:0}}
 @media(prefers-reduced-motion:reduce){.radar-pulse:before,.radar-pulse:after,.reva-pin-friend:after{animation:none}.reva-pin{transition:none}}
+
+/* Reva: restore the original dashboard composition, with a square radar */
+:root{
+  --canvas:#f3f0e9;
+  --surface:#fffdf8;
+  --ink:#202c2b;
+  --muted:#777f7b;
+  --line:#e5e0d6;
+  --sage:#dce8dd;
+  --sage-strong:#577966;
+  --sage-dark:#294d40;
+  --lavender:#eee8f5;
+  --shadow:0 18px 50px rgba(39,48,43,.075);
+}
+body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.38),transparent 32%),linear-gradient(180deg,#f7f5ef 0%,var(--canvas) 100%)}
+.app-header{background:rgba(255,253,248,.88);border-bottom-color:rgba(219,213,202,.8);backdrop-filter:blur(18px)}
+.wordmark-mark{background:linear-gradient(145deg,#dce8dc,#e9e0f0);color:#344e42;box-shadow:inset 0 1px 0 rgba(255,255,255,.85)}
+.wordmark strong{font-size:23px;letter-spacing:-1px}
+.page-intro{min-height:0;padding:23px 24px 20px;max-width:1440px}
+.page-intro h1{font-size:clamp(29px,3.2vw,40px);letter-spacing:-1.8px}
+.page-intro .intro-copy{font-size:13px}
+.page-intro .privacy-note{background:#e9e2f0;color:#716084}
+.dashboard-grid{grid-template-columns:minmax(265px,320px) minmax(0,1fr);gap:22px;align-items:start}
+.dashboard-grid aside{grid-column:1;grid-row:1}
+.dashboard-grid .map-stage{grid-column:2;grid-row:1;width:100%;max-width:none;min-width:0;margin:0;padding:0}
+.dashboard-grid .map-stack{display:contents}
+.dashboard-grid .reva-card{grid-column:1/-1;grid-row:2;margin-top:0;padding:24px 26px}
+.dashboard-grid .map-heading{align-items:center;margin:0 3px 12px}
+.dashboard-grid .map-heading h2{font-size:18px}
+.map-stage .map-frame{position:relative;width:100%;aspect-ratio:1/1;height:auto;min-height:0;border:1px solid rgba(255,255,255,.9);border-radius:24px;overflow:hidden;background:#e7ebe3;box-shadow:0 22px 60px rgba(39,48,43,.12),0 0 0 5px rgba(255,253,248,.78)}
+.map-stage #map{position:absolute;inset:0;width:100%;height:100%;min-height:0;max-height:none;border:0;border-radius:22px;box-shadow:none}
+.map-overlay{background:rgba(255,253,248,.91);border-color:rgba(255,255,255,.88);box-shadow:0 10px 30px rgba(32,44,43,.13)}
+.map-overlay strong{color:#294d40}
+.map-hint{background:rgba(255,253,248,.94);color:#52675b}
+.radar-pulse{background:#b18bce}
+.radar-pulse:before,.radar-pulse:after{border-color:rgba(177,139,206,.65)}
+.reva-card{background:linear-gradient(115deg,#fffdf8 0%,#f5f1f7 55%,#eef3ec 100%);border-color:#e5dfeb;box-shadow:0 20px 55px rgba(50,47,58,.07)}
+.reva-avatar{background:linear-gradient(145deg,#e9e0f2,#dce9df);border-color:#e0d8e9;color:#6d5a85;box-shadow:inset 0 1px 0 rgba(255,255,255,.8)}
+.reva-title{font-size:22px}
+.reva-prompts button{background:rgba(255,255,255,.76);border-color:#e3dbea;color:#6d5c7e}
+#askForm button[type=submit],#start,#friendForm button{background:linear-gradient(135deg,#345e4b,#263f38);box-shadow:0 8px 20px rgba(41,77,64,.18)}
+#askForm button[type=submit]:hover,#start:hover,#friendForm button:hover{background:linear-gradient(135deg,#294d40,#1f3831)}
+.panel{border-color:rgba(224,219,209,.9);box-shadow:0 12px 34px rgba(39,48,43,.055)}
+.section-icon{background:linear-gradient(145deg,#e2ebe0,#edf0e7);color:#4e705b}
+.friends-panel .section-icon{background:linear-gradient(145deg,#ece3f4,#f2edf6);color:#7b6594}
+.privacy-panel .section-icon{background:linear-gradient(145deg,#f4ead8,#f8f1e6);color:#987d4f}
+@media(min-width:781px){
+  .dashboard-grid .map-stage .map-caption{font-size:10px}
+  .dashboard-grid aside .panel{padding:18px;margin-bottom:13px}
+  .dashboard-grid .reva-card{margin-top:0}
+}
+@media(max-width:1000px) and (min-width:781px){
+  .dashboard-grid{grid-template-columns:minmax(240px,.78fr) minmax(0,1.22fr);gap:16px}
+  .dashboard-grid .map-stage .map-heading{align-items:flex-start;flex-direction:column;gap:4px}
+  .dashboard-grid .map-stage .map-heading h2{font-size:16px}
+  .dashboard-grid aside .panel{padding:15px}
+}
+@media(max-width:780px){
+  .page-intro{padding:25px 18px 18px}
+  .dashboard-grid{grid-template-columns:1fr;gap:14px}
+  .dashboard-grid aside{grid-column:1;grid-row:2}
+  .dashboard-grid .map-stage{grid-column:1;grid-row:1;padding:0}
+  .dashboard-grid .map-stack{display:contents}
+  .dashboard-grid .reva-card{grid-column:1;grid-row:3;padding:20px}
+  .dashboard-grid .map-stage .map-heading{align-items:flex-start;flex-direction:row}
+  .dashboard-grid .map-stage .map-caption{font-size:10px}
+  .map-stage .map-frame{aspect-ratio:1/1;border-radius:20px}
+  .map-stage #map{height:100%;min-height:0;border-radius:19px}
+}
+@media(max-width:520px){
+  .page-intro{padding:23px 17px 17px}
+  .page-intro h1{font-size:35px}
+  .dashboard-grid .map-stage .map-heading{flex-direction:column;gap:3px}
+  .dashboard-grid .map-stage .map-heading h2{font-size:17px}
+  .map-stage .map-frame{border-radius:18px}
+  .map-stage #map{border-radius:17px}
+  .dashboard-grid .reva-card{padding:18px}
+}
