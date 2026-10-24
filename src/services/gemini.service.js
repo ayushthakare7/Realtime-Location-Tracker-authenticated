@@ -25,37 +25,38 @@ async function groqChat(messages, { temperature = 0.2, max_tokens = 450 } = {}) 
 }
 
 
+function normalizeLocationPlan(plan) {
+  if (!plan || typeof plan !== "object" || Array.isArray(plan)) throw new Error("Location planner returned an invalid object");
+  const allowedIntents = new Set(["distance", "compare_places", "nearest_person", "history", "other"]);
+  if (!allowedIntents.has(plan.intent)) throw new Error("Location planner returned an unsupported intent");
+  const textOrNull = value => typeof value === "string" && value.trim() ? value.trim().slice(0, 160) : null;
+  const allowedTypes = new Set(["person", "place", "unknown", "me"]);
+  const origin = allowedTypes.has(plan.origin) ? plan.origin : "unknown";
+  const destinationType = allowedTypes.has(plan.destinationType) ? plan.destinationType : "unknown";
+  const targetType = allowedTypes.has(plan.targetType) ? plan.targetType : "unknown";
+  const places = Array.isArray(plan.places) ? plan.places.slice(0, 2).map(textOrNull).filter(Boolean) : [];
+  const normalized = { intent: plan.intent, origin, originPerson: textOrNull(plan.originPerson), originPlace: textOrNull(plan.originPlace), destination: textOrNull(plan.destination), destinationType, targetType, target: textOrNull(plan.target), places, relation: plan.relation === "farthest" ? "farthest" : "closest" };
+  if (normalized.intent === "distance") {
+    if (normalized.origin === "friend" && normalized.originPerson) normalized.originType = "person";
+    else if (normalized.origin === "me") normalized.originType = "person";
+    else if (normalized.origin === "place" && normalized.originPlace) normalized.originType = "place";
+    else throw new Error("Location planner could not identify the distance origin");
+    if (!normalized.destination || !["person", "place"].includes(normalized.destinationType)) throw new Error("Location planner could not identify the distance destination");
+  } else if (normalized.intent === "compare_places") {
+    if (normalized.places.length !== 2 || !normalized.target || !["me", "person", "place"].includes(normalized.targetType)) throw new Error("Location planner could not identify the comparison endpoints");
+  } else if (normalized.intent === "nearest_person") {
+    if (!normalized.target || !["me", "person", "place"].includes(normalized.targetType)) throw new Error("Location planner could not identify the comparison target");
+  }
+  return normalized;
+}
+
 async function understandLocationQuestion(question) {
   const raw = await groqChat([
-    {
-      role: "system",
-      content: `You are Reva's location-query parser. Your job is ONLY to identify what a user is asking so the application can perform deterministic location calculations with authorized database coordinates. Do not answer the question and do not calculate anything.
-
-Return ONLY valid JSON with exactly these keys:
-{
-  "intent": "distance" | "current_location" | "history" | "other",
-  "origin": "me" | "friend" | "unknown",
-  "originPerson": string | null,
-  "destination": string | null,
-  "destinationType": "place" | "person" | "unknown"
+    { role: "system", content: "You are Reva's semantic query planner. Interpret meaning, not exact keywords or sentence templates. Do not answer, calculate distances, invent coordinates, or access private data. Return ONLY JSON with keys:\n{\"intent\":\"distance|compare_places|nearest_person|history|other\",\"origin\":\"me|friend|place|unknown\",\"originPerson\":string|null,\"originPlace\":string|null,\"destination\":string|null,\"destinationType\":\"place|person|unknown\",\"targetType\":\"me|person|place|unknown\",\"target\":string|null,\"places\":string[],\"relation\":\"closest|farthest\"|null}\nInterpret unusual, ungrammatical, or repeated phrasing semantically:\n- \"Nagpur is away, how many kilometers Nagpur is away from me\" => distance from me to place Nagpur.\n- \"What is the distance between me and Nagpur?\" => distance from me to place Nagpur.\n- \"How far would I need to drive to reach Nagpur?\" => distance from me to place Nagpur.\n- \"How far is Raipur from my friend Siddhant?\" => distance from friend Siddhant to place Raipur.\n- \"How far is Siddhant from me?\" => distance from me to person Siddhant.\n- \"Distance between Nagpur and Raipur\" => distance between places; origin=\"place\", originPlace=\"Nagpur\", destination=\"Raipur\", destinationType=\"place\".\n- \"Which is closer to me, Nagpur or Raipur?\" => compare_places, targetType=\"me\", target=\"me\", places=[\"Nagpur\",\"Raipur\"].\n- \"Which friend is farthest from Nagpur?\" => nearest_person, relation=\"farthest\", targetType=\"place\", target=\"Nagpur\".\n- Past location/event questions => history. Unrelated questions => other.\nFor distance, identify origin and destination. A friend origin requires originPerson; a place origin requires originPlace. destinationType distinguishes person from geocodable place. compare_places requires exactly two places and a target. nearest_person requires target and relation. Never assume a named person is authorized; the application enforces permissions." },
+    { role: "user", content: String(question || "").slice(0, 500) }
+  ], { temperature: 0, max_tokens: 300 });
+  const cleaned = raw.replace(/^```(?:json)?\\s*/i, "").replace(/\\s*```$/i, "").trim();
+  return normalizeLocationPlan(JSON.parse(cleaned));
 }
 
-For a distance question, identify the two endpoints. If the user asks how far a city/place is from a named friend, set origin="friend", originPerson to that person's username/name, destination to the place, destinationType="place". If the user asks how far a place is from themselves, set origin="me". If the user asks distance between two people, use origin="friend" and destinationType="person" for the second person. Preserve the person's name/username exactly as written when possible.
-
-Examples:
-"how far is Raipur from my friend Siddhant" -> {"intent":"distance","origin":"friend","originPerson":"Siddhant","destination":"Raipur","destinationType":"place"}
-"what is the distance from user2 to Nagpur" -> {"intent":"distance","origin":"friend","originPerson":"user2","destination":"Nagpur","destinationType":"place"}
-"how much distance is Nagpur from user2" -> {"intent":"distance","origin":"friend","originPerson":"user2","destination":"Nagpur","destinationType":"place"}
-"how far am I from Mumbai" -> {"intent":"distance","origin":"me","originPerson":null,"destination":"Mumbai","destinationType":"place"}
-"how far is Siddhant from me" -> {"intent":"distance","origin":"me","originPerson":null,"destination":"Siddhant","destinationType":"person"}
-"where was I yesterday" -> {"intent":"history","origin":"unknown","originPerson":null,"destination":null,"destinationType":"unknown"}`
-    },
-    { role: "user", content: String(question || "") }
-  ], { temperature: 0, max_tokens: 180 });
-
-  const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-  const parsed = JSON.parse(cleaned);
-  return parsed;
-}
-
-module.exports = { understandLocationQuestion, groqChat };
+module.exports = { understandLocationQuestion, groqChat, normalizeLocationPlan };
