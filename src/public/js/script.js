@@ -37,13 +37,23 @@ function distanceMeters(aLat, aLon, bLat, bLon) {
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(aLat)) * Math.cos(rad(bLat)) * Math.sin(dLon / 2) ** 2;
   return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
+function createRadarIcon(isMe) {
+  const kind = isMe ? "reva-pin-me" : "reva-pin-friend";
+  return L.divIcon({
+    className: "reva-marker-shell",
+    html: '<span class="reva-pin ' + kind + '"><i></i></span>',
+    iconSize: [28, 28],
+    iconAnchor: [14, 14]
+  });
+}
+
 function upsertMarker(data, accuracy) {
   if (!data || !Number.isFinite(Number(data.latitude)) || !Number.isFinite(Number(data.longitude))) return;
   const id = String(data.userId || data.username);
   const point = [Number(data.latitude), Number(data.longitude)];
   if (markers.has(id)) markers.get(id).setLatLng(point);
   else {
-    const marker = L.marker(point).addTo(map).bindTooltip(data.username || "Friend", { permanent: true, direction: "top" });
+    const marker = L.marker(point, { icon: createRadarIcon(id === "me") }).addTo(map).bindTooltip(data.username || "Friend", { permanent: true, direction: "top" });
     markers.set(id, marker);
   }
   if (accuracy && Number.isFinite(Number(accuracy))) {
@@ -82,8 +92,11 @@ async function animateCrewReveal() {
       const tooltip = marker.getTooltip();
       const friendName = tooltip ? String(tooltip.getContent()) : "your friend";
       hint.textContent = "Connecting the dots · " + friendName;
+      const markerElement = marker.getElement();
+      if (markerElement) markerElement.classList.add("radar-targeted");
       map.flyTo(marker.getLatLng(), 13, { duration: 1.05 });
       await wait(1250);
+      if (markerElement) markerElement.classList.remove("radar-targeted");
     }
 
     const bounds = L.latLngBounds([...markers.values()].map(marker => marker.getLatLng()));
