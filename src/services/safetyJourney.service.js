@@ -1,6 +1,7 @@
 const Friendship = require("../models/Friendship");
 const SafetyJourney = require("../models/SafetyJourney");
 const User = require("../models/User");
+const Location = require("../models/Location");
 const { resolveTravelMode } = require("./travelMode.service");
 const { resolveAndRoute } = require("./journeyRouting.service");
 const { calculateRemainingDistanceMeters } = require("./routeProgress.service");
@@ -126,10 +127,22 @@ async function prepareRouteOptions({ journeyId, travellerId }) {
     return { status: 409, body: { success: false, message: "Routes can only be changed before the journey starts." } };
   }
 
+  const originIsCurrentLocation = /^(my )?(current location|current position|here|my location)$/i.test(String(journey.originText || "").trim());
+  let currentOrigin = null;
+  if (originIsCurrentLocation) {
+    const latest = await Location.findOne({ userId: travellerId }).lean();
+    if (!latest || !latest.lastSeen || Date.now() - new Date(latest.lastSeen).getTime() > 5 * 60 * 1000) {
+      const error = new Error("Your latest GPS location is missing or older than 5 minutes. Update location sharing, or enter a specific origin.");
+      error.code = "ORIGIN_LOCATION_STALE";
+      throw error;
+    }
+    currentOrigin = { latitude: latest.latitude, longitude: latest.longitude };
+  }
   const result = await resolveAndRoute({
     originText: journey.originText,
     destinationText: journey.destinationText,
-    modeId: journey.transportModeId
+    modeId: journey.transportModeId,
+    currentOrigin
   });
   journey.origin = result.origin;
   journey.destination = result.destination;
