@@ -820,3 +820,42 @@ body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.3
     overflow: visible;
   }
 }
+
+/* Login/register: medium-paced ambient motion, kept behind the form card. */
+.auth-page {
+  background-size: 160% 160%, 160% 160%, 100% 100%;
+  animation: reva-auth-aurora 16s ease-in-out infinite alternate;
+}
+.auth-page::before,
+.auth-page::after {
+  will-change: transform, opacity;
+}
+.auth-page::before {
+  animation: reva-auth-orbit-left 13s ease-in-out infinite alternate;
+}
+.auth-page::after {
+  animation: reva-auth-orbit-right 15s ease-in-out infinite alternate;
+}
+@keyframes reva-auth-aurora {
+  0% { background-position: 0% 15%, 100% 85%, center; }
+  50% { background-position: 55% 45%, 45% 55%, center; }
+  100% { background-position: 100% 75%, 0% 25%, center; }
+}
+@keyframes reva-auth-orbit-left {
+  0% { transform: translate3d(0, -8px, 0) scale(.94); opacity: .7; }
+  50% { transform: translate3d(34px, 22px, 0) scale(1.04); opacity: 1; }
+  100% { transform: translate3d(12px, -18px, 0) scale(.98); opacity: .78; }
+}
+@keyframes reva-auth-orbit-right {
+  0% { transform: translate3d(0, 10px, 0) scale(1.02); opacity: .7; }
+  50% { transform: translate3d(-30px, -24px, 0) scale(.92); opacity: 1; }
+  100% { transform: translate3d(-10px, 14px, 0) scale(1.06); opacity: .8; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-page,
+  .auth-page::before,
+  .auth-page::after {
+    animation: none !important;
+  }
+}
+
