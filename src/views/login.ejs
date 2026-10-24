@@ -117,13 +117,8 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
   // a randomly selected anonymous map point. No live user location is used.
   // Fast camera hops across India, followed by a deliberate slow zoom-in/out.
   // World-wide camera journey: quick global sweeps, then a slower close-up.
-  const sweepViews = [
-    [18,10], [28.6139,77.2090], [51.5072,-0.1276],
-    [35.6762,139.6503], [-1.2921,36.8219], [40.7128,-74.0060],
-    [-23.5505,-46.6333], [-33.8688,151.2093], [19.4326,-99.1332],
-    [41.0082,28.9784], [13.7563,100.5018], [-26.2041,28.0473],
-    [48.8566,2.3522], [37.5665,126.9780], [-34.6037,-58.3816]
-  ];
+  // Globe-like motion: rapidly sweep longitudes around the whole Earth, then
+  // slow down at a random destination for a gentle zoom-in and zoom-out.
   const randomTargets = [
     [28.6139,77.2090], [19.0760,72.8777], [12.9716,77.5946],
     [51.5072,-0.1276], [48.8566,2.3522], [40.7128,-74.0060],
@@ -137,7 +132,7 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
     [6.5244,3.3792], [39.9042,116.4074], [50.1109,8.6821]
   ];
   const wait = ms => new Promise(resolve => window.setTimeout(resolve, ms));
-  const travel = (center, zoom, duration, easing=0.22) => new Promise(resolve => {
+  const travel = (center, zoom, duration, easing=0.2) => new Promise(resolve => {
     let finished = false;
     const done = () => {
       if (finished) return;
@@ -147,33 +142,36 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
     };
     map.once("moveend", done);
     map.flyTo(center, zoom, { animate:true, duration, easeLinearity:easing });
-    window.setTimeout(done, duration * 1000 + 1300);
+    window.setTimeout(done, duration * 1000 + 1400);
   });
   const cinematicJourney = async () => {
-    let sweepIndex = Math.floor(Math.random() * sweepViews.length);
+    let longitude = -180 + Math.random() * 120;
     let previousTarget = -1;
     while (host.isConnected) {
-      // Rapidly traverse continents at world scale, like a globe in motion.
-      const hops = 3 + Math.floor(Math.random() * 3);
-      for (let i=0; i<hops; i++) {
-        const center = sweepViews[sweepIndex % sweepViews.length];
-        sweepIndex = (sweepIndex + 1 + Math.floor(Math.random() * 4)) % sweepViews.length;
-        await travel(center, 2.7, 1.25 + Math.random() * 0.45, 0.28);
+      // Rapid eastward longitude sweeps create the feeling of Earth rotating.
+      // Longitudes beyond +/-180 intentionally wrap around the world map.
+      const rotationHops = 8 + Math.floor(Math.random() * 5);
+      for (let i=0; i<rotationHops; i++) {
+        longitude += 42 + Math.random() * 24;
+        const latitude = 8 + Math.random() * 14;
+        await travel([latitude, longitude], 2.35, 0.8 + Math.random() * 0.25, 0.3);
       }
 
-      // Settle on a random world location, zoom in slowly, then pull back.
+      // Brake at a randomly chosen world location and make the close-up deliberate.
       let targetIndex;
       do {
         targetIndex = Math.floor(Math.random() * randomTargets.length);
       } while (targetIndex === previousTarget);
       previousTarget = targetIndex;
       const target = randomTargets[targetIndex];
-      await travel(target, 2.7, 1.2, 0.25);
-      await wait(220);
-      await travel(target, 5.8, 3.1, 0.12);
-      await wait(650);
-      await travel(target, 2.7, 2.2, 0.14);
-      await wait(180);
+
+      await travel([target[0], target[1]], 2.35, 0.75, 0.28);
+      await wait(250);
+      await travel(target, 5.8, 3.4, 0.1);
+      await wait(700);
+      await travel([target[0], target[1]], 2.35, 2.25, 0.12);
+      await wait(200);
+      // Continue the longitude sweep, like the next turn of a rotating globe.
     }
   };
   requestAnimationFrame(() => { cinematicJourney(); });
