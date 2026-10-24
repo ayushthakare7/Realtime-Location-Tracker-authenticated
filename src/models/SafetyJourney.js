@@ -53,6 +53,7 @@ const safetyJourneySchema = new mongoose.Schema({
   route: { type: routeSchema, default: () => ({}) },
   sharedWith: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   sharingEnabled: { type: Boolean, default: true },
+  connectionStatus: { type: String, enum: ["unknown", "online", "offline"], default: "unknown" },
   expectedArrivalAt: { type: Date, default: null, index: true },
   gracePeriodMinutes: { type: Number, min: 0, max: 180, default: 10 },
   checkInRequestedAt: { type: Date, default: null },
