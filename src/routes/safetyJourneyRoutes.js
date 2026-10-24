@@ -4,6 +4,8 @@ const controller = require("../controllers/safetyJourneyController");
 
 const router = express.Router();
 router.use(auth);
+router.get("/notifications", controller.listNotifications);
+router.patch("/notifications/:notificationId/read", controller.markNotificationRead);
 router.get("/modes", controller.listTravelModes);
 router.post("/", controller.createDraft);
 router.post("/:id/routes", controller.getRoutes);
