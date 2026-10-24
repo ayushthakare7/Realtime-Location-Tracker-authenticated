@@ -11,6 +11,15 @@ const api = async (path, options = {}) => {
   return data;
 };
 
+async function journeyApi(path) {
+  const response = await fetch("/api/journeys" + path, {
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.success === false) throw new Error(data.message || "Could not load shared journeys.");
+  return data;
+}
+
 const map = L.map("map").setView([20.5937, 78.9629], 5);
 const baseTiles = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap contributors" }).addTo(map);
 
@@ -91,6 +100,200 @@ function createRadarIcon(isMe) {
     iconSize: [28, 28],
     iconAnchor: [14, 14]
   });
+}
+
+const sharedJourneyMarkers = new Map();
+const sharedJourneyLayers = new Map();
+let selectedJourneyId = new URLSearchParams(window.location.search).get("journeyId");
+
+function journeyVehicle(mode) {
+  return ({
+    car: "🚗", motorcycle: "🏍️", scooter: "🛵", auto_rickshaw: "🛺",
+    bicycle: "🚲", kick_scooter: "🛴", walking: "🚶", running: "🏃",
+    wheelchair: "♿", skateboard: "🛹", roller_skates: "🛼"
+  })[String(mode || "").toLowerCase()] || "📍";
+}
+function createJourneyIcon(mode) {
+  const vehicle = journeyVehicle(mode);
+  return L.divIcon({
+    className: "reva-marker-shell",
+    html: '<span class="reva-live-vehicle" aria-label="Live journey vehicle">' + vehicle + '</span>',
+    iconSize: [42, 42],
+    iconAnchor: [21, 21]
+  });
+}
+function createJourneyEndpointIcon(kind, label) {
+  return L.divIcon({
+    className: "reva-marker-shell",
+    html: '<span class="reva-route-endpoint reva-route-' + kind + '" title="' + label + '">' + (kind === "start" ? "A" : "B") + '</span>',
+    iconSize: [30, 30],
+    iconAnchor: [15, 15]
+  });
+}
+function decodeJourneyPolyline(encoded, precision = 5) {
+  if (typeof encoded !== "string" || !encoded.length) return [];
+  let index = 0, lat = 0, lon = 0;
+  const points = [], factor = 10 ** precision;
+  const read = () => {
+    let result = 0, shift = 0, byte;
+    do {
+      if (index >= encoded.length) throw new Error("Incomplete route geometry.");
+      byte = encoded.charCodeAt(index++) - 63;
+      if (byte < 0 || byte > 63 || shift > 30) throw new Error("Invalid route geometry.");
+      result |= (byte & 31) << shift; shift += 5;
+    } while (byte >= 32);
+    return result & 1 ? ~(result >> 1) : result >> 1;
+  };
+  while (index < encoded.length) {
+    lat += read(); lon += read();
+    points.push([lat / factor, lon / factor]);
+  }
+  return points;
+}
+function journeyStatusLabel(status) {
+  return ({
+    ACTIVE: "In progress",
+    OVERDUE_UNCONFIRMED: "Overdue — check-in needed",
+    ALERT_SENT: "Check-in requested",
+    EMERGENCY_ALERTED: "Emergency alert sent",
+    ARRIVED: "Arrived"
+  })[status] || String(status || "Status unavailable").replaceAll("_", " ").toLowerCase();
+}
+function removeSharedJourneyLayers(id) {
+  const layers = sharedJourneyLayers.get(String(id));
+  if (!layers) return;
+  for (const layer of [layers.route, layers.start, layers.end]) if (layer) map.removeLayer(layer);
+  sharedJourneyLayers.delete(String(id));
+}
+function focusSharedJourney(id) {
+  const key = String(id);
+  const marker = sharedJourneyMarkers.get(key);
+  const layers = sharedJourneyLayers.get(key);
+  if (layers && layers.route && layers.route.getLatLngs().length > 1) {
+    const bounds = layers.route.getBounds();
+    if (marker) bounds.extend(marker.getLatLng());
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [42, 42], maxZoom: 15, animate: !(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) });
+    }
+  } else if (marker) {
+    map.flyTo(marker.getLatLng(), Math.max(map.getZoom(), 14), {
+      duration: window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 1.2
+    });
+  }
+  if (marker) marker.openPopup();
+}
+async function loadSharedJourneys() {
+  const status = document.getElementById("sharedJourneysStatus");
+  const list = document.getElementById("sharedJourneysList");
+  if (!status || !list) return;
+  try {
+    const body = await journeyApi("/shared");
+    const journeys = Array.isArray(body.journeys) ? body.journeys : [];
+    const visibleIds = new Set(journeys.map(journey => String(journey.id)));
+    for (const id of [...sharedJourneyLayers.keys()]) if (!visibleIds.has(id)) removeSharedJourneyLayers(id);
+    for (const [id, marker] of sharedJourneyMarkers) {
+      if (!visibleIds.has(id)) { map.removeLayer(marker); sharedJourneyMarkers.delete(id); }
+    }
+    list.replaceChildren();
+    if (!journeys.length) {
+      status.textContent = "No friends are sharing an active Safety Travel journey with you right now.";
+      return;
+    }
+    let locationsAvailable = 0;
+    for (const journey of journeys) {
+      const id = String(journey.id);
+      const point = journey.lastConfirmedLocation;
+      const hasPoint = point && point.latitude != null && point.longitude != null &&
+        Number.isFinite(Number(point.latitude)) && Number.isFinite(Number(point.longitude));
+      const name = String(journey.travellerUsername || "A friend");
+      const state = journeyStatusLabel(journey.status);
+      const updatedAt = point && point.recordedAt && Number.isFinite(Date.parse(point.recordedAt))
+        ? new Date(point.recordedAt).toLocaleString() : null;
+      const origin = journey.origin;
+      const destination = journey.destination;
+      const layers = sharedJourneyLayers.get(id) || {};
+      if (journey.route && journey.route.encodedPolyline) {
+        try {
+          const routePoints = decodeJourneyPolyline(journey.route.encodedPolyline);
+          if (routePoints.length > 1) {
+            if (layers.route) layers.route.setLatLngs(routePoints);
+            else layers.route = L.polyline(routePoints, {
+              color: "#477e63", weight: 6, opacity: 0.88, lineCap: "round", lineJoin: "round"
+            }).addTo(map);
+          }
+        } catch (routeError) {
+          console.warn("Could not draw shared journey route", routeError);
+        }
+      }
+      if (origin && Number.isFinite(Number(origin.latitude)) && Number.isFinite(Number(origin.longitude))) {
+        if (layers.start) layers.start.setLatLng([Number(origin.latitude), Number(origin.longitude)]);
+        else layers.start = L.marker([Number(origin.latitude), Number(origin.longitude)], {
+          icon: createJourneyEndpointIcon("start", "Journey origin")
+        }).addTo(map).bindTooltip(document.createTextNode("A · " + String(origin.label || "Start")));
+      }
+      if (destination && Number.isFinite(Number(destination.latitude)) && Number.isFinite(Number(destination.longitude))) {
+        if (layers.end) layers.end.setLatLng([Number(destination.latitude), Number(destination.longitude)]);
+        else layers.end = L.marker([Number(destination.latitude), Number(destination.longitude)], {
+          icon: createJourneyEndpointIcon("end", "Journey destination")
+        }).addTo(map).bindTooltip(document.createTextNode("B · " + String(destination.label || "Destination")));
+      }
+      sharedJourneyLayers.set(id, layers);
+
+      const row = document.createElement("div");
+      row.className = "shared-journey-row";
+      const details = document.createElement("div");
+      const title = document.createElement("strong");
+      title.textContent = name + " · " + state;
+      const meta = document.createElement("p");
+      const routeKm = journey.route && Number.isFinite(Number(journey.route.distanceMeters))
+        ? (Number(journey.route.distanceMeters) / 1000).toFixed(1) + " km route" : "Route details unavailable";
+      const eta = journey.expectedArrivalAt && Number.isFinite(Date.parse(journey.expectedArrivalAt))
+        ? " · ETA " + new Date(journey.expectedArrivalAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+      meta.textContent = (updatedAt ? "Live GPS updated: " + updatedAt : "Waiting for the first GPS location to sync.") + " · " + routeKm + eta;
+      details.append(title, meta);
+      row.append(details);
+      if (hasPoint) {
+        locationsAvailable++;
+        const popup = document.createElement("div");
+        const popupTitle = document.createElement("strong");
+        popupTitle.textContent = name + " · " + state;
+        const popupTime = document.createElement("div");
+        popupTime.textContent = updatedAt ? "GPS updated " + updatedAt : "GPS time unavailable";
+        const popupRoute = document.createElement("div");
+        popupRoute.textContent = (origin && origin.label ? origin.label : "A · Start") + " → " + (destination && destination.label ? destination.label : "B · Destination");
+        popup.append(popupTitle, popupTime, popupRoute);
+        let marker = sharedJourneyMarkers.get(id);
+        if (marker) {
+          marker.setLatLng([Number(point.latitude), Number(point.longitude)]);
+          marker.setIcon(createJourneyIcon(journey.transportModeId || journey.avatarKey));
+        } else {
+          marker = L.marker([Number(point.latitude), Number(point.longitude)], {
+            icon: createJourneyIcon(journey.transportModeId || journey.avatarKey), zIndexOffset: 1000
+          }).addTo(map);
+          sharedJourneyMarkers.set(id, marker);
+        }
+        marker.bindPopup(popup);
+      } else if (sharedJourneyMarkers.has(id)) {
+        map.removeLayer(sharedJourneyMarkers.get(id));
+        sharedJourneyMarkers.delete(id);
+      }
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "secondary shared-journey-view";
+      button.textContent = "View route & live vehicle";
+      button.addEventListener("click", () => focusSharedJourney(id));
+      row.append(button);
+      list.append(row);
+    }
+    status.textContent = journeys.length + " shared journey" + (journeys.length === 1 ? "" : "s") + " · " + locationsAvailable + " with confirmed GPS. Routes and vehicles refresh every 10 seconds.";
+    if (selectedJourneyId && visibleIds.has(selectedJourneyId)) {
+      focusSharedJourney(selectedJourneyId);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("journeyId");
+      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+      selectedJourneyId = null;
+    }
+  } catch (e) { status.textContent = e.message || "Could not load journeys shared with you."; }
 }
 
 function upsertMarker(data, accuracy) {
@@ -289,6 +492,13 @@ async function setSharing(enabled) {
       removeMarker("me");
     }
     await loadFriends();
+loadSharedJourneys();
+setInterval(() => {
+  if (document.visibilityState !== "hidden") loadSharedJourneys();
+}, 10000);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") loadSharedJourneys();
+});
   } catch (e) { setStatus(e.message); }
 }
 

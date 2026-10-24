@@ -1,0 +1,46 @@
+:root{--live-ink:#1d3028;--live-muted:#78877e;--live-green:#2f6b50;--live-line:#e4eae2}
+.live-journey-page{min-height:100vh;background:linear-gradient(145deg,#f6f8f3,#eef3ed 55%,#f7f4ee);color:var(--live-ink)}
+.live-topbar{height:76px;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(16px,5vw,70px);background:rgba(255,255,251,.92);border-bottom:1px solid var(--live-line)}
+.live-brand{display:flex;align-items:center;gap:11px;color:var(--live-ink);text-decoration:none}
+.live-brand-mark{display:grid;place-items:center;width:43px;height:43px;border-radius:15px;background:#dfeadf;color:#315748;font:800 25px/1 Manrope,sans-serif}
+.live-brand strong,.live-brand small{display:block}
+.live-brand strong{font:800 22px/1 Manrope,sans-serif;letter-spacing:-1px}
+.live-brand small{margin-top:4px;color:var(--live-muted);font-size:10px}
+.live-back{padding:10px 14px;border:1px solid #dfe7dc;border-radius:999px;background:#fffefa;color:#496454;text-decoration:none;font-size:12px;font-weight:750}
+.live-shell{max-width:1440px;margin:0 auto;padding:24px clamp(13px,3.5vw,48px) 34px}
+.live-trip-card{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(250px,.7fr);gap:25px;padding:clamp(21px,3vw,34px);border:1px solid #e3e9e0;border-radius:24px;background:rgba(255,255,251,.95);box-shadow:0 18px 48px rgba(36,61,43,.06)}
+.live-kicker{display:flex;align-items:center;gap:8px;margin:0 0 11px;color:#668271;font-size:10px;font-weight:850;letter-spacing:1.7px}
+.live-pulse{width:8px;height:8px;border-radius:50%;background:#42a46b;box-shadow:0 0 0 5px #42a46b1c;animation:live-pulse 1.8s ease-in-out infinite}
+@keyframes live-pulse{50%{box-shadow:0 0 0 9px #42a46b05}}
+.live-trip-main h1{margin:0;font:800 clamp(25px,3vw,38px)/1.12 Manrope,sans-serif;letter-spacing:-1.4px}
+.live-trip-state{margin:9px 0 22px;color:#4d8866;font-size:13px;font-weight:750}
+.live-route-summary{display:flex;gap:13px;max-width:680px;padding:15px 16px;border:1px solid #e6ece4;border-radius:17px;background:#f8faf6}
+.live-route-symbols{display:flex;flex-direction:column;align-items:center;width:15px;padding:4px 0}
+.live-origin-dot,.live-destination-dot{width:11px;height:11px;border:3px solid white;border-radius:50%;box-shadow:0 0 0 1px #6c9a78;background:#4f9567}
+.live-destination-dot{background:#bd7652;box-shadow:0 0 0 1px #bd7652}
+.live-route-dashes{flex:1;min-height:26px;margin:4px 0;border-left:2px dashed #a8b8a7}
+.live-route-labels{display:flex;flex:1;flex-direction:column;gap:14px;min-width:0}
+.live-route-labels small,.live-trip-stats small{display:block;margin-bottom:3px;color:#8a988e;font-size:9px;font-weight:850;letter-spacing:1.3px}
+.live-route-labels strong{display:block;overflow-wrap:anywhere;color:#2b4134;font-size:12px;line-height:1.5}
+.live-trip-stats{display:grid;grid-template-columns:1fr 1fr;align-content:start;gap:16px;padding:5px 0 0}
+.live-trip-stats>div{padding:14px;border:1px solid #e7ece5;border-radius:14px;background:#fbfcf9}
+.live-trip-stats>div strong{display:block;font:800 19px/1.3 Manrope,sans-serif;color:#2e4d3b;overflow-wrap:anywhere}
+#locationFreshness{grid-column:1/-1;margin:0;color:#718176;font-size:11px;line-height:1.6}
+.live-map-card{margin-top:18px;padding:18px;border:1px solid #e3e9e0;border-radius:24px;background:#fffefa;box-shadow:0 18px 48px rgba(36,61,43,.06)}
+.live-map-heading{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:1px 3px 14px}
+.live-map-heading .live-kicker{margin-bottom:4px}
+.live-map-heading h2{margin:0;font:800 19px/1.3 Manrope,sans-serif;letter-spacing:-.5px}
+.live-map-legend{display:flex;align-items:center;gap:8px;color:#78877e;font-size:10px}
+.live-map-legend i{width:8px;height:8px;border-radius:50%;background:#3f8a67;box-shadow:0 0 0 4px #3f8a671c}
+.live-map-wrap{position:relative;overflow:hidden;border:1px solid #e4eae2;border-radius:18px}
+#liveMap{height:min(66vh,690px);min-height:400px;width:100%;background:#e7eee5}
+.live-map-status{position:absolute;z-index:500;left:15px;bottom:15px;max-width:calc(100% - 30px);padding:10px 14px;border:1px solid #e5ebe3;border-radius:13px;background:rgba(255,255,251,.95);box-shadow:0 8px 25px #1b39201a;color:#536d5c;font-size:11px;font-weight:750;backdrop-filter:blur(12px)}
+.live-map-footer{display:flex;justify-content:space-between;gap:12px;padding:12px 3px 0;color:#859188;font-size:10px}
+.live-privacy-note{margin:13px 4px 0;color:#7c8980;font-size:11px;line-height:1.7}
+.live-vehicle-icon-shell,.live-endpoint-shell{background:transparent;border:0}
+.live-vehicle-icon{display:grid;place-items:center;width:46px;height:46px;border:3px solid white;border-radius:16px;background:#2e644a;font-size:25px;line-height:1;box-shadow:0 5px 17px #173e2b45,0 0 0 5px #3f8a6724;transform:rotate(var(--vehicle-heading,0deg));transition:transform .18s ease}
+.live-endpoint{display:grid;place-items:center;width:31px;height:31px;border:3px solid white;border-radius:50%;color:white;font-size:12px;font-weight:900;box-shadow:0 4px 14px #1b39202b}
+.live-endpoint-start{background:#39885d}.live-endpoint-end{background:#bd7652}
+@media(max-width:800px){.live-trip-card{grid-template-columns:1fr}.live-trip-stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.live-trip-stats>div{padding:11px}.live-trip-stats>div strong{font-size:16px}.live-trip-stats small{font-size:8px}.live-trip-stats #locationFreshness{grid-column:1/-1}}
+@media(max-width:560px){.live-topbar{height:66px;padding:0 13px}.live-brand-mark{width:38px;height:38px}.live-brand strong{font-size:20px}.live-back{padding:9px 10px;font-size:10px}.live-shell{padding:13px 10px 25px}.live-trip-card{gap:17px;padding:18px;border-radius:20px}.live-trip-main h1{font-size:26px}.live-route-summary{padding:12px}.live-trip-stats{grid-template-columns:1fr 1fr}.live-trip-stats>div strong{font-size:17px}.live-map-card{padding:10px;border-radius:20px}.live-map-heading{align-items:flex-start;flex-direction:column;padding:6px 5px 12px}.live-map-heading h2{font-size:18px}#liveMap{height:58vh;min-height:360px}.live-map-status{left:9px;bottom:9px;font-size:10px}.live-map-footer{font-size:9px}}
+@media(prefers-reduced-motion:reduce){.live-pulse{animation:none}}

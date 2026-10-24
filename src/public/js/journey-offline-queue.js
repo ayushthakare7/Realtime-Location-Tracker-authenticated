@@ -85,7 +85,7 @@
 
     async function enqueue(journeyId, event) {
       if (!/^[a-f\d]{24}$/i.test(String(journeyId || ""))) throw new Error("A valid active journey ID is required to queue progress.");
-      if (!event || !["location", "check_in", "arrival", "offline", "online", "emergency"].includes(event.type)) throw new Error("Unsupported journey event type.");
+      if (!event || !["location", "check_in", "arrival", "offline", "online", "emergency", "cancelled"].includes(event.type)) throw new Error("Unsupported journey event type.");
       const recordedAt = event.recordedAt || new Date(now()).toISOString();
       if (!Number.isFinite(Date.parse(recordedAt)) || Date.parse(recordedAt) > now() + 5 * 60 * 1000 || Date.parse(recordedAt) < now() - MAX_AGE_MS) throw new Error("Journey event timestamp is outside the accepted seven-day window.");
       if (event.type === "location" && (!Number.isFinite(Number(event.latitude)) || Number(event.latitude) < -90 || Number(event.latitude) > 90 || !Number.isFinite(Number(event.longitude)) || Number(event.longitude) < -180 || Number(event.longitude) > 180)) throw new Error("Valid GPS coordinates are required.");

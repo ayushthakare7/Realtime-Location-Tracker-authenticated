@@ -41,17 +41,43 @@
           <div><p class="eyebrow">PLAN A JOURNEY</p><h2>Where are you going?</h2><p class="muted">Describe your trip naturally. Reva can ask for details if needed.</p></div>
         </div>
         <form id="journeyForm" class="journey-form">
-          <label for="journeyRequest">Describe your journey</label>
-          <textarea id="journeyRequest" name="journeyRequest" rows="4" maxlength="1000" placeholder="For example: I’m going from my home to the railway station by car. Share my progress with my trusted friends and alert them if I don’t confirm arrival." required></textarea>
-          <div class="form-hint">Include your start, destination, and how you’re travelling if you know them.</div>
           <div class="travel-form-grid">
-            <div><label for="travelMode">Travel mode</label><select id="travelMode" name="travelMode"><option value="">Let Reva ask me</option><option value="walking">Walking</option><option value="bicycle">Bicycle</option><option value="motorcycle">Motorcycle / scooter</option><option value="car">Car</option><option value="public-transport">Public transport</option></select></div>
+            <div><label for="originText">Starting point</label><input id="originText" name="originText" maxlength="200" autocomplete="street-address" placeholder="e.g. Durg Railway Station" required></div>
+            <div><label for="destinationText">Destination</label><input id="destinationText" name="destinationText" maxlength="200" placeholder="e.g. Raipur Airport" required></div>
+          </div>
+          <label for="journeyRequest">Journey note (optional)</label>
+          <textarea id="journeyRequest" name="journeyRequest" rows="2" maxlength="500" placeholder="Anything your trusted contacts should know?"></textarea>
+          <div class="form-hint">Enter recognizable places or addresses. Reva uses a free public geocoder, which may be rate-limited.</div>
+          <div class="travel-form-grid">
+            <div><label for="travelMode">Travel mode</label><select id="travelMode" name="travelMode"><option value="" disabled selected>Choose a travel mode</option><option value="walking">Walking</option><option value="bicycle">Bicycle</option><option value="motorcycle">Motorcycle</option><option value="scooter">Scooter</option><option value="auto_rickshaw">Auto-rickshaw</option><option value="car">Car</option><option value="running">Running</option><option value="wheelchair">Wheelchair</option><option value="kick_scooter">Kick scooter</option><option value="skateboard">Skateboard</option><option value="roller_skates">Roller skates</option></select></div>
             <div><label for="safetyLevel">Journey sharing</label><select id="safetyLevel" name="safetyLevel"><option value="ask">Ask me before sharing</option><option value="trusted">Share with my authorized trusted friends</option></select></div>
           </div>
           <label class="travel-consent"><input type="checkbox" id="understandSafety" required><span>I understand that journey tracking requires location permission and an available communication channel for live updates.</span></label>
           <button type="submit" class="travel-submit">Prepare my journey <span aria-hidden="true">↗</span></button>
           <p id="journeyFeedback" class="journey-feedback" role="status" aria-live="polite"></p>
+          <section id="journeyReview" class="travel-side-card" hidden aria-live="polite">
+            <p class="eyebrow">ROUTE REVIEW</p><h3 id="routeSummary">Review your route</h3><p id="routeDetails"></p>
+            <div id="trustedFriends" class="trusted-friends"><p>Choose which accepted friends may see this journey.</p><p id="friendsStatus">Loading your accepted friends…</p><div id="friendChoices"></div></div>
+            <label class="travel-consent"><input type="checkbox" id="approveJourney"><span>I reviewed this route and explicitly approve starting this journey and GPS tracking.</span></label>
+            <button type="button" id="approveJourneyButton" class="travel-submit">Approve route and start journey</button>
+          </section>
+          <section id="activeJourneyControls" class="travel-side-card" hidden aria-live="polite">
+            <p class="eyebrow">JOURNEY CONTROLS</p><h3>You're in control</h3><p id="activeJourneyStatus">Journey tracking is active.</p>
+            <div class="travel-form-grid">
+              <button type="button" id="checkInButton" class="travel-submit">I'm safe — check in</button>
+              <button type="button" id="arrivedButton" class="travel-submit">I've arrived</button>
+              <button type="button" id="emergencyButton" class="travel-submit">Send emergency alert</button>
+              <button type="button" id="cancelJourneyButton" class="travel-submit">Cancel journey</button>
+            </div>
+          </section>
         </form>
+        <section id="friendsLiveJourneys" class="travel-side-card friends-live-journeys" aria-live="polite">
+          <p class="eyebrow">FRIENDS · LIVE SHARING</p>
+          <h3>Friends’ live journeys</h3>
+          <p class="muted">Only journeys shared with your account are listed here.</p>
+          <p id="friendJourneysStatus" class="muted" role="status">Loading journeys shared with you…</p>
+          <div id="friendJourneysList" class="shared-journeys-list"></div>
+        </section>
       </section>
 
       <aside class="travel-side">

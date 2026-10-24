@@ -128,3 +128,12 @@ test("keeps events for separate journeys in separate sync requests", async () =>
   assert.equal(calls[0].body.events.length, 1);
   assert.equal(calls[1].body.events.length, 1);
 });
+
+test("queues explicit cancellation events for offline delivery", async () => {
+  const store = makeStore();
+  const queue = createJourneyOfflineQueue({ store, isOnline: () => false, now: () => Date.parse("2026-10-25T10:00:00.000Z") });
+  await queue.enqueue(JOURNEY_ID, { eventId: "journey-cancelled-1", type: "cancelled", recordedAt: "2026-10-25T09:59:00.000Z" });
+  const events = await store.all();
+  assert.equal(events.length, 1);
+  assert.equal(events[0].type, "cancelled");
+});

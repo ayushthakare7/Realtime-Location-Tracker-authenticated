@@ -62,3 +62,17 @@
 .travel-offline-card p[data-state="offline"]{color:#96633c}
 .travel-offline-card p[data-state="online"]{color:#315748}
 .travel-offline-card .offline-disclaimer{margin-top:8px;padding-top:8px;border-top:1px solid #e5e0ed;font-size:10px}
+
+.journey-form input:not([type="checkbox"]),.journey-form select{width:100%;border:1px solid #dfe5dc;border-radius:13px;background:#fff;color:#2d4034;padding:13px 14px;font:inherit;min-width:0}
+.journey-form input:not([type="checkbox"]):focus,.journey-form select:focus{outline:3px solid #dcebdd;border-color:#93b199}
+.journey-form .travel-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.journey-form .travel-form-grid>div{min-width:0}
+#journeyReview,#activeJourneyControls{margin-top:18px;padding:20px}
+#journeyReview[hidden],#activeJourneyControls[hidden]{display:none}
+#routeDetails,#activeJourneyStatus{color:#607765;line-height:1.7;font-size:13px}
+#friendChoices{display:grid;gap:7px;margin:10px 0}
+#friendChoices .travel-consent{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid #e6e8df;border-radius:10px}
+#approveJourneyButton:disabled{opacity:.65;cursor:wait}
+.journey-feedback[data-state="error"]{color:#9b3939}
+.journey-feedback[data-state="success"]{color:#315748}
+@media(max-width:600px){.journey-form .travel-form-grid{grid-template-columns:minmax(0,1fr)}}

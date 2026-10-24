@@ -1018,3 +1018,41 @@ body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.3
 .safety-travel-link { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; margin-top: 14px; padding: 12px 15px; border-radius: 12px; background: var(--sage-dark); color: #fff; text-decoration: none; font-weight: 700; box-shadow: 0 6px 16px rgba(49,87,72,.13); transition: transform .18s ease, background .18s ease; }
 .safety-travel-link:hover { background: #264a3b; transform: translateY(-1px); }
 .safety-entry-note { margin: 10px 0 0; color: #8a958b; font-size: 11px; }
+
+
+/* Shared Safety Travel journeys on the existing friend radar */
+.shared-journeys-panel{margin-bottom:18px}
+.shared-journeys-list{display:grid;gap:10px}
+.shared-journey-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 0;border-top:1px solid #e8ece7}
+.shared-journey-row strong{display:block;color:#263c30;font-size:13px}
+.shared-journey-row p{margin:4px 0 0;color:#68776d;font-size:12px;line-height:1.5}
+.shared-journey-view{flex:0 0 auto;padding:8px 11px;font-size:12px}
+.reva-journey-pin{display:grid;place-items:center;width:30px;height:30px;border:2px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#6b5bd2;color:#fff;box-shadow:0 2px 10px #1e2b2440;font-size:16px}
+.reva-journey-pin::first-letter{transform:rotate(45deg)}
+@media(max-width:560px){.shared-journey-row{align-items:flex-start;flex-wrap:wrap}.shared-journey-view{margin-left:auto}}
+
+
+/* Uber-like shared journey route and transport-mode live vehicle */
+.reva-live-vehicle{
+  display:grid;place-items:center;width:38px;height:38px;border:3px solid #fff;border-radius:15px;
+  background:#315748;color:#fff;font-size:22px;line-height:1;
+  box-shadow:0 5px 18px rgba(28,54,40,.28),0 0 0 5px rgba(75,126,91,.18);
+  animation:reva-vehicle-pulse 2.2s ease-out infinite;
+}
+.reva-route-endpoint{
+  display:grid;place-items:center;width:28px;height:28px;border:3px solid #fff;border-radius:50%;
+  color:#fff;font-size:12px;font-weight:850;box-shadow:0 3px 12px rgba(30,45,35,.22)
+}
+.reva-route-start{background:#477e63}
+.reva-route-end{background:#b36d50}
+@keyframes reva-vehicle-pulse{
+  0%,100%{box-shadow:0 5px 18px rgba(28,54,40,.28),0 0 0 4px rgba(75,126,91,.14)}
+  50%{box-shadow:0 5px 18px rgba(28,54,40,.28),0 0 0 9px rgba(75,126,91,.04)}
+}
+.shared-journeys-list{display:grid;gap:10px;margin-top:12px}
+.shared-journey-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px;border:1px solid var(--line,#e5e0d6);border-radius:13px;background:rgba(255,253,248,.85)}
+.shared-journey-row strong{display:block;color:var(--ink,#202c2b);font-size:13px}
+.shared-journey-row p{margin:5px 0 0;color:var(--muted,#777f7b);font-size:11px;line-height:1.55;overflow-wrap:anywhere}
+.shared-journey-view{flex:0 0 auto}
+@media(max-width:520px){.shared-journey-row{align-items:stretch;flex-direction:column}.shared-journey-view{align-self:flex-start}}
+@media(prefers-reduced-motion:reduce){.reva-live-vehicle{animation:none}}

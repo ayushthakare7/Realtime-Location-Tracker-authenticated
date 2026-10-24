@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#172a24">
+  <title>Live Journey · Reva</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/live-journey.css">
+</head>
+<body class="live-journey-page">
+  <header class="live-topbar">
+    <a class="live-brand" href="/safety-travel"><span class="live-brand-mark">r.</span><span><strong>reva</strong><small>live journey</small></span></a>
+    <a class="live-back" href="/safety-travel#friendsLiveJourneys">← Friends' journeys</a>
+  </header>
+  <main class="live-shell">
+    <section class="live-trip-card">
+      <div class="live-trip-main">
+        <p class="live-kicker"><span class="live-pulse"></span> LIVE JOURNEY SHARED WITH YOU</p>
+        <h1 id="travellerName">Loading your friend's journey…</h1>
+        <p id="tripState" class="live-trip-state">Verifying shared access…</p>
+        <div class="live-route-summary">
+          <div class="live-route-symbols"><span class="live-origin-dot"></span><span class="live-route-dashes"></span><span class="live-destination-dot"></span></div>
+          <div class="live-route-labels"><div><small>FROM</small><strong id="originLabel">Loading origin…</strong></div><div><small>TO</small><strong id="destinationLabel">Loading destination…</strong></div></div>
+        </div>
+      </div>
+      <div class="live-trip-stats">
+        <div><small>TRIP DISTANCE</small><strong id="distanceValue">—</strong></div>
+        <div><small>ESTIMATED ARRIVAL</small><strong id="etaValue">—</strong></div>
+        <div><small>TRAVEL MODE</small><strong id="modeValue">—</strong></div>
+        <p id="locationFreshness" role="status">Waiting for GPS update…</p>
+      </div>
+    </section>
+    <section class="live-map-card">
+      <div class="live-map-heading"><div><p class="live-kicker">THE ROUTE</p><h2>Follow their journey</h2></div><span class="live-map-legend"><i></i> Confirmed live location</span></div>
+      <div class="live-map-wrap"><div id="liveMap" aria-label="Friend's live journey map"></div><div id="mapStatus" class="live-map-status" role="status">Loading approved route…</div></div>
+      <div class="live-map-footer"><span id="routeProvider">Route from the approved journey</span><span>Updates automatically</span></div>
+    </section>
+    <p class="live-privacy-note">You can see this trip because your friend explicitly shared it with you. The vehicle follows confirmed GPS updates; when updates pause, its last confirmed position remains visible.</p>
+  </main>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="/js/live-journey.js"></script>
+</body>
+</html>
