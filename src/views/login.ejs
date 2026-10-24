@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#f6f6f2">
   <title>Who's Out There? — Sign In</title>
   <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
   <style>
     .auth-page{min-height:100vh;display:grid;place-items:center;padding:28px 16px;background:var(--canvas)}
     .auth-card{width:min(100%,440px);padding:clamp(25px,6vw,42px);border:1px solid var(--line);border-radius:25px;background:rgba(255,254,250,.94);box-shadow:0 24px 80px rgba(42,59,48,.09)}
@@ -66,42 +67,73 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
   }
 });
 </script>
-<script src="https://unpkg.com/globe.gl"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script>
   (() => {
     const host = document.getElementById("authMap");
-    if (!host || typeof Globe !== "function") return;
-
+    if (!host || !window.L) return;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const world = Globe()(host)
-      .globeImageUrl("https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg")
-      .bumpImageUrl("https://unpkg.com/three-globe/example/img/earth-topology.png")
-      .backgroundColor("rgba(0,0,0,0)")
-      .showAtmosphere(true)
-      .atmosphereColor("#a9c9d6")
-      .atmosphereAltitude(0.16)
-      .width(host.clientWidth || window.innerWidth)
-      .height(host.clientHeight || window.innerHeight);
+    const map = L.map(host, {
+      zoomControl: false, attributionControl: false,
+      dragging: false, touchZoom: false, scrollWheelZoom: false,
+      doubleClickZoom: false, boxZoom: false, keyboard: false,
+      zoomSnap: 0.25, zoomDelta: 0.25, preferCanvas: true
+    }).setView([23, 5], 2.25);
 
-    const controls = world.controls();
-    controls.enableZoom = false;
-    controls.enablePan = false;
-    controls.enableRotate = false;
-    controls.autoRotate = !reducedMotion.matches;
-    controls.autoRotateSpeed = 0.22;
-    world.pointOfView({ lat: 16, lng: 5, altitude: 2.15 }, 0);
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
+      subdomains: "abcd", maxZoom: 19, noWrap: false
+    }).addTo(map);
 
-    const resize = () => {
-      world.width(host.clientWidth || window.innerWidth)
-        .height(host.clientHeight || window.innerHeight);
+    // Animated travel paths and soft location pulses give the flat map a living, exploratory feel.
+    const routes = [
+      [[48.86, 2.35], [41.9, 12.5], [30.04, 31.24], [19.07, 72.87]],
+      [[37.77, -122.42], [19.43, -99.13], [-12.05, -77.04], [-33.87, 151.21]],
+      [[51.5, -0.12], [25.2, 55.27], [1.35, 103.82], [35.68, 139.69]]
+    ];
+    const lines = routes.map((points, index) => {
+      const line = L.polyline(points, {
+        color: index === 1 ? "#7f9e8c" : "#9a91b7",
+        weight: 2, opacity: 0.7, dashArray: "3 11", lineCap: "round"
+      }).addTo(map);
+      return { line, base: points };
+    });
+    const markers = [[19.07,72.87], [51.5,-0.12], [37.77,-122.42]].map((point, i) =>
+      L.circleMarker(point, {
+        radius: 5, color: "#fffdf8", weight: 2,
+        fillColor: i === 1 ? "#8e83b0" : "#668b77", fillOpacity: .95
+      }).addTo(map)
+    );
+
+    let raf = null, last = 0, elapsed = 0, offset = 0;
+    const tick = (now) => {
+      if (document.hidden || reducedMotion.matches) { raf = null; last = 0; return; }
+      if (!last) last = now;
+      const dt = Math.min(now - last, 40);
+      last = now;
+      elapsed += dt;
+      // Gentle constant eastward drift; the tiny vertical wave prevents a mechanical feel.
+      offset += dt * 0.0009;
+      map.panBy([dt * 0.012, Math.sin(elapsed / 5200) * dt * 0.0018], { animate: false, noMoveStart: true });
+      const phase = (elapsed / 1800) % 1;
+      lines.forEach(({line, base}, i) => {
+        line.setStyle({ opacity: 0.28 + 0.45 * (0.5 + 0.5 * Math.sin(elapsed / 1300 + i * 1.8)) });
+      });
+      markers.forEach((marker, i) => {
+        marker.setStyle({ radius: 4.5 + 2 * (0.5 + 0.5 * Math.sin(elapsed / 850 + i * 2)) });
+      });
+      raf = requestAnimationFrame(tick);
     };
-    window.addEventListener("resize", resize, { passive: true });
-
-    const syncMotion = () => {
-      controls.autoRotate = !reducedMotion.matches && !document.hidden;
+    const start = () => {
+      if (!document.hidden && !reducedMotion.matches && raf === null) {
+        last = 0; raf = requestAnimationFrame(tick);
+      }
     };
-    document.addEventListener("visibilitychange", syncMotion);
-    reducedMotion.addEventListener?.("change", syncMotion);
+    const stop = () => { if (raf !== null) cancelAnimationFrame(raf); raf = null; last = 0; };
+    setTimeout(() => map.invalidateSize(false), 80);
+    start();
+    document.addEventListener("visibilitychange", () => document.hidden ? stop() : start());
+    reducedMotion.addEventListener?.("change", () => reducedMotion.matches ? stop() : start());
+    window.addEventListener("resize", () => map.invalidateSize(false), { passive: true });
   })();
 </script>
 
