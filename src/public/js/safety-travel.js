@@ -94,9 +94,9 @@ async function loadFriendLiveJourneys() {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "secondary shared-journey-view";
-      button.textContent = "Open this friend's live map";
+      button.textContent = "Watch live journey";
       button.addEventListener("click", () => {
-        window.location.href = "/tracker?journeyId=" + encodeURIComponent(String(journey.id));
+        window.location.href = "/live-journey?journeyId=" + encodeURIComponent(String(journey.id));
       });
       row.append(button);
       list.append(row);
