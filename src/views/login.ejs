@@ -18,14 +18,21 @@
     .auth-page { position:relative; z-index:1; min-height:100svh; background:transparent; }
     .auth-map-backdrop { position:fixed; inset:-3%; z-index:0; overflow:hidden; background:#e7ebe3; }
     .auth-map-backdrop .leaflet-container { width:100%; height:100%; background:#e7ebe3; }
-    .auth-map-backdrop .leaflet-tile-pane { filter:saturate(.58) contrast(.92) brightness(1.05); opacity:.78; }
-    .auth-map-shade { position:fixed; inset:0; z-index:0; pointer-events:none; background:rgba(246,246,242,.48); }
+    .auth-map-backdrop .leaflet-tile-pane { filter:saturate(.88) contrast(1.04) brightness(1.01); opacity:1; }
+    .auth-map-shade { position:fixed; inset:0; z-index:0; pointer-events:none; background:rgba(246,246,242,.10); }
     .auth-card { position:relative; z-index:2; background:rgba(255,254,250,.91); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
     .auth-map-pin { width:15px;height:15px;border-radius:50%;background:#527765;border:3px solid #fffefa;box-shadow:0 2px 12px rgba(36,51,47,.32); }
     .auth-map-pin.auth-map-pin-lavender { background:#8b7d9f; }
     .auth-map-pin.auth-map-pin-gold { background:#c19c62; }
     .auth-map-label { padding:5px 9px;border-radius:999px;background:rgba(255,254,250,.94);border:1px solid rgba(82,119,101,.22);color:#315748;font:600 11px/1.2 'DM Sans',sans-serif;box-shadow:0 4px 15px rgba(42,59,48,.10);white-space:nowrap; }
     .auth-map-backdrop .leaflet-control-attribution { font-size:9px; background:rgba(255,254,250,.72); }
+    /* Keep the map crisp and remove the two decorative circular patches. */
+    .auth-page::before, .auth-page::after { display:none !important; content:none !important; }
+    .auth-page { background:transparent !important; }
+    .auth-map-backdrop { filter:none; opacity:1; }
+    .auth-map-shade { background:rgba(246,246,242,.10); }
+    .auth-card { backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); }
+
     @media (prefers-reduced-motion: reduce) { .auth-map-backdrop { display:none; } .auth-page { background:var(--canvas); } }
 \n  </style>
 </head>
