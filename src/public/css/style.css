@@ -572,3 +572,109 @@ body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.3
     grid-column: auto;
   }
 }
+
+
+/* Header tagline and consistent spacing across dashboard cards */
+.app-header {
+  position: relative;
+}
+.header-tagline {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: calc(100% - 420px);
+  color: #315748;
+  font: 700 clamp(14px, 1.55vw, 20px)/1.25 'Manrope', sans-serif;
+  letter-spacing: -.35px;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.header-tagline em {
+  color: #71927c;
+  font-style: normal;
+}
+@media (max-width: 780px) {
+  .app-header {
+    display: flex;
+    flex-wrap: wrap;
+    row-gap: 7px;
+  }
+  .header-tagline {
+    position: static;
+    order: 3;
+    transform: none;
+    width: 100%;
+    max-width: 100%;
+    padding: 2px 0 4px;
+    font-size: clamp(14px, 3.8vw, 18px);
+    white-space: normal;
+  }
+  .app-header .wordmark,
+  .app-header .header-actions {
+    position: relative;
+    z-index: 1;
+  }
+}
+
+/* Give card content a consistent rhythm and balanced vertical spacing */
+.dashboard-grid .panel {
+  line-height: 1.6;
+}
+.dashboard-grid .panel .section-heading {
+  margin-bottom: 12px;
+}
+.dashboard-grid .panel > .muted {
+  margin-top: 0;
+  margin-bottom: 12px;
+  line-height: 1.65;
+}
+.dashboard-grid .sharing-panel > p {
+  margin-top: 0;
+}
+.dashboard-grid .friends-panel #requests,
+.dashboard-grid .friends-panel #friends {
+  margin-top: 10px;
+}
+.dashboard-grid .privacy-panel .switch-row {
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+.dashboard-grid .reva-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dashboard-grid .reva-card > .muted {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.dashboard-grid .reva-card .reva-prompts {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+.dashboard-grid .reva-card #answer {
+  margin-top: 4px;
+}
+@media (min-width: 781px) {
+  .dashboard-grid > aside > .panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .dashboard-grid > aside > .panel .section-heading {
+    margin-bottom: 2px;
+  }
+  .dashboard-grid > aside > .friends-panel #friends {
+    flex: 1 1 auto;
+  }
+  .dashboard-grid > aside > .privacy-panel > p {
+    max-width: 38ch;
+  }
+}
+@media (max-width: 780px) {
+  .dashboard-grid .panel .section-heading {
+    margin-bottom: 10px;
+  }
+}
