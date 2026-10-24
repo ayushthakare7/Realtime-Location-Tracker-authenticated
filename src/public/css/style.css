@@ -1009,3 +1009,12 @@ body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.3
   opacity: .6;
   cursor: wait;
 }
+
+
+/* Safety Travel dashboard entry */
+.safety-travel-entry { background: linear-gradient(145deg, #fffefa 0%, #edf4ec 100%); border-color: #dce8dc; }
+.safety-travel-entry .safety-icon { background: #dcebdd; color: #315748; font-size: 23px; }
+.safety-travel-entry > p { line-height: 1.7; }
+.safety-travel-link { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; margin-top: 14px; padding: 12px 15px; border-radius: 12px; background: var(--sage-dark); color: #fff; text-decoration: none; font-weight: 700; box-shadow: 0 6px 16px rgba(49,87,72,.13); transition: transform .18s ease, background .18s ease; }
+.safety-travel-link:hover { background: #264a3b; transform: translateY(-1px); }
+.safety-entry-note { margin: 10px 0 0; color: #8a958b; font-size: 11px; }
