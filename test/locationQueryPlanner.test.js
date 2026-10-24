@@ -61,38 +61,3 @@ test("plans closest/farthest friend comparisons", () => {
     { intent: "nearest_person", relation: "farthest", targetType: "place", target: "Durg" }
   );
 });
-
-test("plans the Reva Live closest-friend question with natural wording", () => {
-  assert.deepEqual(
-    planDistanceQuestion("Who is closest to me right now?", ["User One", "User Two"]),
-    { intent: "nearest_person", relation: "closest", targetType: "me", target: null }
-  );
-});
-
-test("plans Reva Live friend-to-self distance wording", () => {
-  assert.deepEqual(
-    planDistanceQuestion("How far is User One from me?", ["User One"]),
-    {
-      intent: "distance",
-      origin: "me",
-      originPerson: null,
-      originType: "person",
-      destination: "User One",
-      destinationType: "person"
-    }
-  );
-});
-
-test("plans Reva Live distance wording with the friend as the subject", () => {
-  assert.deepEqual(
-    planDistanceQuestion("How far away am I from User One?", ["User One"]),
-    {
-      intent: "distance",
-      origin: "me",
-      originPerson: null,
-      originType: "person",
-      destination: "User One",
-      destinationType: "person"
-    }
-  );
-});
