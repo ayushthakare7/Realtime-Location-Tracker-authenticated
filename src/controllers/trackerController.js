@@ -4,6 +4,7 @@ const LocationPoint = require("../models/LocationPoint");
 const LocationVisit = require("../models/LocationVisit");
 const LocationEvent = require("../models/LocationEvent");
 const Friendship = require("../models/Friendship");
+const SafetyJourney = require("../models/SafetyJourney");
 const { askRagService } = require("../services/ragClient.service");
 const { placeLabel, reverseGeocode } = require("../services/locationEvents.service");
 
@@ -62,6 +63,10 @@ exports.removeFriend = async (req, res) => {
     if (!friendship) {
       return res.status(404).json({ success: false, message: "Friendship not found." });
     }
+    await Promise.all([
+      SafetyJourney.updateMany({ travellerId: uid, sharedWith: friendId }, { $pull: { sharedWith: friendId } }),
+      SafetyJourney.updateMany({ travellerId: friendId, sharedWith: uid }, { $pull: { sharedWith: uid } })
+    ]);
     req.app.get("io")?.to("user:" + friendId).emit("friend-removed", { userId: uid });
     req.app.get("io")?.to("user:" + uid).emit("friend-removed", { userId: friendId });
     res.json({ success: true, message: "Friend removed." });
