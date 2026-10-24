@@ -233,6 +233,10 @@ async function appendJourneyEvents({ journeyId, travellerId, events }) {
   const journey = await SafetyJourney.findOne({ _id: journeyId, travellerId });
   if (!journey) return { status: 404, body: { success: false, message: "Journey not found." } };
   if (["CANCELLED", "COMPLETED", "ARRIVED"].includes(journey.status)) {
+    const terminalDuplicates = events.every(event => event && typeof event.eventId === "string" && journey.eventIds.includes(event.eventId.trim()));
+    if (terminalDuplicates) {
+      return { status: 200, body: { success: true, acceptedCount: 0, duplicateEventIds: events.map(event => event.eventId.trim()), status: journey.status, lastConfirmedLocation: journey.lastConfirmedLocation } };
+    }
     return { status: 409, body: { success: false, message: "This journey no longer accepts progress events." } };
   }
 
