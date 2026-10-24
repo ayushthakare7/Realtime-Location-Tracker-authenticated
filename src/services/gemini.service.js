@@ -30,7 +30,7 @@ function normalizeLocationPlan(plan) {
   const allowedIntents = new Set(["distance", "compare_places", "nearest_person", "history", "other"]);
   if (!allowedIntents.has(plan.intent)) throw new Error("Location planner returned an unsupported intent");
   const textOrNull = value => typeof value === "string" && value.trim() ? value.trim().slice(0, 160) : null;
-  const allowedTypes = new Set(["person", "place", "unknown", "me"]);
+  const allowedTypes = new Set(["person", "place", "unknown", "me", "friend"]);
   const origin = allowedTypes.has(plan.origin) ? plan.origin : "unknown";
   const destinationType = allowedTypes.has(plan.destinationType) ? plan.destinationType : "unknown";
   const targetType = allowedTypes.has(plan.targetType) ? plan.targetType : "unknown";
