@@ -977,3 +977,19 @@ body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.3
     transition: none !important;
   }
 }
+
+
+/* Authentication map: remove the whitish veil and keep map tiles crisp. */
+.auth-map-background {
+  background: #dce5df !important;
+}
+.auth-map-background .leaflet-tile-pane {
+  filter: saturate(.9) contrast(1.04) brightness(1) !important;
+}
+.auth-map-background::after {
+  background: transparent !important;
+  opacity: 0 !important;
+}
+.auth-map-background .leaflet-container {
+  background: #dce5df !important;
+}
