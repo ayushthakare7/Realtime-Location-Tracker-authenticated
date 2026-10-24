@@ -753,3 +753,70 @@ body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.3
     grid-column: auto;
   }
 }
+
+
+/* Desktop balance: three equal-height control cards span from map top to Reva bottom */
+@media (min-width:781px) {
+  .dashboard-grid {
+    align-items: stretch;
+    grid-template-rows: auto auto;
+  }
+  .dashboard-grid > aside {
+    align-self: stretch;
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: stretch;
+    gap: 14px;
+  }
+  .dashboard-grid > aside > .sharing-panel,
+  .dashboard-grid > aside > .friends-panel,
+  .dashboard-grid > aside > .privacy-panel {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    justify-content: flex-start;
+    min-height: 0;
+    height: auto;
+    margin: 0;
+    padding: 17px 18px;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .dashboard-grid > aside > .sharing-panel > .section-heading,
+  .dashboard-grid > aside > .friends-panel > .section-heading,
+  .dashboard-grid > aside > .privacy-panel > .section-heading {
+    flex: 0 0 auto;
+    margin-bottom: 12px;
+  }
+  .dashboard-grid > aside > .sharing-panel > p,
+  .dashboard-grid > aside > .privacy-panel > p {
+    flex: 0 0 auto;
+    line-height: 1.45;
+  }
+  .dashboard-grid > aside > .sharing-panel #status {
+    flex: 0 1 auto;
+    overflow-wrap: anywhere;
+  }
+  .dashboard-grid > aside > .friends-panel #requests,
+  .dashboard-grid > aside > .friends-panel #friends {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .dashboard-grid > aside > .privacy-panel #deleteHistory {
+    margin-top: auto;
+  }
+}
+@media (max-width:780px) {
+  .dashboard-grid { align-items: start; }
+  .dashboard-grid > aside > .sharing-panel,
+  .dashboard-grid > aside > .friends-panel,
+  .dashboard-grid > aside > .privacy-panel {
+    flex: initial;
+    height: auto;
+    overflow: visible;
+  }
+}
