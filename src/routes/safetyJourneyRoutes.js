@@ -8,6 +8,9 @@ router.get("/modes", controller.listTravelModes);
 router.post("/", controller.createDraft);
 router.post("/:id/routes", controller.getRoutes);
 router.post("/:id/approve", controller.approveRoute);
+router.post("/:id/events", controller.appendEvents);
+router.post("/:id/sync", controller.appendEvents);
+router.post("/:id/cancel", controller.cancelJourney);
 router.get("/", controller.listMine);
 router.get("/:id", controller.getOne);
 
