@@ -192,5 +192,10 @@ exports.askMap = async (req, res) => {
       success: true,
       answer: result.answer || "I couldn't find enough information in the shared location history to answer that yet."
     });
-  } catch (e) { console.error("Reva assistant error:", e); res.status(e.status === 429 ? 429 : 502).json({ success: false, message: "Reva couldn't answer right now. Please try again." }); }
+  } catch (e) {
+    console.error("Reva assistant error:", e);
+    const status = [400, 401, 403, 429].includes(e.status) ? e.status : 502;
+    const message = status === 400 ? e.message : "Reva couldn't answer right now. Please try again.";
+    res.status(status).json({ success: false, message });
+  }
 };
