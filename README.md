@@ -30,7 +30,7 @@ Python service (standard-library HTTP server + LangChain + LangGraph)
 MongoDB locationevents collection + vector index
 ```
 
-Both services read the same MongoDB database. The Python service is private to the backend and should not be called directly by the browser. The local launch command binds it to `127.0.0.1:8001`. Safety Travel is implemented as a module in the existing Node service, not as an additional microservice. Real route alternatives require a configured Google Routes API key; unsupported modes return an explicit error rather than a fabricated route.
+Both services read the same MongoDB database. The Python service is private to the backend and should not be called directly by the browser. The local launch command binds it to `127.0.0.1:8001`. Safety Travel is implemented as a module in the existing Node service, not as an additional microservice. Safety Travel uses a public OpenStreetMap-based Valhalla router by default and does not require a Google Maps API key. The public endpoint has rate limits and no uptime guarantee; unsupported modes return an explicit error rather than a fabricated route.
 
 ## Request and response flow
 
