@@ -1358,3 +1358,256 @@ input:focus, textarea:focus {
     border-color: #414141;
   }
 }
+
+
+/* Calm premium palette — warm graphite, soft sage, and muted lavender */
+:root {
+  color-scheme: dark;
+  --canvas: #151715;
+  --surface: #1d211e;
+  --ink: #f1f0e9;
+  --muted: #b0b5ad;
+  --line: #343a34;
+  --sage: #29362d;
+  --sage-strong: #b7c9b5;
+  --sage-dark: #91aa91;
+  --lavender: #2b2930;
+  --shadow: 0 14px 36px rgba(0, 0, 0, .2);
+}
+html, body { background: #151715; color: #f1f0e9; }
+body {
+  background:
+    radial-gradient(ellipse at 12% 0%, rgba(127, 155, 123, .10), transparent 34rem),
+    radial-gradient(ellipse at 92% 8%, rgba(153, 139, 166, .07), transparent 32rem),
+    #151715;
+}
+.app-header {
+  background: rgba(21, 23, 21, .96);
+  border-bottom: 1px solid #303630;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .13);
+}
+.wordmark { color: #f1f0e9; }
+.wordmark-mark {
+  color: #dce7d9;
+  background: #2b392d;
+  border: 1px solid #455746;
+  border-radius: 12px;
+}
+.wordmark small { color: #aab3a8; }
+.header-tagline { color: #eeeee7; font-weight: 600; }
+.header-tagline em { color: #bdcfb9; }
+.gps-pill {
+  color: #c4cbc1;
+  background: #222722;
+  border-color: #3b443a;
+}
+.status-dot { background: #a8c2a3; }
+.logout-button, .secondary, #stop {
+  color: #e7e9e1;
+  background: #292e29;
+  border-color: #424a40;
+  border-radius: 10px;
+}
+.logout-button:hover, .secondary:hover, #stop:hover { background: #343b33; }
+.page-intro h1 { color: #f3f1ea; }
+.page-intro h1 em { color: #bdcfb9; }
+.page-intro .eyebrow,
+.section-heading .eyebrow,
+.map-heading .eyebrow { color: #a7b5a3; }
+.intro-copy, .muted { color: #b0b5ad; }
+.privacy-note {
+  color: #d4e0d0;
+  background: #252f26;
+  border: 1px solid #3b4a3a;
+  border-radius: 999px;
+}
+.panel {
+  color: #f1f0e9;
+  background: linear-gradient(145deg, #202420, #1b1f1c);
+  border-color: #343b34;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .17);
+  border-radius: 18px;
+}
+.section-icon {
+  color: #d3e0cf;
+  background: #2b382d;
+  border: 1px solid #3d4c3e;
+  border-radius: 12px;
+}
+.friends-panel .section-icon {
+  color: #d5cde0;
+  background: #302d35;
+  border-color: #46404b;
+}
+.privacy-panel .section-icon {
+  color: #ddcfb3;
+  background: #332f26;
+  border-color: #4b4435;
+}
+input, textarea {
+  color: #f1f0e9;
+  background: #171b18;
+  border-color: #3b443b;
+  border-radius: 10px;
+}
+input::placeholder, textarea::placeholder { color: #8f998e; }
+input:focus, textarea:focus {
+  border-color: #8fa98e;
+  outline-color: rgba(143, 169, 142, .2);
+}
+#start, #friendForm button, #askForm button[type=submit] {
+  color: #172018;
+  background: #c1d0bb;
+  border: 1px solid #c1d0bb;
+  border-radius: 10px;
+  font-weight: 700;
+  box-shadow: none;
+}
+#start:hover, #friendForm button:hover, #askForm button[type=submit]:hover {
+  background: #d0dccb;
+  border-color: #d0dccb;
+}
+#status {
+  color: #c0c9bd;
+  background: #191e1a;
+  border: 1px solid #333d33;
+  border-radius: 10px;
+}
+.friend { border-bottom-color: #343b34; }
+.friend strong { color: #f1f0e9; }
+.switch-row { color: #e0e4dc; }
+.switch-row input { accent-color: #a8c2a3; }
+.map-heading h2 { color: #f1f0e9; }
+.map-caption { color: #b0b5ad; }
+.map-frame {
+  border-color: #242b25;
+  box-shadow: 0 18px 46px rgba(0, 0, 0, .24);
+  border-radius: 18px;
+}
+.leaflet-container { background: #252d27; }
+.map-overlay {
+  background: rgba(28, 33, 29, .95);
+  border-color: #3b473b;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .2);
+  border-radius: 11px;
+}
+.map-overlay strong { color: #c6d6c0; }
+.map-overlay small { color: #b0b5ad; }
+.radar-pulse { background: #b6cbb0; }
+.radar-pulse:before, .radar-pulse:after { border-color: rgba(182, 203, 176, .45); }
+.map-hint {
+  color: #e7e9e1;
+  background: rgba(27, 32, 28, .94);
+  border-color: #3b473b;
+  border-radius: 10px;
+}
+.reva-card {
+  background: linear-gradient(145deg, #222521, #1c1f1d 78%);
+  border-color: #3a4038;
+}
+.reva-avatar {
+  color: #e1d9e9;
+  background: #34303b;
+  border-color: #4a4353;
+  border-radius: 13px;
+}
+.reva-subtitle { color: #bdb4c8; }
+.reva-prompts button {
+  color: #e1e2dc;
+  background: #292d29;
+  border-color: #41483f;
+  border-radius: 10px;
+}
+.reva-prompts button:hover {
+  color: #f4f3ed;
+  background: #343a33;
+  border-color: #596452;
+}
+#answer { color: #d9e0d5; }
+#answer:not(:empty) {
+  background: #191e1a;
+  border-color: #364136;
+  border-radius: 12px;
+}
+#askForm label { color: #b0b5ad !important; }
+#askForm label input { accent-color: #a8c2a3; }
+
+/* Keep long usernames, friend status, and request actions inside the Friends card */
+.dashboard-grid .friends-panel {
+  min-width: 0;
+  overflow: hidden;
+}
+.friends-panel #friendForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+.friends-panel #friendForm input {
+  width: 100%;
+  min-width: 0;
+}
+.friends-panel #friendForm button {
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.friends-panel #requests,
+.friends-panel #friends {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.friends-panel .friend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px 8px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 12px 0;
+}
+.friends-panel .friend strong,
+.friends-panel .friend > span,
+.friends-panel .friend .muted {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.friends-panel .friend .muted {
+  flex: 1 1 100%;
+  line-height: 1.45;
+}
+.friends-panel .friend button {
+  flex: 0 1 auto;
+  margin: 2px 5px 2px 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.friends-panel #requests h4 {
+  margin: 12px 0 4px;
+  color: #dce4d8;
+}
+@media (max-width: 420px) {
+  .friends-panel #friendForm {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .friends-panel #friendForm button { width: 100%; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .panel { transition: background .2s ease, border-color .2s ease, box-shadow .2s ease; }
+  .panel:hover {
+    border-color: #465044;
+    box-shadow: 0 16px 38px rgba(0, 0, 0, .21);
+  }
+}
