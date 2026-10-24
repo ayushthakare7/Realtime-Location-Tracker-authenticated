@@ -19,6 +19,7 @@ app.use("/api/tracker", trackerRoutes);
 app.get("/", (req, res) => res.redirect("/login"));
 app.get("/login", (req, res) => res.render("login"));
 app.get("/register", (req, res) => res.render("register"));
+app.get("/safety-travel", (req, res) => res.render("safety-travel"));
 app.get("/tracker", (req, res) => res.render("index"));
 
 module.exports = app;
