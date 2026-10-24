@@ -1,0 +1,29 @@
+name: Reva Journey Service
+
+on:
+  push:
+    branches: [feature/reva-journey-service]
+    paths:
+      - "reva-journey-service/**"
+      - ".github/workflows/journey-service.yml"
+  pull_request:
+    paths:
+      - "reva-journey-service/**"
+      - ".github/workflows/journey-service.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: reva-journey-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: reva-journey-service/package.json
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      - run: node --check server.js && node --check auth.js && node --check routes.js && node --check models/Journey.js
