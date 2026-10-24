@@ -95,6 +95,7 @@ if (window.RevaJourneyOfflineQueue) {
 window.RevaSafetyTravelOffline = Object.freeze({
   async recordEvent(journeyId, event) {
     if (!offlineQueue) throw new Error("Local offline storage is unavailable.");
+    if (!trackingJourneyId || trackingJourneyId !== String(journeyId)) throw new Error("Start an explicitly approved and consented journey before recording events.");
     const eventId = await offlineQueue.enqueue(journeyId, event);
     await refreshQueueStatus();
     return eventId;
@@ -102,15 +103,16 @@ window.RevaSafetyTravelOffline = Object.freeze({
   async recordLocation(journeyId, position) {
     if (!position || !position.coords) throw new Error("A valid GPS position is required.");
     const recordedAt = new Date(position.timestamp || Date.now()).toISOString();
-    try { localStorage.setItem("reva-safety-travel-last-gps-at", recordedAt); } catch (_) {}
-    updateLastGpsStatus();
-    return this.recordEvent(journeyId, {
+    const eventId = await this.recordEvent(journeyId, {
       type: "location",
       latitude: position.coords.latitude,
       longitude: position.coords.longitude,
       accuracyMeters: position.coords.accuracy,
       recordedAt
     });
+    try { localStorage.setItem("reva-safety-travel-last-gps-at", recordedAt); } catch (_) {}
+    updateLastGpsStatus();
+    return eventId;
   },
   async recordConnection(journeyId, online) {
     return this.recordEvent(journeyId, { type: online ? "online" : "offline", recordedAt: new Date().toISOString() });
