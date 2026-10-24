@@ -3,7 +3,7 @@ import hmac
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, TypedDict
 
 from bson import ObjectId
@@ -109,7 +109,7 @@ def index_event(event_id: str) -> bool:
     vector = embeddings().embed_query(event_text(event))
     collection().update_one(
         {"_id": event["_id"]},
-        {"$set": {"embedding": vector, "embeddingModel": EMBEDDING_MODEL, "embeddingUpdatedAt": datetime.utcnow()}},
+        {"$set": {"embedding": vector, "embeddingModel": EMBEDDING_MODEL, "embeddingUpdatedAt": datetime.now(timezone.utc)}},
     )
     return True
 
@@ -136,7 +136,7 @@ def retrieve_node(state: GraphState) -> GraphState:
         return {"events": []}
 
     q = state["question"].lower()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     date_filter: dict[str, Any] = {}
     if "yesterday" in q:
         end = datetime(now.year, now.month, now.day)
