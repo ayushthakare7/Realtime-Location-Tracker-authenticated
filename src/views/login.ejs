@@ -96,6 +96,33 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
       maxZoom: 19
     }).addTo(authMap);
     setTimeout(() => authMap.invalidateSize(false), 100);
+
+    // Gentle, alternating map drift adds life without distracting from the form.
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (!reducedMotion.matches) {
+      let driftForward = true;
+      let driftTimer;
+      const drift = () => {
+        if (document.hidden || reducedMotion.matches) {
+          driftTimer = setTimeout(drift, 3000);
+          return;
+        }
+        authMap.panBy(driftForward ? [26, 12] : [-26, -12], {
+          animate: true,
+          duration: 7
+        });
+        driftForward = !driftForward;
+        driftTimer = setTimeout(drift, 9000);
+      };
+      driftTimer = setTimeout(drift, 1800);
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) clearTimeout(driftTimer);
+      });
+      reducedMotion.addEventListener?.("change", event => {
+        if (event.matches) clearTimeout(driftTimer);
+      });
+    }
+
   })();
 </script>
 
