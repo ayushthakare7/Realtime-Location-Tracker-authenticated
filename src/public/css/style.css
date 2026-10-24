@@ -180,3 +180,14 @@ textarea { margin: 0; }
 .auth-form button{box-shadow:0 8px 18px rgba(49,87,72,.14);transition:transform .18s,box-shadow .18s,background .18s}
 .auth-form button:hover{transform:translateY(-1px);box-shadow:0 12px 24px rgba(49,87,72,.2)}
 @media(max-width:520px){.auth-card{border-radius:22px}.auth-brand{margin-bottom:25px}}
+
+/* Soft, game-like radar markers */
+.reva-marker-shell{background:transparent;border:0}
+.reva-pin{position:relative;display:block;width:17px;height:17px;margin:5px;border:3px solid #fff;border-radius:50%;box-shadow:0 3px 12px rgba(33,52,42,.28);transition:transform .25s ease}
+.reva-pin i{position:absolute;inset:3px;border-radius:50%;background:#fff;opacity:.9}
+.reva-pin-me{background:#315748;outline:5px solid rgba(93,139,106,.18)}
+.reva-pin-friend{background:#8b79a8;outline:4px solid rgba(139,121,168,.16)}
+.radar-targeted .reva-pin-friend{transform:scale(1.45);box-shadow:0 0 0 7px rgba(139,121,168,.18),0 0 0 15px rgba(139,121,168,.08),0 5px 18px rgba(33,52,42,.25)}
+.reva-pin-friend:after{content:"";position:absolute;inset:-8px;border:1px solid rgba(139,121,168,.5);border-radius:50%;animation:reva-friend-ping 2s ease-out infinite}
+@keyframes reva-friend-ping{0%{transform:scale(.55);opacity:.8}100%{transform:scale(1.8);opacity:0}}
+@media(prefers-reduced-motion:reduce){.radar-pulse:before,.radar-pulse:after,.reva-pin-friend:after{animation:none}.reva-pin{transition:none}}
