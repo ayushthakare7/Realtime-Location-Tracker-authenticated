@@ -192,6 +192,13 @@ async function loadSharedJourneys() {
       list.append(row);
     }
     status.textContent = journeys.length + " shared journey" + (journeys.length === 1 ? "" : "s") + " · " + locationsAvailable + " with a confirmed GPS location. Refreshes every 10 seconds.";
+    const requestedJourneyId = new URLSearchParams(window.location.search).get("journeyId");
+    if (requestedJourneyId && sharedJourneyMarkers.has(requestedJourneyId)) {
+      focusSharedJourney(requestedJourneyId);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("journeyId");
+      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+    }
   } catch (error) {
     status.textContent = error.message || "Could not load journeys shared with you.";
   }
