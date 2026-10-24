@@ -1,5 +1,5 @@
 // REVA LLM generation and natural-language query understanding use Groq's OpenAI-compatible API.
-async function groqChat(messages, { temperature = 0.2, max_tokens = 450 } = {}) {
+async function groqChat(messages, { temperature = 0.2, max_tokens = 450, response_format } = {}) {
   const key = process.env.GROQ_API_KEY;
   if (!key) throw new Error("GROQ_API_KEY is missing");
 
@@ -10,7 +10,7 @@ async function groqChat(messages, { temperature = 0.2, max_tokens = 450 } = {}) 
       "Content-Type": "application/json",
       Authorization: `Bearer ${key}`
     },
-    body: JSON.stringify({ model, messages, temperature, max_tokens }),
+    body: JSON.stringify({ model, messages, temperature, max_tokens, ...(response_format ? { response_format } : {}) }),
     signal: AbortSignal.timeout(15000)
   });
 
@@ -54,7 +54,7 @@ async function understandLocationQuestion(question) {
   const raw = await groqChat([
     { role: "system", content: "You are Reva's semantic query planner. Interpret meaning, not exact keywords or sentence templates. Do not answer, calculate distances, invent coordinates, or access private data. Return ONLY JSON with keys:\n{\"intent\":\"distance|compare_places|nearest_person|history|other\",\"origin\":\"me|friend|place|unknown\",\"originPerson\":string|null,\"originPlace\":string|null,\"destination\":string|null,\"destinationType\":\"place|person|unknown\",\"targetType\":\"me|person|place|unknown\",\"target\":string|null,\"places\":string[],\"relation\":\"closest|farthest\"|null}\nInterpret unusual, ungrammatical, or repeated phrasing semantically:\n- \"Nagpur is away, how many kilometers Nagpur is away from me\" => distance from me to place Nagpur.\n- \"What is the distance between me and Nagpur?\" => distance from me to place Nagpur.\n- \"How far would I need to drive to reach Nagpur?\" => distance from me to place Nagpur.\n- \"How far is Raipur from my friend Siddhant?\" => distance from friend Siddhant to place Raipur.\n- \"How far is Siddhant from me?\" => distance from me to person Siddhant.\n- \"Distance between Nagpur and Raipur\" => distance between places; origin=\"place\", originPlace=\"Nagpur\", destination=\"Raipur\", destinationType=\"place\".\n- \"Which is closer to me, Nagpur or Raipur?\" => compare_places, targetType=\"me\", target=\"me\", places=[\"Nagpur\",\"Raipur\"].\n- \"Which friend is farthest from Nagpur?\" => nearest_person, relation=\"farthest\", targetType=\"place\", target=\"Nagpur\".\n- Past location/event questions => history. Unrelated questions => other.\nFor distance, identify origin and destination. A friend origin requires originPerson; a place origin requires originPlace. destinationType distinguishes person from geocodable place. compare_places requires exactly two places and a target. nearest_person requires target and relation. Never assume a named person is authorized; the application enforces permissions." },
     { role: "user", content: String(question || "").slice(0, 500) }
-  ], { temperature: 0, max_tokens: 300 });
+  ], { temperature: 0, max_tokens: 300, response_format: { type: "json_object" } });
   const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
   return normalizeLocationPlan(JSON.parse(cleaned));
 }
