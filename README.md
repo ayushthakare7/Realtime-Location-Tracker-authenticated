@@ -2,7 +2,7 @@
 
 Reva is a location-sharing application with a Node.js web backend/frontend and a separate Python RAG microservice. The existing JavaScript application remains responsible for accounts, authentication, friendships, live GPS sharing, consent, and deterministic geospatial calculations. Python owns the RAG pipeline: embeddings, MongoDB Vector Search retrieval, LangGraph orchestration, and natural-language answer generation through LangChain.
 
-## Two-service architecture
+## Service architecture
 
 ```text
 Browser (EJS + JavaScript + Leaflet)
@@ -14,6 +14,8 @@ Node.js service (Express + MongoDB/Mongoose)
   - Friends and sharing permissions
   - Live location and location-event creation
   - Deterministic distance/geocoding/routing
+  - Safety Travel journeys, route approval, progress/offline event sync, and overdue checks
+  - Persistent in-app safety notifications
   - Consent check and authorized user ID selection
           |
           | HTTP POST + Bearer service token
@@ -28,7 +30,7 @@ Python service (standard-library HTTP server + LangChain + LangGraph)
 MongoDB locationevents collection + vector index
 ```
 
-Both services read the same MongoDB database. The Python service is private to the backend and should not be called directly by the browser. The local launch command binds it to `127.0.0.1:8001`.
+Both services read the same MongoDB database. The Python service is private to the backend and should not be called directly by the browser. The local launch command binds it to `127.0.0.1:8001`. Safety Travel is implemented as a module in the existing Node service, not as an additional microservice. Real route alternatives require a configured Google Routes API key; unsupported modes return an explicit error rather than a fabricated route.
 
 ## Request and response flow
 
@@ -218,7 +220,7 @@ Deploy the Python service before the Node service. Then test sign-in, live locat
 | `RAG_SERVICE_TOKEN` | Shared secret for Node-to-Python requests |
 | `EMBEDDING_MODEL` | Python Sentence Transformers model |
 | `RAG_VECTOR_INDEX` | MongoDB Atlas vector index name |
-| `RAG_TOP_K` | Maximum number of relevant events retrieved |
+| `RAG_TOP_K` | Maximum number of relevant events retrieved |\n| `GOOGLE_MAPS_API_KEY` | Server-only Google Routes API key for supported walking, cycling, road, and transit route alternatives |\n| `JOURNEY_CHECKIN_GRACE_MINUTES` | Minutes after an overdue check-in prompt before trusted contacts are notified (default 5) |\n| `JOURNEY_WORKER_INTERVAL_MS` | Safety deadline polling interval (default 30000 ms; minimum 10000 ms) |
 
 ## Privacy and security
 
