@@ -27,6 +27,7 @@ async function checkOverdueJourneys(now = new Date()) {
         { $set: { status: "OVERDUE_UNCONFIRMED" } }
       );
       if (changed.modifiedCount) {
+        await queueNotification({ journey, recipientId: journey.travellerId, type: "journey_overdue_checkin", title: "Please check in", body: "Your expected arrival time has passed. Are you safe? A late arrival alone does not mean there is an emergency.", keySuffix: "traveller-checkin:" + journey.expectedArrivalAt.toISOString() });
         for (const recipientId of journey.sharedWith) {
           await queueNotification({ journey, recipientId, type: "journey_overdue_checkin", title: "Safety Travel check-in", body: journey.travellerUsername + " has reached their estimated arrival time. Please check in with them if needed.", keySuffix: "checkin:" + journey.expectedArrivalAt.toISOString() });
         }
