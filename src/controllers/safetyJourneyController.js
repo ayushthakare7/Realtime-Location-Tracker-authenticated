@@ -168,6 +168,42 @@ exports.appendEvents = async (req, res) => {
   }
 };
 
+
+exports.setJourneySharing = async (req, res) => {
+  try {
+    if (typeof req.body?.enabled !== "boolean") {
+      return res.status(400).json({ success: false, message: "enabled must be true or false." });
+    }
+    const journey = await SafetyJourney.findOne({ _id: req.params.id, travellerId: req.user.userId });
+    if (!journey) return res.status(404).json({ success: false, message: "Journey not found." });
+    if (["ARRIVED", "CANCELLED", "COMPLETED"].includes(journey.status) && req.body.enabled) {
+      return res.status(409).json({ success: false, message: "A completed journey cannot resume sharing." });
+    }
+    journey.sharingEnabled = req.body.enabled;
+    await journey.save();
+    const io = req.app.get("io");
+    for (const recipientId of journey.sharedWith || []) {
+      if (!journey.sharingEnabled) {
+        io?.to("user:" + recipientId).emit("journey-sharing-stopped", { journeyId: String(journey._id), travellerId: String(journey.travellerId) });
+      } else {
+        io?.to("user:" + recipientId).emit("journey-update", {
+          journeyId: String(journey._id), travellerId: String(journey.travellerId),
+          travellerUsername: journey.travellerUsername, status: journey.status,
+          avatarKey: journey.avatarKey, transportModeId: journey.transportModeId,
+          origin: journey.origin, destination: journey.destination, route: journey.route,
+          expectedArrivalAt: journey.expectedArrivalAt,
+          lastConfirmedLocation: journey.lastConfirmedLocation,
+          connectionStatus: journey.connectionStatus
+        });
+      }
+    }
+    return res.json({ success: true, sharingEnabled: journey.sharingEnabled });
+  } catch (error) {
+    console.error("Set journey sharing failed:", error.message);
+    return res.status(500).json({ success: false, message: "Could not update journey sharing." });
+  }
+};
+
 exports.cancelJourney = async (req, res) => {
   try {
     const journey = await SafetyJourney.findOne({ _id: req.params.id, travellerId: req.user.userId });
