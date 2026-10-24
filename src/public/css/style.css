@@ -494,3 +494,81 @@ body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.3
     letter-spacing: -0.8px;
   }
 }
+
+
+/* Balanced dashboard columns: left controls span the map-to-Ask-Reva height */
+@media (min-width: 781px) {
+  .dashboard-grid {
+    grid-template-columns: minmax(265px, 320px) minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-items: stretch;
+    column-gap: 22px;
+    row-gap: 16px;
+  }
+  .dashboard-grid > aside {
+    grid-column: 1;
+    grid-row: 1 / 3;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 0;
+  }
+  .dashboard-grid > aside > .panel {
+    flex: 1 1 0;
+    min-height: 0;
+    margin: 0;
+    padding: 17px 18px;
+  }
+  .dashboard-grid > aside > .sharing-panel,
+  .dashboard-grid > aside > .friends-panel,
+  .dashboard-grid > aside > .privacy-panel {
+    height: auto;
+    min-height: 0;
+  }
+  .dashboard-grid > aside > .privacy-panel {
+    display: block;
+    padding: 17px 18px;
+    gap: 0;
+  }
+  .dashboard-grid > aside > .privacy-panel #deleteHistory {
+    margin-top: 5px;
+  }
+  .dashboard-grid > .map-stage {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+  }
+  .dashboard-grid > .map-stack {
+    display: contents;
+  }
+  .dashboard-grid > .reva-card,
+  .dashboard-grid .reva-card {
+    grid-column: 2;
+    grid-row: 2;
+    min-width: 0;
+    align-self: stretch;
+    margin: 0;
+  }
+}
+@media (max-width: 780px) {
+  .dashboard-grid > aside {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .dashboard-grid > aside > .panel {
+    min-width: 0;
+    margin: 0;
+  }
+  .dashboard-grid > aside > .privacy-panel {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 520px) {
+  .dashboard-grid > aside {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-grid > aside > .privacy-panel {
+    grid-column: auto;
+  }
+}
