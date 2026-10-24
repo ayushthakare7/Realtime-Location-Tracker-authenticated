@@ -381,3 +381,68 @@ body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.3
     grid-row: auto;
   }
 }
+
+
+/* Final dashboard balance: centered, higher hero and paired lower panels */
+@media (min-width: 781px) {
+  .page-intro {
+    min-height: 0;
+    padding: 8px clamp(18px, 3vw, 42px) 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+  }
+  .page-intro .intro-center {
+    margin-inline: auto;
+    max-width: 760px;
+  }
+  .page-intro .eyebrow { margin-bottom: 3px; }
+  .page-intro h1 {
+    font-size: clamp(28px, 2.8vw, 36px);
+    line-height: 1.06;
+    letter-spacing: -1.5px;
+  }
+  .page-intro .intro-copy {
+    margin: 6px auto 0;
+    font-size: 12px;
+  }
+  .page-intro .privacy-note {
+    position: absolute;
+    right: clamp(18px, 3vw, 42px);
+    bottom: 13px;
+  }
+  .dashboard-grid {
+    padding-top: 0;
+    row-gap: 14px;
+  }
+  .dashboard-grid aside {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .dashboard-grid .map-stage {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .dashboard-grid > .privacy-panel {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: stretch;
+    margin: 0;
+  }
+  .dashboard-grid .reva-card {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: stretch;
+    margin: 0;
+    min-width: 0;
+  }
+}
+@media (max-width: 780px) {
+  .page-intro {
+    text-align: center;
+    align-items: center;
+  }
+  .page-intro .intro-center { margin-inline: auto; }
+  .page-intro .intro-copy { margin-inline: auto; }
+}
