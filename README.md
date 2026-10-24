@@ -228,7 +228,7 @@ All endpoints below require the existing JWT bearer authentication.
 | `GET /api/journeys/notifications` | Read persisted in-app safety notifications |
 | `PATCH /api/journeys/notifications/:notificationId/read` | Mark a notification as read |
 
-The route provider uses the server-only `GOOGLE_MAPS_API_KEY` setting. Enable the Google Routes API and billing for the key before testing route resolution. Unsupported transport types return an explicit error; Reva does not fabricate a route. The catalogue's avatar keys are exact identifiers (for example, `bicycle` stays `bicycle`, and natural-language walking maps to `walking`).
+The route provider uses the public OpenStreetMap-based Valhalla endpoint by default and does not require a Google Maps API key. The endpoint is best-effort and may rate-limit or become unavailable. Unsupported transport types return an explicit error; Reva does not fabricate a route. The catalogue's avatar keys are exact identifiers (for example, `bicycle` stays `bicycle`, and natural-language walking maps to `walking`).
 
 Offline event batches are idempotent by `eventId`, accept up to 100 events per request, and preserve the most recent recorded location by timestamp. Friend map updates include location freshness and remaining distance along the approved route when route geometry is available. Overdue checks run in a persistent database-backed polling worker; the app sends a check-in prompt after ETA plus the configured journey grace period, then alerts shared friends if there is still no response. Explicit emergency events follow a separate alert path. Notifications are persisted and emitted over Socket.IO; native/background push delivery still requires a push subscription/provider integration before claiming alerts can reach a fully closed app.
 
@@ -245,7 +245,7 @@ Offline event batches are idempotent by `eventId`, accept up to 100 events per r
 | `EMBEDDING_MODEL` | Python Sentence Transformers model |
 | `RAG_VECTOR_INDEX` | MongoDB Atlas vector index name |
 | `RAG_TOP_K` | Maximum number of relevant events retrieved |
-| `GOOGLE_MAPS_API_KEY` | Server-only Google Routes API key for supported walking, cycling, road, and transit route alternatives |
+| `VALHALLA_ROUTE_URL` | Optional URL override for a compatible OpenStreetMap-based Valhalla router; defaults to the public no-key endpoint |
 | `JOURNEY_CHECKIN_GRACE_MINUTES` | Minutes after an overdue check-in prompt before trusted contacts are notified (default 5) |
 | `JOURNEY_WORKER_INTERVAL_MS` | Safety deadline polling interval (default 30000 ms; minimum 10000 ms) |
 
