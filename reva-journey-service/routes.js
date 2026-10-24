@@ -28,7 +28,7 @@ function canView(j, userId) {
   return j.travellerId === userId || (j.sharingEnabled && j.sharedWith.includes(userId));
 }
 function validId(id) { return mongoose.isValidObjectId(id); }
-async function notify(journey, type, title, body, suffix, recipients = journey.sharingEnabled ? journey.sharedWith : []) {
+async function notify(journey, type, title, body, suffix, recipients = journey.sharedWith) {
   for (const recipientId of [...new Set(recipients.map(String))]) {
     await queueNotification({ journey, recipientId, type, title, body, keySuffix: suffix });
   }
