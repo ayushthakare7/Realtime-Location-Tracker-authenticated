@@ -96,7 +96,7 @@ async function loadFriendLiveJourneys() {
       button.className = "secondary shared-journey-view";
       button.textContent = "Watch live journey";
       button.addEventListener("click", () => {
-        window.location.href = "/live-journey?journeyId=" + encodeURIComponent(String(journey.id));
+        window.location.href = "/live-journey?id=" + encodeURIComponent(String(journey.id));
       });
       row.append(button);
       list.append(row);
