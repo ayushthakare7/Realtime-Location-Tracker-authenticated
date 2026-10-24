@@ -71,11 +71,13 @@ async function animateCrewReveal() {
   }
 
   radarAnimationRunning = true;
-  const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const reducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const wait = ms => new Promise(resolve => setTimeout(resolve, reducedMotion ? 0 : ms));
+  const duration = seconds => reducedMotion ? 0 : seconds;
   try {
     if (!radarFocusedOnMe) {
       hint.textContent = "Finding your signal…";
-      map.flyTo(ownMarker.getLatLng(), 15, { duration: 1.5 });
+      map.flyTo(ownMarker.getLatLng(), 15, { duration: duration(1.5) });
       radarFocusedOnMe = true;
       await wait(1700);
     }
@@ -94,7 +96,7 @@ async function animateCrewReveal() {
       hint.textContent = "Connecting the dots · " + friendName;
       const markerElement = marker.getElement();
       if (markerElement) markerElement.classList.add("radar-targeted");
-      map.flyTo(marker.getLatLng(), 13, { duration: 1.05 });
+      map.flyTo(marker.getLatLng(), 13, { duration: duration(1.05) });
       await wait(1250);
       if (markerElement) markerElement.classList.remove("radar-targeted");
     }
@@ -102,7 +104,7 @@ async function animateCrewReveal() {
     const bounds = L.latLngBounds([...markers.values()].map(marker => marker.getLatLng()));
     if (bounds.isValid()) {
       hint.textContent = "There you are. Your crew, all in one little world.";
-      map.flyToBounds(bounds, { padding: [55, 55], maxZoom: 8, duration: 1.7 });
+      map.flyToBounds(bounds, { padding: [55, 55], maxZoom: 8, duration: duration(1.7) });
       await wait(1900);
     }
     hint.textContent = crew.length + " friend" + (crew.length === 1 ? "" : "s") + " on your radar · shared locations only";
@@ -201,6 +203,10 @@ async function loadFriends({ quiet = false } = {}) {
 
 async function setSharing(enabled) {
   try {
+    if (enabled) {
+      radarAnimationDone = false;
+      radarFocusedOnMe = false;
+    }
     const data = await api("/sharing", { method: "PATCH", body: JSON.stringify({ enabled }) });
     sharing = data.sharingEnabled;
     if (watchId !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchId);
