@@ -859,3 +859,48 @@ body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.3
   }
 }
 
+/* Auth pages: replace decorative rings with a quiet, full-screen map backdrop. */
+.auth-page {
+  isolation: isolate;
+  overflow: hidden;
+  background: #edf0e8;
+}
+.auth-page::before,
+.auth-page::after {
+  content: none !important;
+  display: none !important;
+  animation: none !important;
+}
+.auth-map-background {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(232, 239, 226, .92), rgba(245, 242, 249, .88)),
+    #edf0e8;
+  pointer-events: none;
+}
+.auth-map-background .leaflet-tile-pane {
+  filter: saturate(.55) contrast(.86);
+}
+.auth-map-background::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(246, 246, 242, .60), rgba(246, 246, 242, .30) 50%, rgba(246, 246, 242, .60)),
+    rgba(241, 243, 236, .30);
+  pointer-events: none;
+}
+.auth-card {
+  z-index: 2;
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-page,
+  .auth-page::before,
+  .auth-page::after {
+    animation: none !important;
+  }
+}
+
