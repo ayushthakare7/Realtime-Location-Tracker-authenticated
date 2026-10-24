@@ -840,3 +840,167 @@ input:focus, textarea:focus {
     box-shadow: 0 20px 50px rgba(0, 0, 0, .28);
   }
 }
+
+
+/* Premium midnight theme: restrained ink, champagne, and muted jade */
+:root {
+  color-scheme: dark;
+  --canvas: #101418;
+  --surface: #171c20;
+  --ink: #f0eee8;
+  --muted: #a4aaa8;
+  --line: #30383a;
+  --sage: #25332e;
+  --sage-strong: #a8c1ad;
+  --sage-dark: #547763;
+  --lavender: #292731;
+  --shadow: 0 16px 44px rgba(0, 0, 0, .18);
+}
+html, body { background: #101418; color: #f0eee8; }
+body {
+  background:
+    radial-gradient(ellipse at 12% 0%, rgba(105, 135, 115, .09), transparent 34rem),
+    radial-gradient(ellipse at 92% 10%, rgba(155, 133, 101, .055), transparent 31rem),
+    #101418;
+}
+.app-header {
+  background: rgba(17, 22, 25, .94);
+  border-bottom: 1px solid #2a3234;
+  box-shadow: 0 5px 24px rgba(0, 0, 0, .12);
+}
+.wordmark { color: #f0eee8; }
+.wordmark-mark {
+  background: #202c27;
+  color: #c1d2c2;
+  border: 1px solid #39483f;
+}
+.wordmark small { color: #a0aaa4; }
+.header-tagline {
+  color: #e7e7df;
+  font-weight: 600;
+  letter-spacing: -.25px;
+}
+.header-tagline em { color: #b6cbb8; }
+.gps-pill {
+  color: #b7c0bb;
+  background: #191f22;
+  border-color: #343d3e;
+}
+.status-dot { background: #a8c5ad; }
+.logout-button, .secondary, #stop {
+  color: #d1d5cf;
+  background: #202629;
+  border-color: #3a4343;
+}
+.logout-button:hover, .secondary:hover, #stop:hover { background: #293131; }
+.page-intro h1 { color: #f0eee8; }
+.page-intro h1 em { color: #b6cbb8; }
+.page-intro .eyebrow,
+.section-heading .eyebrow,
+.map-heading .eyebrow { color: #9aaa9e; }
+.intro-copy, .muted { color: #a4aaa8; }
+.privacy-note {
+  color: #c4d5c5;
+  background: #202a25;
+  border: 1px solid #39463d;
+}
+.panel {
+  color: #eeede7;
+  background: linear-gradient(145deg, #1a2023, #171d20);
+  border-color: #303a3b;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, .16);
+}
+.section-icon {
+  color: #c3d2c3;
+  background: #26322c;
+}
+.friends-panel .section-icon {
+  color: #c9c0db;
+  background: #2a2732;
+}
+.privacy-panel .section-icon {
+  color: #d5c3a1;
+  background: #302b23;
+}
+input, textarea {
+  color: #f0eee8;
+  background: #12181b;
+  border-color: #394344;
+}
+input::placeholder, textarea::placeholder { color: #828d89; }
+input:focus, textarea:focus {
+  border-color: #819d88;
+  outline-color: rgba(129, 157, 136, .2);
+}
+#start, #friendForm button, #askForm button[type=submit] {
+  color: #101812;
+  background: linear-gradient(135deg, #c1d2c2, #a3bba7);
+  box-shadow: 0 5px 16px rgba(0, 0, 0, .13);
+}
+#start:hover, #friendForm button:hover, #askForm button[type=submit]:hover {
+  background: linear-gradient(135deg, #d2dfd2, #b5cbb8);
+}
+#status {
+  color: #b1bbb5;
+  background: #141b1d;
+  border: 1px solid #2e3b3a;
+}
+.friend { border-bottom-color: #2b3435; }
+.friend strong { color: #eeeDE7; }
+.switch-row { color: #d8ddd7; }
+.switch-row input { accent-color: #a8c1ad; }
+.map-heading h2 { color: #eeede7; }
+.map-caption { color: #a2ada7; }
+.map-frame {
+  border-color: #1b2426;
+  box-shadow: 0 18px 46px rgba(0, 0, 0, .2);
+}
+.leaflet-container { background: #202a2d; }
+.map-overlay {
+  background: rgba(22, 29, 30, .92);
+  border-color: rgba(165, 190, 169, .2);
+  box-shadow: 0 7px 22px rgba(0, 0, 0, .18);
+}
+.map-overlay strong { color: #c2d3c3; }
+.map-overlay small { color: #a4aaa8; }
+.radar-pulse { background: #b0cbb4; }
+.radar-pulse:before, .radar-pulse:after { border-color: rgba(176, 203, 180, .4); }
+.map-hint {
+  color: #e2e4dd;
+  background: rgba(19, 25, 27, .9);
+  border-color: rgba(165, 190, 169, .18);
+}
+.reva-card {
+  background: linear-gradient(135deg, #1a2023 0%, #201f25 100%);
+  border-color: #38363c;
+}
+.reva-avatar {
+  color: #d3c7e2;
+  background: #2c2933;
+  border-color: #47404e;
+}
+.reva-subtitle { color: #b2a9bd; }
+.reva-prompts button {
+  color: #d0c8da;
+  background: #202126;
+  border-color: #3d3a43;
+}
+.reva-prompts button:hover {
+  color: #f0ebf4;
+  background: #2a2930;
+  border-color: #55505c;
+}
+#answer { color: #d1ddd4; }
+#answer:not(:empty) {
+  background: rgba(15, 21, 23, .72);
+  border-color: #35413f;
+}
+#askForm label { color: #a4aaa8 !important; }
+#askForm label input { accent-color: #a8c1ad; }
+@media (prefers-reduced-motion: no-preference) {
+  .panel { transition: border-color .2s ease, box-shadow .2s ease; }
+  .panel:hover {
+    border-color: #45554b;
+    box-shadow: 0 16px 42px rgba(0, 0, 0, .21);
+  }
+}
