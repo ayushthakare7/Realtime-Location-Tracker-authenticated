@@ -1,6 +1,6 @@
 const DISTANCE_TERMS = /\b(distance|how far|far away|away from|separation|separate|closer|closest|nearest|nearer|nearby|road distance|driving distance|kilomet(?:er|re)s?|kms?|miles?|met(?:er|re)s?)\b/i;
 const SELF_TERMS = /\b(me|myself|am i|i am|my location|where i am|where am i|from here|from my location|my current location)\b/i;
-const FILLER = /\b(?:what(?:'s| is)?|how|much|far|is|are|the|distance|between|from|to|of|for|me|myself|my|i|am|where|here|location|current|right|now|please|calculate|work|out|tell|would|be|in|at|and|away|separate|separation|closer|closest|nearest|nearer|nearby|road|driving|kilometers?|kilometres?|kms?|miles?|meters?|metres?|compare|which|one|than|can|you|find|show|give|what)\b/gi;
+const FILLER = /\b(?:what(?:'s| is)?|how|many|much|far|is|are|the|distance|between|from|to|of|for|me|myself|my|i|am|where|here|location|current|right|now|please|calculate|work|out|tell|would|be|in|at|and|away|separate|separation|closer|closest|nearest|nearer|nearby|road|driving|kilometers?|kilometres?|kms?|miles?|meters?|metres?|compare|which|one|than|can|you|find|show|give|what)\b/gi;
 
 function normalizeWords(value) {
   return String(value || "")
