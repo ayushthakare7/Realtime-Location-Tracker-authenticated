@@ -15,8 +15,7 @@ const VALHALLA_COSTING = Object.freeze({
   car: "auto",
   motorcycle: "auto",
   scooter: "auto",
-  auto_rickshaw: "auto",
-  bus: "auto"
+  auto_rickshaw: "auto"
 });
 
 function parseDurationSeconds(value) {
