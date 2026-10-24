@@ -104,7 +104,7 @@ function createRadarIcon(isMe) {
 
 const sharedJourneyMarkers = new Map();
 const sharedJourneyLayers = new Map();
-const selectedJourneyId = new URLSearchParams(window.location.search).get("journeyId");
+let selectedJourneyId = new URLSearchParams(window.location.search).get("journeyId");
 
 function journeyVehicle(mode) {
   return ({
@@ -171,6 +171,7 @@ function focusSharedJourney(id) {
   const layers = sharedJourneyLayers.get(key);
   if (layers && layers.route && layers.route.getLatLngs().length > 1) {
     const bounds = layers.route.getBounds();
+    if (marker) bounds.extend(marker.getLatLng());
     if (bounds.isValid()) {
       map.fitBounds(bounds, { padding: [42, 42], maxZoom: 15, animate: !(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) });
     }
@@ -228,13 +229,13 @@ async function loadSharedJourneys() {
         if (layers.start) layers.start.setLatLng([Number(origin.latitude), Number(origin.longitude)]);
         else layers.start = L.marker([Number(origin.latitude), Number(origin.longitude)], {
           icon: createJourneyEndpointIcon("start", "Journey origin")
-        }).addTo(map).bindTooltip("A · " + String(origin.label || "Start"));
+        }).addTo(map).bindTooltip(document.createTextNode("A · " + String(origin.label || "Start")));
       }
       if (destination && Number.isFinite(Number(destination.latitude)) && Number.isFinite(Number(destination.longitude))) {
         if (layers.end) layers.end.setLatLng([Number(destination.latitude), Number(destination.longitude)]);
         else layers.end = L.marker([Number(destination.latitude), Number(destination.longitude)], {
           icon: createJourneyEndpointIcon("end", "Journey destination")
-        }).addTo(map).bindTooltip("B · " + String(destination.label || "Destination"));
+        }).addTo(map).bindTooltip(document.createTextNode("B · " + String(destination.label || "Destination")));
       }
       sharedJourneyLayers.set(id, layers);
 
@@ -290,6 +291,7 @@ async function loadSharedJourneys() {
       const url = new URL(window.location.href);
       url.searchParams.delete("journeyId");
       window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+      selectedJourneyId = null;
     }
   } catch (e) { status.textContent = e.message || "Could not load journeys shared with you."; }
 }
