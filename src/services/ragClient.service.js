@@ -4,6 +4,10 @@ function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Render Free services can need around a minute to wake from idle. Retry only
+// transient gateway responses long enough for the Python service to start.
+const GATEWAY_RETRY_DELAYS_MS = [1500, 2500, 4000, 6000, 8000, 8000, 8000, 8000];
+
 async function requestRag(path, body = {}) {
   const token = process.env.RAG_SERVICE_TOKEN;
   if (!token) throw new Error("RAG_SERVICE_TOKEN is missing");
@@ -25,10 +29,10 @@ async function requestRag(path, body = {}) {
     body: JSON.stringify(body)
   };
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt <= GATEWAY_RETRY_DELAYS_MS.length; attempt += 1) {
     let response;
     try {
-      console.info(`[Reva RAG] Sending POST to ${endpoint} (attempt ${attempt + 1}/2, timeout ${timeoutMs}ms)`);
+      console.info(`[Reva RAG] Sending POST to ${endpoint} (attempt ${attempt + 1}/${GATEWAY_RETRY_DELAYS_MS.length + 1}, timeout ${timeoutMs}ms)`);
       response = await fetch(endpoint, {
         ...requestOptions,
         signal: AbortSignal.timeout(timeoutMs)
@@ -45,16 +49,17 @@ async function requestRag(path, body = {}) {
     let payload = {};
     try { payload = rawBody ? JSON.parse(rawBody) : {}; } catch {}
 
-    // Retry only likely platform gateway failures, not JSON application errors
-    // such as "RAG processing failed", which should be diagnosed rather than replayed.
+    // Don't replay application errors such as the Python service's own
+    // "RAG processing failed" response. Retry only transient gateway failures.
     const looksLikePlatformGatewayError =
-      !payload || Object.keys(payload).length === 0 || !payload.detail && !payload.message;
+      !payload || Object.keys(payload).length === 0 || (!payload.detail && !payload.message);
     const retryable = response.status === 503 || response.status === 504 ||
       (response.status === 502 && looksLikePlatformGatewayError);
 
-    if (retryable && attempt === 0) {
-      console.warn(`[Reva RAG] Transient gateway HTTP ${response.status}; retrying once after 1.2 seconds`);
-      await delay(1200);
+    if (retryable && attempt < GATEWAY_RETRY_DELAYS_MS.length) {
+      const waitMs = GATEWAY_RETRY_DELAYS_MS[attempt];
+      console.warn(`[Reva RAG] Transient gateway HTTP ${response.status}; retrying in ${waitMs}ms to allow the service to wake`);
+      await delay(waitMs);
       continue;
     }
 
@@ -66,7 +71,7 @@ async function requestRag(path, body = {}) {
     return payload;
   }
 
-  throw new Error("Python RAG service remained unavailable after a retry.");
+  throw new Error("Python RAG service remained unavailable after gateway retries.");
 }
 
 async function askRagService({ question, userIds, context }) {
