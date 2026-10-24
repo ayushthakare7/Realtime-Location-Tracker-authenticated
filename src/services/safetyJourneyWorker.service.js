@@ -17,7 +17,7 @@ async function processSafetyDeadlines(io, now = new Date()) {
     const deadline = new Date(candidate.expectedArrivalAt).getTime() + Number(candidate.gracePeriodMinutes || 0) * 60000;
     if (deadline > now.getTime()) continue;
     const journey = await SafetyJourney.findOneAndUpdate(
-      { _id: candidate._id, status: "ACTIVE" },
+      { _id: candidate._id, status: "ACTIVE", sharingEnabled: true },
       { $set: { status: "OVERDUE_UNCONFIRMED", checkInRequestedAt: now } },
       { new: true }
     );
@@ -48,7 +48,7 @@ async function processSafetyDeadlines(io, now = new Date()) {
 
   for (const candidate of awaiting) {
     const journey = await SafetyJourney.findOneAndUpdate(
-      { _id: candidate._id, status: "OVERDUE_UNCONFIRMED", checkInRequestedAt: { $lte: cutoff } },
+      { _id: candidate._id, status: "OVERDUE_UNCONFIRMED", sharingEnabled: true, checkInRequestedAt: { $lte: cutoff } },
       { $set: { status: "ALERT_SENT", alertSentAt: now } },
       { new: true }
     );
