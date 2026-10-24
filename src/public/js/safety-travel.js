@@ -13,6 +13,52 @@ let trackingJourneyId = null;
 let gpsWatchId = null;
 
 
+
+async function refreshServerLocationStatus() {
+  const target = document.getElementById("serverLocationStatus");
+  if (!target) return;
+  const cacheKey = "reva-safety-travel-last-server-location";
+  const renderCached = () => {
+    try {
+      const cached = JSON.parse(localStorage.getItem(cacheKey) || "null");
+      if (cached && cached.recordedAt && Number.isFinite(Date.parse(cached.recordedAt))) {
+        target.textContent = "Last server-confirmed location for " + cached.traveller + ": " + new Date(cached.recordedAt).toLocaleString() + ". Saved status may be stale while offline.";
+        return true;
+      }
+    } catch (_) {}
+    target.textContent = "No server-confirmed journey location is cached on this device yet.";
+    return false;
+  };
+  if (!navigator.onLine) {
+    renderCached();
+    return;
+  }
+  try {
+    const response = await fetch("/api/journeys", {
+      headers: { "Authorization": "Bearer " + localStorage.getItem("token") }
+    });
+    if (!response.ok) throw new Error("Could not load journey list.");
+    const body = await response.json();
+    const activeStatuses = new Set(["ACTIVE", "OVERDUE_UNCONFIRMED", "ALERT_SENT", "EMERGENCY_ALERTED", "ARRIVED"]);
+    const candidates = (Array.isArray(body.journeys) ? body.journeys : [])
+      .filter(item => activeStatuses.has(item.status) && item.lastConfirmedLocation && Number.isFinite(Date.parse(item.lastConfirmedLocation.recordedAt)))
+      .sort((a, b) => Date.parse(b.lastConfirmedLocation.recordedAt) - Date.parse(a.lastConfirmedLocation.recordedAt));
+    if (!candidates.length) {
+      target.textContent = "No active or recently arrived journey has a server-confirmed location yet.";
+      return;
+    }
+    const latest = candidates[0];
+    const summary = {
+      traveller: String(latest.travellerUsername || "traveller").slice(0, 80),
+      recordedAt: latest.lastConfirmedLocation.recordedAt
+    };
+    try { localStorage.setItem(cacheKey, JSON.stringify(summary)); } catch (_) {}
+    target.textContent = "Last server-confirmed location for " + summary.traveller + ": " + new Date(summary.recordedAt).toLocaleString() + ". This is not necessarily a live position.";
+  } catch (_) {
+    if (!renderCached()) target.textContent = "Could not load the last server-confirmed location while offline.";
+  }
+}
+
 function updateLastGpsStatus() {
   const lastGpsStatus = document.getElementById("lastGpsStatus");
   if (!lastGpsStatus) return;
@@ -156,6 +202,7 @@ window.RevaSafetyTravelOffline = Object.freeze({
 
 setConnectionStatus();
 updateLastGpsStatus();
+refreshServerLocationStatus();
 refreshGpsPermission();
 if (queueReady) {
   refreshQueueStatus();
@@ -166,6 +213,7 @@ if (queueReady) {
 }
 window.addEventListener("online", () => {
   setConnectionStatus();
+  refreshServerLocationStatus();
   if (offlineQueue) {
     if (trackingJourneyId) void window.RevaSafetyTravelOffline.recordConnection(trackingJourneyId, true).catch(() => {});
     offlineQueue.flush().then(refreshQueueStatus);
