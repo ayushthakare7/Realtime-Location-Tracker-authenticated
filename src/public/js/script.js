@@ -212,6 +212,7 @@ function connectSocket() {
   socket.on("sharing-status", data => { if (data) historyEnabled = data.historyEnabled !== false; if (!sharing) setStatus(data.enabled ? "Your sharing is enabled on this account." : "Sharing is off until you opt in."); });
   socket.on("receive-location", data => upsertMarker(data));
   socket.on("sharing-stopped", data => { if (data && data.userId) removeMarker(data.userId); });
+  socket.on("friend-removed", data => { if (data && data.userId) { removeMarker(data.userId); loadFriends({ quiet: true }); } });
   socket.on("friend-request-received", data => { if (data && data.username) setStatus("New friend request from " + data.username + "."); loadFriends(); });
 }
 connectSocket();
@@ -227,7 +228,25 @@ async function loadFriends({ quiet = false } = {}) {
       const title = document.createElement("strong"); title.textContent = friend.username;
       const detail = document.createElement("div"); detail.className = "muted";
       detail.textContent = friend.sharingEnabled ? `${friend.location?.placeName || "Location available"} • ${friend.location ? ageText(friend.location.lastSeen) : "waiting for GPS"}` : "Not sharing";
-      item.append(title, detail); friendRoot.append(item);
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "secondary friend-remove";
+      remove.textContent = "Remove friend";
+      remove.setAttribute("aria-label", "Remove " + friend.username + " from friends");
+      remove.onclick = async () => {
+        if (!window.confirm(`Remove ${friend.username} from your friends? They will no longer appear in your friends list or share locations with you through this friendship.`)) return;
+        remove.disabled = true;
+        try {
+          await api("/friends/" + encodeURIComponent(friend.id), { method: "DELETE" });
+          removeMarker(friend.id);
+          await loadFriends({ quiet: true });
+          setStatus(friend.username + " was removed from your friends.");
+        } catch (error) {
+          remove.disabled = false;
+          alert(error.message || "Could not remove friend.");
+        }
+      };
+      item.append(title, detail, remove); friendRoot.append(item);
       if (friend.location) upsertMarker({ ...friend.location, userId: friend.id, username: friend.username }); else removeMarker(friend.id);
     });
     const requestRoot = document.getElementById("requests"); requestRoot.replaceChildren();
