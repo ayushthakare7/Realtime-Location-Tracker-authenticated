@@ -170,8 +170,11 @@ Create or update a Render **Web Service** connected to this repository with:
 
 - **Root Directory:** `rag_service`
 - **Runtime:** Python
-- **Build Command:** `pip install -r requirements.txt`
+- **Build Command:** `pip install -r requirements.txt && python download_model.py`
 - **Start Command:** `python main.py`
+- **Python version:** set Render environment variable `PYTHON_VERSION=3.11.11` (or use the included `.python-version` file)
+
+The build command downloads and smoke-tests the sentence-transformers model during deployment so the first user request does not need to download model files. The model cache is part of the built service image. If the build fails during model download, fix that build failure before enabling embeddings.
 - **Health check path:** `/health` (use this if your Render plan/settings support health checks)
 
 Set these environment variables in Render (never commit their values):
@@ -180,6 +183,7 @@ Set these environment variables in Render (never commit their values):
 - `MONGO_URI`: the MongoDB Atlas connection string
 - `GROQ_API_KEY`: the Groq API key
 - Optional: `GROQ_MODEL`, `RAG_VECTOR_INDEX`, `RAG_TOP_K`, `EMBEDDING_MODEL`
+- Set `RAG_DISABLE_EMBEDDINGS=false` to enable embedding generation and vector search after the model-preload build succeeds.
 
 Render supplies `PORT` automatically. The service listens on that port in Render; for local development it defaults to port 8001.
 
@@ -231,5 +235,7 @@ Deploy the Python service before the Node service. Then test sign-in, live locat
 - **Connection refused:** start Python first and check `RAG_SERVICE_URL` and port 8001.
 - **Vector index error:** verify MongoDB Atlas Vector Search support, the index name, 384 dimensions, and the `userId`/`recordedAt` filter fields.
 - **No history answer:** confirm history events exist, have embeddings, and belong to the authorized user IDs.
-- **First query is slow:** the Python embedding model may be downloading/loading for the first time.
+- **Embedding model fails to load:** confirm the Render build command includes `python download_model.py`, the build completed successfully, and `EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2`.
+- **Existing events have no embeddings:** after enabling embeddings, call the authenticated `POST /reindex` endpoint using the repository's `npm run rag:setup` script to backfill events and ensure the Atlas Vector Search index is ready.
+- **First query is slow:** the model should be preloaded during the build; check logs for the exact stage if initialization still stalls.
 - **Road distance vs. straight-line distance:** deterministic routing remains in the JavaScript location-query layer; semantic RAG should not estimate route distances.
