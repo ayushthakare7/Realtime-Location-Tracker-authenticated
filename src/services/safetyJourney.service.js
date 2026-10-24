@@ -240,7 +240,7 @@ async function appendJourneyEvents({ journeyId, travellerId, events }) {
     return { status: 409, body: { success: false, message: "This journey no longer accepts progress events." } };
   }
 
-  const allowedTypes = new Set(["location", "check_in", "arrival", "offline", "online"]);
+  const allowedTypes = new Set(["location", "check_in", "arrival", "offline", "online", "emergency"]);
   const now = new Date();
   const accepted = [];
   const duplicates = [];
