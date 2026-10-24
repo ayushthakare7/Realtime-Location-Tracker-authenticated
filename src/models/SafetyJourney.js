@@ -7,6 +7,8 @@ const coordinateSchema = new mongoose.Schema({
 }, { _id: false });
 
 const routeSchema = new mongoose.Schema({
+  optionId: { type: String, trim: true, maxlength: 100, default: null },
+  routeLabels: { type: [String], default: [] },
   provider: { type: String, trim: true, maxlength: 80, default: null },
   providerRouteId: { type: String, trim: true, maxlength: 200, default: null },
   distanceMeters: { type: Number, min: 0, default: null },
@@ -47,6 +49,7 @@ const safetyJourneySchema = new mongoose.Schema({
   originText: { type: String, required: true, trim: true, maxlength: 200 },
   destination: { type: coordinateSchema, default: null },
   destinationText: { type: String, required: true, trim: true, maxlength: 200 },
+  routeOptions: { type: [routeSchema], default: [] },
   route: { type: routeSchema, default: () => ({}) },
   sharedWith: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   sharingEnabled: { type: Boolean, default: true },
