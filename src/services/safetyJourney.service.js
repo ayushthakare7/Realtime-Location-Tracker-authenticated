@@ -313,7 +313,7 @@ async function appendJourneyEvents({ journeyId, travellerId, events }) {
     } else if (event.type === "online") {
       journey.connectionStatus = "online";
     } else if (event.type === "check_in") {
-      if (["OVERDUE_UNCONFIRMED", "ALERT_SENT"].includes(journey.status)) journey.status = "ACTIVE";
+      if (["OVERDUE_UNCONFIRMED", "ALERT_SENT", "EMERGENCY_ALERTED"].includes(journey.status)) journey.status = "ACTIVE";
       journey.checkInRequestedAt = null;
     } else if (event.type === "arrival") {
       journey.status = "ARRIVED";
