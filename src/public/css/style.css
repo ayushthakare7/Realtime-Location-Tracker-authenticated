@@ -480,3 +480,17 @@ body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.3
     margin-top: auto;
   }
 }
+
+
+/* Keep the Reva hero headline as one centered sentence */
+.page-intro .single-line-headline {
+  white-space: nowrap;
+  width: 100%;
+  max-width: none;
+}
+@media (max-width: 520px) {
+  .page-intro .single-line-headline {
+    font-size: clamp(20px, 5.3vw, 28px);
+    letter-spacing: -0.8px;
+  }
+}
