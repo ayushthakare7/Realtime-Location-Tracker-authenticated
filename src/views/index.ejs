@@ -12,19 +12,19 @@
 <div class="page-intro"><div><p class="eyebrow">YOUR PERSONAL SPACE</p><h1>Stay close, <em>feel connected.</em></h1><p class="intro-copy">A quieter way to share your location and keep up with the people who matter.</p></div><span class="privacy-note"><span aria-hidden="true">✳</span> Private by choice</span></div>
 <main class="dashboard-grid">
   <aside>
-    <section class="panel">
-      <h3>Location sharing</h3>
+    <section class="panel sharing-panel">
+      <div class="section-heading"><span class="section-icon" aria-hidden="true">⌖</span><div><p class="eyebrow">YOUR PRESENCE</p><h2>Location sharing</h2></div></div>
       <p class="muted">Your location is off by default. Turn it on only when you want accepted friends to see your latest location.</p>
       <button id="start">Start sharing</button> <button id="stop" class="secondary">Stop sharing</button>
       <div id="status">Sharing is off until you opt in.</div>
     </section>
-    <section class="panel">
-      <h3>Friends</h3>
+    <section class="panel friends-panel">
+      <div class="section-heading"><span class="section-icon" aria-hidden="true">♡</span><div><p class="eyebrow">YOUR CIRCLE</p><h2>Friends</h2></div></div>
       <form id="friendForm"><input id="friendUsername" placeholder="Friend's exact username" required><button>Send request</button></form>
       <div id="requests"></div><div id="friends">Loading friends…</div>
     </section>
-    <section class="panel">
-      <h3>Privacy controls</h3>
+    <section class="panel privacy-panel">
+      <div class="section-heading"><span class="section-icon" aria-hidden="true">◈</span><div><p class="eyebrow">YOUR CHOICES</p><h2>Privacy controls</h2></div></div>
       <div class="switch-row"><span>Store location history</span><input id="historyToggle" type="checkbox" checked></div>
       <p class="muted">When disabled, new GPS history points and semantic location events are not stored. Live sharing can still work.</p>
       <button id="deleteHistory" class="secondary">Delete my location history</button>
