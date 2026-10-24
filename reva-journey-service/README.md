@@ -19,7 +19,7 @@ Health check: `GET http://localhost:3001/health`. All `/api/journeys` endpoints 
 - `GET /api/journeys/modes` — supported transport modes and matching avatar keys.
 - `POST /api/journeys` — create a draft from coordinates or place text; shared recipients must be accepted Reva friends in the shared MongoDB.
 - `POST /api/journeys/:id/routes` — calculate a route with the free public OpenStreetMap-based Valhalla service. Public endpoint has rate limits/no SLA; no API key or paid routing account is required.
-- `POST /api/journeys/:id/approve` — explicitly approve the route before sharing/tracking begins.
+- `POST /api/journeys/:id/approve` — explicitly approve the route before sharing/tracking begins.\n- `PATCH /api/journeys/:id/eta` — set a new ETA after a safety check-in.
 - `POST /api/journeys/:id/sync` — idempotently ingest 1–100 location, offline/online, check-in, arrival, emergency, or cancellation events; event IDs prevent duplicate sync.
 - `GET /api/journeys`, `GET /api/journeys/shared`, `GET /api/journeys/:id` — list own journeys, shared journeys, or a permitted journey.
 - `PATCH /api/journeys/:id/sharing`, `POST /api/journeys/:id/cancel` — stop sharing or cancel a journey.
@@ -29,4 +29,4 @@ A background worker requests a traveller check-in when an enabled shared journey
 
 ## Important integration notes
 
-This service is independently runnable and its journey data is isolated from the existing `SafetyJourney` model. It shares the existing MongoDB database initially so it can verify accepted friendships and validate Reva JWTs. The main app has not yet been switched to proxy these endpoints; integration is a separate step. Do not deploy it publicly until the gateway/client integration, friend-recipient validation, and deployment CORS/origin settings are reviewed. The free public geocoder/router is best effort and may rate-limit requests.
+This service is independently runnable and its journey data is isolated from the existing `SafetyJourney` model. It shares the existing MongoDB database initially so it can verify accepted friendships and validate Reva JWTs. The main app has an optional API proxy. To enable it, set `JOURNEY_SERVICE_URL=http://127.0.0.1:3001` in the main app environment and restart the main API; with this variable unset, the legacy in-process API remains active. The existing UI has not yet been adapted to the service response shape, so leave this proxy unset until the UI integration is completed and tested. Do not deploy it publicly until the gateway/client integration, friend-recipient validation, and deployment CORS/origin settings are reviewed. The free public geocoder/router is best effort and may rate-limit requests.
