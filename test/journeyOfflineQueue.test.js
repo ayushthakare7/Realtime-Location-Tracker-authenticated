@@ -57,7 +57,7 @@ test("queues location updates locally while offline and syncs them after reconne
 
 test("retains queued events when the server fails and does not duplicate a concurrent flush", async () => {
   const store = makeStore();
-  let online = true;
+  let online = false;
   let calls = 0;
   let release;
   const blocked = new Promise(resolve => { release = resolve; });
@@ -77,6 +77,7 @@ test("retains queued events when the server fails and does not duplicate a concu
     latitude: 21.1904, longitude: 81.2849,
     recordedAt: "2026-10-25T09:59:00.000Z"
   });
+  online = true;
   const first = queue.flush();
   await new Promise(resolve => setImmediate(resolve));
   const second = await queue.flush();
@@ -104,14 +105,26 @@ test("validates journey identifiers and GPS coordinates before storing", async (
 
 test("keeps events for separate journeys in separate sync requests", async () => {
   const store = makeStore();
+  let online = false;
   const calls = [];
   const queue = createJourneyOfflineQueue({
     store,
-    isOnline: () => false,
-    now: () => Date.parse("2026-10-25T10:00:00.000Z")
+    isOnline: () => online,
+    getToken: () => "test-token",
+    now: () => Date.parse("2026-10-25T10:00:00.000Z"),
+    fetchImpl: async (url, options) => {
+      calls.push({ url, body: JSON.parse(options.body) });
+      return { ok: true, status: 200, json: async () => ({ success: true, acceptedCount: 1 }) };
+    }
   });
   await queue.enqueue(JOURNEY_ID, { eventId: "journey-a", type: "offline", recordedAt: "2026-10-25T09:59:00.000Z" });
   await queue.enqueue("507f1f77bcf86cd799439012", { eventId: "journey-b", type: "offline", recordedAt: "2026-10-25T09:59:01.000Z" });
   assert.equal((await queue.status()).pendingCount, 2);
-  assert.deepEqual(calls, []);
+  online = true;
+  const result = await queue.flush();
+  assert.equal(result.pendingCount, 0);
+  assert.equal(calls.length, 2);
+  assert.notEqual(calls[0].url, calls[1].url);
+  assert.equal(calls[0].body.events.length, 1);
+  assert.equal(calls[1].body.events.length, 1);
 });
