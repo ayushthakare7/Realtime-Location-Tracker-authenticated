@@ -269,3 +269,144 @@ body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.3
   .map-stage #map{border-radius:17px}
   .dashboard-grid .reva-card{padding:18px}
 }
+
+
+/* Layout-only refinements: preserve the existing Reva color palette */
+.header-tagline {
+  margin: 0;
+  flex: 1 1 auto;
+  text-align: center;
+  color: var(--ink);
+  font: 700 clamp(15px, 1.7vw, 21px)/1.25 'Manrope', sans-serif;
+  letter-spacing: -.45px;
+  white-space: nowrap;
+}
+.header-tagline em { color: #71927c; font-style: normal; }
+.app-header { display: grid; grid-template-columns: minmax(170px, 1fr) minmax(220px, auto) minmax(170px, 1fr); }
+.header-actions { justify-self: end; }
+.dashboard-grid {
+  grid-template-columns: minmax(265px, 320px) minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: stretch;
+  column-gap: 22px;
+  row-gap: 16px;
+}
+.dashboard-grid > aside {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  min-height: 0;
+}
+.dashboard-grid > aside > .panel {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 17px 18px;
+}
+.dashboard-grid > .map-stage {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+.dashboard-grid > .map-stack { display: contents; }
+.dashboard-grid > .reva-card,
+.dashboard-grid .reva-card {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  align-self: stretch;
+  margin: 0;
+}
+.dashboard-grid .map-stage .map-frame {
+  width: 100%;
+  aspect-ratio: 1.42 / 1;
+  height: auto;
+  min-height: 0;
+}
+.dashboard-grid .map-stage #map {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.dashboard-grid .friends-panel,
+.dashboard-grid .friends-panel #friends,
+.dashboard-grid .friends-panel #requests {
+  min-width: 0;
+  max-width: 100%;
+}
+.dashboard-grid .friends-panel #friends,
+.dashboard-grid .friends-panel #requests,
+.dashboard-grid .friends-panel .friend strong,
+.dashboard-grid .friends-panel .friend .muted {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+.dashboard-grid .friends-panel .friend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  min-width: 0;
+  width: 100%;
+}
+.dashboard-grid .friends-panel .friend > * { min-width: 0; max-width: 100%; }
+.dashboard-grid .friends-panel .friend .muted { flex: 1 1 100%; }
+.dashboard-grid .friends-panel .friend button { max-width: 100%; white-space: normal; }
+.dashboard-grid #friendForm { display: flex; flex-direction: column; min-width: 0; }
+.dashboard-grid #friendForm input { min-width: 0; }
+@media (max-width: 1000px) and (min-width: 781px) {
+  .app-header { grid-template-columns: minmax(140px, 1fr) minmax(190px, auto) minmax(140px, 1fr); }
+  .dashboard-grid { grid-template-columns: minmax(240px, .82fr) minmax(0, 1.18fr); column-gap: 16px; }
+  .dashboard-grid > aside > .panel { padding: 15px; }
+  .dashboard-grid .map-stage .map-heading { align-items: flex-start; flex-direction: column; gap: 4px; }
+}
+@media (max-width: 780px) {
+  .app-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 10px 16px;
+  }
+  .header-tagline {
+    order: 3;
+    flex: 1 0 100%;
+    white-space: normal;
+    text-align: center;
+    padding: 2px 0 4px;
+  }
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    gap: 14px;
+  }
+  .dashboard-grid > .map-stage { grid-column: 1; grid-row: 1; padding: 0 14px; }
+  .dashboard-grid > aside {
+    grid-column: 1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .dashboard-grid > aside > .panel { min-height: 0; margin: 0; }
+  .dashboard-grid > aside > .privacy-panel { grid-column: 1 / -1; }
+  .dashboard-grid > .map-stack { display: contents; }
+  .dashboard-grid > .reva-card,
+  .dashboard-grid .reva-card { grid-column: 1; grid-row: 3; margin: 0; }
+  .dashboard-grid .map-stage .map-frame { aspect-ratio: 1.35 / 1; }
+}
+@media (max-width: 520px) {
+  .header-tagline { font-size: 15px; }
+  .dashboard-grid > aside { grid-template-columns: 1fr; }
+  .dashboard-grid > aside > .privacy-panel { grid-column: auto; }
+  .dashboard-grid > .map-stage { padding: 0 14px; }
+  .dashboard-grid .map-stage .map-frame { aspect-ratio: 1 / 1; }
+}
