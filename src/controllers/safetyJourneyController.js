@@ -1,5 +1,5 @@
 const { listTravelModes } = require("../services/travelMode.service");
-const { approveJourneyRoute, createJourneyDraft, getJourneyForViewer, prepareRouteOptions } = require("../services/safetyJourney.service");
+const { appendJourneyEvents, approveJourneyRoute, createJourneyDraft, getJourneyForViewer, prepareRouteOptions } = require("../services/safetyJourney.service");
 const User = require("../models/User");
 const SafetyJourney = require("../models/SafetyJourney");
 
@@ -55,6 +55,81 @@ exports.approveRoute = async (req, res) => {
   } catch (error) {
     console.error("Approve safety journey route failed:", error.message);
     return res.status(500).json({ success: false, message: "Could not approve this route." });
+  }
+};
+
+
+exports.appendEvents = async (req, res) => {
+  try {
+    const result = await appendJourneyEvents({
+      journeyId: req.params.id,
+      travellerId: req.user.userId,
+      events: Array.isArray(req.body?.events) ? req.body.events : [req.body?.event || req.body]
+    });
+    if (result.status >= 400) return res.status(result.status).json(result.body);
+
+    const journey = await SafetyJourney.findOne({ _id: req.params.id, travellerId: req.user.userId }).lean();
+    if (journey && result.body.acceptedCount > 0) {
+      const payload = {
+        journeyId: String(journey._id),
+        travellerId: String(journey.travellerId),
+        travellerUsername: journey.travellerUsername,
+        status: journey.status,
+        transportModeId: journey.transportModeId,
+        avatarKey: journey.avatarKey,
+        origin: journey.origin,
+        destination: journey.destination,
+        route: journey.route,
+        expectedArrivalAt: journey.expectedArrivalAt,
+        lastConfirmedLocation: journey.lastConfirmedLocation,
+        connectionStatus: journey.connectionStatus,
+        remainingDistanceMeters: result.body.remainingDistanceMeters,
+        locationFreshness: result.body.locationFreshness,
+        arrivedAt: journey.arrivedAt
+      };
+      const io = req.app.get("io");
+      for (const recipientId of journey.sharedWith || []) {
+        io?.to("user:" + recipientId).emit("journey-update", payload);
+        if (journey.status === "ARRIVED") io?.to("user:" + recipientId).emit("journey-arrived", {
+          journeyId: String(journey._id),
+          travellerUsername: journey.travellerUsername,
+          destination: journey.destination?.label || journey.destinationText,
+          arrivedAt: journey.arrivedAt
+        });
+      }
+    }
+    return res.status(result.status).json(result.body);
+  } catch (error) {
+    console.error("Journey event sync failed:", error.message);
+    return res.status(500).json({ success: false, message: "Could not sync journey events." });
+  }
+};
+
+exports.cancelJourney = async (req, res) => {
+  try {
+    const journey = await SafetyJourney.findOne({ _id: req.params.id, travellerId: req.user.userId });
+    if (!journey) return res.status(404).json({ success: false, message: "Journey not found." });
+    if (["ARRIVED", "CANCELLED", "COMPLETED"].includes(journey.status)) {
+      return res.status(409).json({ success: false, message: "This journey has already ended." });
+    }
+    journey.status = "CANCELLED";
+    journey.cancelledAt = new Date();
+    await journey.save();
+    const io = req.app.get("io");
+    for (const recipientId of journey.sharedWith || []) {
+      io?.to("user:" + recipientId).emit("journey-update", {
+        journeyId: String(journey._id),
+        travellerId: String(journey.travellerId),
+        travellerUsername: journey.travellerUsername,
+        status: journey.status,
+        avatarKey: journey.avatarKey,
+        message: "The traveller cancelled this journey."
+      });
+    }
+    return res.json({ success: true, status: journey.status });
+  } catch (error) {
+    console.error("Cancel safety journey failed:", error.message);
+    return res.status(500).json({ success: false, message: "Could not cancel this journey." });
   }
 };
 
