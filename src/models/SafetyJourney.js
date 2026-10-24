@@ -38,7 +38,7 @@ const safetyJourneySchema = new mongoose.Schema({
   travellerUsername: { type: String, required: true, trim: true, maxlength: 80 },
   status: {
     type: String,
-    enum: ["DRAFT", "AWAITING_ROUTE_APPROVAL", "ACTIVE", "OVERDUE_UNCONFIRMED", "ALERT_SENT", "ARRIVED", "CANCELLED", "COMPLETED"],
+    enum: ["DRAFT", "AWAITING_ROUTE_APPROVAL", "ACTIVE", "OVERDUE_UNCONFIRMED", "ALERT_SENT", "EMERGENCY_ALERTED", "ARRIVED", "CANCELLED", "COMPLETED"],
     default: "DRAFT",
     index: true
   },
