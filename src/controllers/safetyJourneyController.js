@@ -72,7 +72,7 @@ exports.getRoutes = async (req, res) => {
   } catch (error) {
     console.error("Resolve safety journey routes failed:", error.message);
     const status = error.code === "ROUTING_NOT_CONFIGURED" ? 503
-      : ["ROUTING_MODE_UNSUPPORTED", "INVALID_TRAVEL_MODE", "ORIGIN_UNRESOLVED", "DESTINATION_UNRESOLVED", "SAME_ENDPOINT"].includes(error.code) ? 422
+      : ["ROUTING_MODE_UNSUPPORTED", "INVALID_TRAVEL_MODE", "ORIGIN_UNRESOLVED", "ORIGIN_LOCATION_STALE", "DESTINATION_UNRESOLVED", "SAME_ENDPOINT"].includes(error.code) ? 422
       : error.code === "NO_ROUTE_FOUND" ? 404 : 502;
     return res.status(status).json({
       success: false,
