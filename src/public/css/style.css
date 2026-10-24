@@ -904,3 +904,18 @@ body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.3
   }
 }
 
+
+/* Gentle map motion: tiles drift slowly and reverse direction smoothly. */
+.auth-map-background .leaflet-tile-pane {
+  filter: saturate(.55) contrast(.86);
+}
+.auth-map-background .leaflet-control-container {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-map-background,
+  .auth-map-background * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
