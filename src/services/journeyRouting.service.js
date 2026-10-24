@@ -79,7 +79,7 @@ async function fetchGoogleRoutes({ origin, destination, modeId }) {
   });
 }
 
-async function resolveAndRoute({ originText, destinationText, modeId }) {
+async function resolveAndRoute({ originText, destinationText, modeId, currentOrigin = null }) {
   const mode = getTravelModeById(modeId);
   if (!mode) {
     const error = new Error("Select a supported travel mode.");
@@ -92,10 +92,20 @@ async function resolveAndRoute({ originText, destinationText, modeId }) {
     throw error;
   }
 
-  const [origin, destination] = await Promise.all([
-    geocodePlace(originText),
+  const originIsCurrentLocation = /^(my )?(current location|current position|here|my location)$/i.test(String(originText || "").trim());
+  const [resolvedOrigin, destination] = await Promise.all([
+    originIsCurrentLocation && currentOrigin
+      ? Promise.resolve({
+          latitude: Number(currentOrigin.latitude),
+          longitude: Number(currentOrigin.longitude),
+          name: "Current location",
+          state: null,
+          country: null
+        })
+      : geocodePlace(originText),
     geocodePlace(destinationText)
   ]);
+  const origin = resolvedOrigin;
   if (!origin) {
     const error = new Error("Could not resolve the origin. Add a more specific place name.");
     error.code = "ORIGIN_UNRESOLVED";
