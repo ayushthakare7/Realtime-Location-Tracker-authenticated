@@ -24,8 +24,14 @@ function view(j) {
     sharingEnabled: j.sharingEnabled, sharedWith: j.sharedWith, lastConfirmedLocation: j.lastConfirmedLocation,
     arrivedAt: j.arrivedAt, emergencyAt: j.emergencyAt, createdAt: j.createdAt, updatedAt: j.updatedAt };
 }
-function canView(j, userId) {
-  return j.travellerId === userId || (j.sharingEnabled && j.sharedWith.includes(userId));
+async function canView(j, userId) {
+  if (j.travellerId === userId) return true;
+  if (!j.sharingEnabled || !j.sharedWith.includes(userId)) return false;
+  const Friendship = require("./models/Friendship");
+  return Boolean(await Friendship.exists({ status: "accepted", $or: [
+    { requester: j.travellerId, recipient: userId },
+    { requester: userId, recipient: j.travellerId }
+  ] }));
 }
 function validId(id) { return mongoose.isValidObjectId(id); }
 async function notify(journey, type, title, body, suffix, recipients = journey.sharedWith) {
@@ -121,13 +127,18 @@ router.get("/", async (req, res) => {
   res.json({ success: true, journeys: journeys.map(view) });
 });
 router.get("/shared", async (req, res) => {
+  const Friendship = require("./models/Friendship");
+  const links = await Friendship.find({ status: "accepted", $or: [
+    { requester: req.authUser.id }, { recipient: req.authUser.id }
+  ] }).lean();
+  const acceptedFriendIds = new Set(links.map(f => String(f.requester) === req.authUser.id ? String(f.recipient) : String(f.requester)));
   const journeys = await Journey.find({ sharedWith: req.authUser.id, sharingEnabled: true, status: { $in: activeStatuses.concat(["ARRIVED"]) } }).sort({ updatedAt: -1 }).limit(100).lean();
-  res.json({ success: true, journeys: journeys.map(view) });
+  res.json({ success: true, journeys: journeys.filter(j => acceptedFriendIds.has(j.travellerId)).map(view) });
 });
 router.get("/:id", async (req, res) => {
   if (!validId(req.params.id)) return res.status(400).json({ success: false, message: "Invalid journey ID." });
   const j = await Journey.findById(req.params.id).lean();
-  if (!j || !canView(j, req.authUser.id)) return res.status(404).json({ success: false, message: "Journey not found." });
+  if (!j || !(await canView(j, req.authUser.id))) return res.status(404).json({ success: false, message: "Journey not found." });
   res.json({ success: true, journey: view(j) });
 });
 
