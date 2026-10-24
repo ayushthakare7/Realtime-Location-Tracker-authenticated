@@ -16,24 +16,15 @@
     .auth-message{margin:12px 0 0;color:#a44e48;font-size:12px;text-align:center}.auth-note{display:flex;gap:9px;align-items:flex-start;margin-top:24px;padding:12px;border-radius:12px;background:#f4f5ef;color:#7c887e;font-size:11px;line-height:1.6}
 
     .auth-page { position:relative; z-index:1; min-height:100svh; background:transparent; }
-    .auth-map-backdrop { position:fixed; inset:-3%; z-index:0; overflow:hidden; background:#e7ebe3; }
-    .auth-map-backdrop .leaflet-container { width:100%; height:100%; background:#e7ebe3; }
-    .auth-map-backdrop .leaflet-tile-pane { filter:saturate(.88) contrast(1.04) brightness(1.01); opacity:1; }
-    .auth-map-shade { position:fixed; inset:0; z-index:0; pointer-events:none; background:rgba(246,246,242,.10); }
     .auth-card { position:relative; z-index:2; background:rgba(255,254,250,.91); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
     .auth-map-pin { width:15px;height:15px;border-radius:50%;background:#527765;border:3px solid #fffefa;box-shadow:0 2px 12px rgba(36,51,47,.32); }
     .auth-map-pin.auth-map-pin-lavender { background:#8b7d9f; }
     .auth-map-pin.auth-map-pin-gold { background:#c19c62; }
     .auth-map-label { padding:5px 9px;border-radius:999px;background:rgba(255,254,250,.94);border:1px solid rgba(82,119,101,.22);color:#315748;font:600 11px/1.2 'DM Sans',sans-serif;box-shadow:0 4px 15px rgba(42,59,48,.10);white-space:nowrap; }
-    .auth-map-backdrop .leaflet-control-attribution { font-size:9px; background:rgba(255,254,250,.72); }
     /* Keep the map crisp and remove the two decorative circular patches. */
-    .auth-page::before, .auth-page::after { display:none !important; content:none !important; }
-    .auth-page { background:transparent !important; }
-    .auth-map-backdrop { filter:none; opacity:1; }
-    .auth-map-shade { background:rgba(246,246,242,.10); }
     .auth-card { backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); }
 
-    @media (prefers-reduced-motion: reduce) { .auth-map-backdrop { display:none; } .auth-page { background:var(--canvas); } }
+    @media (prefers-reduced-motion: reduce) { .auth-page { background:var(--canvas); } }
 \n  </style>
 </head>
 <body>
@@ -84,80 +75,6 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 (() => {
-  const host = document.getElementById("authMap");
-  if (!host || !window.L || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const map = L.map(host, {
-    zoomControl: false, scrollWheelZoom: false, dragging: false, doubleClickZoom: false,
-    touchZoom: false, keyboard: false, attributionControl: true, zoomAnimation: true,
-    fadeAnimation: true
-  }).setView([18, 10], 2.6);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 18, minZoom: 2, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
-  }).addTo(map);
-  const pin = (tone) => L.divIcon({className:"",html:'<span class="auth-map-pin '+tone+'"></span>',iconSize:[15,15],iconAnchor:[7,7]});
-  const spots = [
-    {p:[28.6139,77.2090],tone:"",label:"New Delhi"},
-    {p:[51.5072,-0.1276],tone:"auth-map-pin-lavender",label:"London"},
-    {p:[40.7128,-74.0060],tone:"auth-map-pin-gold",label:"New York"},
-    {p:[35.6762,139.6503],tone:"",label:"Tokyo"},
-    {p:[-1.2921,36.8219],tone:"auth-map-pin-lavender",label:"Nairobi"},
-    {p:[-23.5505,-46.6333],tone:"auth-map-pin-gold",label:"São Paulo"},
-    {p:[-33.8688,151.2093],tone:"",label:"Sydney"}
-  ];
-  spots.forEach((spot,i) => {
-    L.marker(spot.p,{icon:pin(spot.tone),interactive:false}).addTo(map);
-    if (i===0 || i===2) L.marker([spot.p[0]+.0012,spot.p[1]+.0014],{
-      icon:L.divIcon({className:"",html:'<span class="auth-map-label">'+spot.label+'</span>',iconSize:[100,25],iconAnchor:[0,30]}),
-      interactive:false
-    }).addTo(map);
-  });
-  // Fast cinematic sweeps across India, then a slow zoom-in/zoom-out at
-  // a randomly selected anonymous map point. No live user location is used.
-  // Fast camera hops across India, followed by a deliberate slow zoom-in/out.
-  // World-wide camera journey: quick global sweeps, then a slower close-up.
-  // Globe-like motion: rapidly sweep longitudes around the whole Earth, then
-  // slow down at a random destination for a gentle zoom-in and zoom-out.
-  // Random destinations span all continents and latitudes, not just India.
-  // Medium-paced global motion. Zoom into the exact place the camera reaches
-  // during its sweep, rather than returning to a fixed starting point or India.
-  const wait = ms => new Promise(resolve => window.setTimeout(resolve, ms));
-  const wrapLongitude = value => ((value + 180) % 360 + 360) % 360 - 180;
-  const travel = (center, zoom, duration, easing=0.22) => new Promise(resolve => {
-    let finished = false;
-    const done = () => {
-      if (finished) return;
-      finished = true;
-      map.off("moveend", done);
-      resolve();
-    };
-    map.once("moveend", done);
-    map.flyTo(center, zoom, { animate:true, duration, easeLinearity:easing });
-    window.setTimeout(done, duration * 1000 + 1500);
-  });
-  const cinematicJourney = async () => {
-    let longitude = -160 + Math.random() * 320;
-    let latitude = -42 + Math.random() * 84;
-    while (host.isConnected) {
-      // Several smooth, medium-speed sweeps across different parts of the world.
-      const sweepCount = 4 + Math.floor(Math.random() * 3);
-      for (let i=0; i<sweepCount; i++) {
-        longitude = wrapLongitude(longitude + 24 + Math.random() * 24);
-        latitude = Math.max(-58, Math.min(68, latitude + (Math.random() - 0.5) * 18));
-        await travel([latitude, longitude], 2.35, 1.15 + Math.random() * 0.35, 0.22);
-      }
-
-      // Freeze the current camera location as the target. Zooming therefore happens
-      // wherever the journey has arrived—not at the initial view or a fixed country.
-      const target = [latitude, longitude];
-      await travel(target, 5.4, 2.6, 0.13);
-      await wait(300);
-      await travel(target, 2.35, 2.0, 0.15);
-
-      // Resume from the same global coordinate, without a reset or long pause.
-    }
-  };
-  requestAnimationFrame(() => { cinematicJourney(); });
-  window.addEventListener("resize",()=>map.invalidateSize({pan:false}));
-})();
+  // Background map animation removed; keep the authentication UI and existing palette.
 </script>\n</body>
 </html>
