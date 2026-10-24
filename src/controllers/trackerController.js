@@ -49,7 +49,7 @@ exports.removeFriend = async (req, res) => {
   try {
     const uid = String(req.user.userId);
     const friendId = String(req.params.id || "");
-    if (!/^[a-f\\d]{24}$/i.test(friendId) || friendId === uid) {
+    if (!/^[a-f\d]{24}$/i.test(friendId) || friendId === uid) {
       return res.status(400).json({ success: false, message: "Invalid friend." });
     }
     const friendship = await Friendship.findOneAndDelete({
