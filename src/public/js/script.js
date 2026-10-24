@@ -131,33 +131,31 @@ async function animateCrewReveal() {
     const crew = [...markers.entries()].filter(([id, marker]) =>
       id !== "me" && marker && marker.getLatLng()
     );
-    if (!crew.length) {
-      hint.textContent = "You're on the radar. Add friends to bring your crew into orbit.";
-      return;
+
+    if (crew.length) {
+      for (const [id, marker] of crew) {
+        const tooltip = marker.getTooltip();
+        const friendName = tooltip ? String(tooltip.getContent()) : "your friend";
+        hint.textContent = "Connecting the dots · " + friendName;
+        const markerElement = marker.getElement();
+        if (markerElement) markerElement.classList.add("radar-targeted");
+        flyToAtSteadyPace(marker.getLatLng(), 13);
+        await waitForMapTiles();
+        // Keep every friend's pin and label visible for the same amount of time.
+        await wait(reducedMotion ? 0 : 650);
+        if (markerElement) markerElement.classList.remove("radar-targeted");
+      }
     }
 
-    for (const [id, marker] of crew) {
-      const tooltip = marker.getTooltip();
-      const friendName = tooltip ? String(tooltip.getContent()) : "your friend";
-      hint.textContent = "Connecting the dots · " + friendName;
-      const markerElement = marker.getElement();
-      if (markerElement) markerElement.classList.add("radar-targeted");
-      flyToAtSteadyPace(marker.getLatLng(), 13);
-      await waitForMapTiles();
-      // Keep every friend's pin and label visible for the same amount of time.
-      await wait(reducedMotion ? 0 : 650);
-      if (markerElement) markerElement.classList.remove("radar-targeted");
-    }
+    // Always finish at the user's own location and city-level zoom.
+    // Never fit all friends into the viewport: that can zoom the map too far out.
+    hint.textContent = "Returning to your location…";
+    flyToAtSteadyPace(ownMarker.getLatLng(), 13);
+    await waitForMapTiles();
 
-    const bounds = L.latLngBounds([...markers.values()].map(marker => marker.getLatLng()));
-    if (bounds.isValid()) {
-      hint.textContent = "There you are. Your crew, all in one little world.";
-      const boundsCenter = bounds.getCenter();
-      const boundsZoom = Math.min(map.getBoundsZoom(bounds, false, L.point(55, 55)), 8);
-      flyToAtSteadyPace(boundsCenter, boundsZoom);
-      await waitForMapTiles();
-    }
-    hint.textContent = crew.length + " friend" + (crew.length === 1 ? "" : "s") + " on your radar · shared locations only";
+    hint.textContent = crew.length
+      ? crew.length + " friend" + (crew.length === 1 ? "" : "s") + " on your radar · shared locations only"
+      : "You're on the radar. Add friends to bring your crew into orbit.";
     radarAnimationDone = true;
   } finally {
     radarAnimationRunning = false;
