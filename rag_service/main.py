@@ -398,7 +398,10 @@ class RevaRAGHandler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     host = os.getenv("HOST", "0.0.0.0")
-    port = int(os.getenv("PORT") or "8001")
+    # Render injects PORT at runtime. Locally, ignore PORT from the shared
+    # project .env (often used by the Node server) and keep the RAG service on 8001.
+    is_render = any(os.getenv(key) for key in ("RENDER", "RENDER_SERVICE_ID", "RENDER_EXTERNAL_URL"))
+    port = int(os.getenv("PORT") or "8001") if is_render else 8001
     server = ThreadingHTTPServer((host, port), RevaRAGHandler)
     print(f"Reva RAG service listening on {host}:{port}", flush=True)
     try:
