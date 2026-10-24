@@ -23,6 +23,9 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 VECTOR_INDEX = os.getenv("RAG_VECTOR_INDEX", "location_event_vector_index_384")
+# Set RAG_DISABLE_EMBEDDINGS=true on small hosted instances to avoid model-download stalls.
+# Retrieval then uses the authorized MongoDB history fallback and skips embedding writes.
+RAG_DISABLE_EMBEDDINGS = os.getenv("RAG_DISABLE_EMBEDDINGS", "false").strip().lower() in {"1", "true", "yes", "on"}
 TOP_K = int(os.getenv("RAG_TOP_K", "10"))
 DB_NAME = os.getenv("MONGO_DB_NAME", "location_tracker")
 if MONGO_URI and not os.getenv("MONGO_DB_NAME"):
@@ -116,6 +119,9 @@ def ensure_vector_index() -> str:
     return "created"
 
 def index_event(event_id: str) -> bool:
+    if RAG_DISABLE_EMBEDDINGS:
+        print("[Reva RAG] embedding writes disabled by RAG_DISABLE_EMBEDDINGS; skipping event indexing", flush=True)
+        return False
     if not ObjectId.is_valid(event_id):
         raise ValueError("Invalid eventId")
     event = collection().find_one({"_id": ObjectId(event_id)})
@@ -185,35 +191,38 @@ def retrieve_node(state: GraphState) -> GraphState:
                     event[key] = event[key].isoformat()
         return events
 
-    # Semantic retrieval is the primary path. It may fail if Atlas vector search
-    # is not configured yet, or the vector index is still being built.
-    try:
-        print("[Reva RAG] retrieve: embedding query started", flush=True)
-        query_vector = embeddings().embed_query(state["question"])
-        print("[Reva RAG] retrieve: embedding query completed; vector search starting", flush=True)
-        vector_filter: dict[str, Any] = {"userId": {"$in": ids}}
-        if date_filter:
-            vector_filter["recordedAt"] = date_filter
-        pipeline = [
-            {"$vectorSearch": {
-                "index": VECTOR_INDEX, "path": "embedding",
-                "queryVector": query_vector,
-                "numCandidates": max(100, TOP_K * 20),
-                "limit": TOP_K, "filter": vector_filter,
-            }},
-            {"$project": {
-                **fields,
-                "score": {"$meta": "vectorSearchScore"},
-            }},
-        ]
-        events = list(collection().aggregate(pipeline))
-        print(f"[Reva RAG] retrieve: vector search completed with {len(events)} events", flush=True)
-        if events:
-            print(f"[Reva RAG] semantic retrieval returned {len(events)} events", flush=True)
-            return {"events": serialize(events)}
-        print("[Reva RAG] vector search returned no events; using MongoDB fallback", flush=True)
-    except Exception as exc:
-        print(f"[Reva RAG] semantic retrieval unavailable ({type(exc).__name__}: {exc}); using MongoDB fallback", flush=True)
+    # Semantic retrieval is optional: on constrained hosts, bypass model loading
+    # and use the authorized MongoDB query instead of hanging on first download.
+    if RAG_DISABLE_EMBEDDINGS:
+        print("[Reva RAG] embeddings disabled; using MongoDB history fallback", flush=True)
+    else:
+        try:
+            print("[Reva RAG] retrieve: embedding query started", flush=True)
+            query_vector = embeddings().embed_query(state["question"])
+            print("[Reva RAG] retrieve: embedding query completed; vector search starting", flush=True)
+            vector_filter: dict[str, Any] = {"userId": {"$in": ids}}
+            if date_filter:
+                vector_filter["recordedAt"] = date_filter
+            pipeline = [
+                {"$vectorSearch": {
+                    "index": VECTOR_INDEX, "path": "embedding",
+                    "queryVector": query_vector,
+                    "numCandidates": max(100, TOP_K * 20),
+                    "limit": TOP_K, "filter": vector_filter,
+                }},
+                {"$project": {
+                    **fields,
+                    "score": {"$meta": "vectorSearchScore"},
+                }},
+            ]
+            events = list(collection().aggregate(pipeline))
+            print(f"[Reva RAG] retrieve: vector search completed with {len(events)} events", flush=True)
+            if events:
+                print(f"[Reva RAG] semantic retrieval returned {len(events)} events", flush=True)
+                return {"events": serialize(events)}
+            print("[Reva RAG] vector search returned no events; using MongoDB fallback", flush=True)
+        except Exception as exc:
+            print(f"[Reva RAG] semantic retrieval unavailable ({type(exc).__name__}: {exc}); using MongoDB fallback", flush=True)
 
     # Reliable non-vector fallback: query only authorized users and sort by time.
     # Include enough events to answer multi-place/stay-duration questions.
