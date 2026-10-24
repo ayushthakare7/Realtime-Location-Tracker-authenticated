@@ -22,6 +22,9 @@ let socket;
 let lastSent = null;
 let lastSentAt = 0;
 let latestPosition = null;
+let radarAnimationRunning = false;
+let radarAnimationDone = false;
+let radarFocusedOnMe = false;
 
 function setStatus(message) { document.getElementById("status").textContent = message; }
 function ageText(date) {
@@ -48,6 +51,54 @@ function upsertMarker(data, accuracy) {
     else accuracyCircles.set(id, L.circle(point, { radius: Number(accuracy), weight: 1, fillOpacity: 0.08 }).addTo(map));
   }
 }
+async function animateCrewReveal() {
+  const hint = document.getElementById("mapHint");
+  if (!hint || radarAnimationRunning || radarAnimationDone) return;
+  const ownMarker = markers.get("me");
+  if (!ownMarker || !sharing) {
+    hint.textContent = "Turn on sharing to bring your place onto the radar";
+    return;
+  }
+
+  radarAnimationRunning = true;
+  const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+  try {
+    if (!radarFocusedOnMe) {
+      hint.textContent = "Finding your signal…";
+      map.flyTo(ownMarker.getLatLng(), 15, { duration: 1.5 });
+      radarFocusedOnMe = true;
+      await wait(1700);
+    }
+
+    const crew = [...markers.entries()].filter(([id, marker]) =>
+      id !== "me" && marker && marker.getLatLng()
+    );
+    if (!crew.length) {
+      hint.textContent = "You're on the radar. Add friends to bring your crew into orbit.";
+      return;
+    }
+
+    for (const [id, marker] of crew) {
+      const tooltip = marker.getTooltip();
+      const friendName = tooltip ? String(tooltip.getContent()) : "your friend";
+      hint.textContent = "Connecting the dots · " + friendName;
+      map.flyTo(marker.getLatLng(), 13, { duration: 1.05 });
+      await wait(1250);
+    }
+
+    const bounds = L.latLngBounds([...markers.values()].map(marker => marker.getLatLng()));
+    if (bounds.isValid()) {
+      hint.textContent = "There you are. Your crew, all in one little world.";
+      map.flyToBounds(bounds, { padding: [55, 55], maxZoom: 8, duration: 1.7 });
+      await wait(1900);
+    }
+    hint.textContent = crew.length + " friend" + (crew.length === 1 ? "" : "s") + " on your radar · shared locations only";
+    radarAnimationDone = true;
+  } finally {
+    radarAnimationRunning = false;
+  }
+}
+
 function removeMarker(id) {
   const key = String(id);
   const marker = markers.get(key); if (marker) map.removeLayer(marker);
@@ -74,6 +125,7 @@ function handlePosition(position) {
     accuracy: position.coords.accuracy
   };
   upsertMarker({ userId: "me", username: "You", latitude: latestPosition.latitude, longitude: latestPosition.longitude }, latestPosition.accuracy);
+  animateCrewReveal();
   if (sendLatestPosition(false)) setStatus("Location updated. Your current position is being shared with accepted friends.");
   else if (!socket || !socket.connected) setStatus("GPS location received. Waiting for the secure connection to send it…");
 }
@@ -130,6 +182,7 @@ async function loadFriends({ quiet = false } = {}) {
     document.getElementById("historyToggle").checked = historyEnabled;
     if (!quiet) setStatus(sharing ? "Sharing is enabled. Accepted friends can see your latest location." : "Sharing is off. Your location is not being broadcast.");
     if (sharing && latestPosition && socket?.connected) sendLatestPosition(true);
+    if (sharing && latestPosition) animateCrewReveal();
   } catch (e) { if (!quiet) setStatus(e.message); }
 }
 
