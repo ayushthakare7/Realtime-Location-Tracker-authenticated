@@ -11,7 +11,7 @@ from bson import ObjectId
 from dotenv import load_dotenv
 from pymongo import MongoClient
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_huggingface import HuggingFaceEmbeddings
+from fastembed import TextEmbedding
 from langchain_groq import ChatGroq
 from langgraph.graph import END, START, StateGraph
 
@@ -55,21 +55,34 @@ def collection():
         raise RuntimeError("MONGO_URI is missing")
     return mongo[DB_NAME]["locationevents"]
 
+class FastEmbedAdapter:
+    """Small ONNX-based embedding adapter with the interface used by Reva."""
+    def __init__(self, model_name: str):
+        self.model = TextEmbedding(model_name=model_name)
+
+    def embed_query(self, text: str) -> list[float]:
+        return next(self.model.query_embed(text)).tolist()
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        return [vector.tolist() for vector in self.model.passage_embed(texts)]
+
+
 def embeddings():
     global _embeddings
     if _embeddings is None:
         with _embeddings_lock:
             if _embeddings is None:
-                print(f"[Reva RAG] embedding model initialization started: {EMBEDDING_MODEL}", flush=True)
+                print(f"[Reva RAG] ONNX embedding model initialization started: {EMBEDDING_MODEL}", flush=True)
                 try:
-                    _embeddings = HuggingFaceEmbeddings(
-                        model_name=EMBEDDING_MODEL,
-                        model_kwargs={"device": "cpu"},
-                        encode_kwargs={"normalize_embeddings": True},
-                    )
-                    print("[Reva RAG] embedding model initialization completed", flush=True)
+                    _embeddings = FastEmbedAdapter(EMBEDDING_MODEL)
+                    # Force one inference during startup of the first request so
+                    # model/runtime errors are reported before vector search.
+                    test_vector = _embeddings.embed_query("Reva embedding smoke test")
+                    if len(test_vector) != 384:
+                        raise RuntimeError(f"Expected 384-dimensional embeddings, got {len(test_vector)}")
+                    print("[Reva RAG] ONNX embedding model initialization completed; dimension=384", flush=True)
                 except Exception as exc:
-                    print(f"[Reva RAG] embedding model initialization failed: {type(exc).__name__}: {exc}", flush=True)
+                    print(f"[Reva RAG] ONNX embedding model initialization failed: {type(exc).__name__}: {exc}", flush=True)
                     raise
     return _embeddings
 
