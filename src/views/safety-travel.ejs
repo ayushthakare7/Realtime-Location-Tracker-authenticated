@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f6f2">
+  <title>Safety Travel · Reva</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/safety-travel.css">
+</head>
+<body class="travel-page">
+  <header class="app-header travel-header">
+    <a class="wordmark" href="/tracker" aria-label="Back to Reva home">
+      <span class="wordmark-mark" aria-hidden="true">r.</span>
+      <span><strong>reva</strong><small>stay close, feel connected</small></span>
+    </a>
+    <a class="travel-back" href="/tracker"><span aria-hidden="true">←</span> Back to home</a>
+  </header>
+
+  <main class="travel-shell">
+    <section class="travel-hero">
+      <div class="travel-hero-copy">
+        <p class="eyebrow">REVA CARE · JOURNEY SAFETY</p>
+        <h1>Every journey,<br><em>with a little more peace of mind.</em></h1>
+        <p>Tell Reva where you’re heading. Review your route before you start, then keep your trusted people in the loop.</p>
+        <div class="travel-trust"><span aria-hidden="true">◈</span> Your journey is shared only with the people you authorize.</div>
+      </div>
+      <div class="travel-hero-art" aria-hidden="true">
+        <div class="route-orbit orbit-one"></div><div class="route-orbit orbit-two"></div>
+        <div class="route-path"><span class="route-point point-start"></span><span class="route-point point-end"></span><span class="route-car">➤</span></div>
+        <div class="art-label label-start"><span> A </span><b>Start</b></div>
+        <div class="art-label label-end"><span> C </span><b>Destination</b></div>
+        <div class="art-caption">YOUR ROUTE, YOUR CHOICE</div>
+      </div>
+    </section>
+
+    <div class="travel-layout">
+      <section class="travel-main-card">
+        <div class="travel-card-heading">
+          <div class="travel-icon" aria-hidden="true">↗</div>
+          <div><p class="eyebrow">PLAN A JOURNEY</p><h2>Where are you going?</h2><p class="muted">Describe your trip naturally. Reva can ask for details if needed.</p></div>
+        </div>
+        <form id="journeyForm" class="journey-form">
+          <label for="journeyRequest">Describe your journey</label>
+          <textarea id="journeyRequest" name="journeyRequest" rows="4" maxlength="1000" placeholder="For example: I’m going from my home to the railway station by car. Share my progress with my trusted friends and alert them if I don’t confirm arrival." required></textarea>
+          <div class="form-hint">Include your start, destination, and how you’re travelling if you know them.</div>
+          <div class="travel-form-grid">
+            <div><label for="travelMode">Travel mode</label><select id="travelMode" name="travelMode"><option value="">Let Reva ask me</option><option value="walking">Walking</option><option value="bicycle">Bicycle</option><option value="motorcycle">Motorcycle / scooter</option><option value="car">Car</option><option value="public-transport">Public transport</option></select></div>
+            <div><label for="safetyLevel">Journey sharing</label><select id="safetyLevel" name="safetyLevel"><option value="ask">Ask me before sharing</option><option value="trusted">Share with my authorized trusted friends</option></select></div>
+          </div>
+          <label class="travel-consent"><input type="checkbox" id="understandSafety" required><span>I understand that journey tracking requires location permission and an available communication channel for live updates.</span></label>
+          <button type="submit" class="travel-submit">Prepare my journey <span aria-hidden="true">↗</span></button>
+          <p id="journeyFeedback" class="journey-feedback" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <aside class="travel-side">
+        <section class="travel-side-card">
+          <p class="eyebrow">HOW IT WORKS</p>
+          <div class="travel-step"><span>01</span><div><b>Describe your trip</b><p>Tell Reva your start and destination in your own words.</p></div></div>
+          <div class="travel-step"><span>02</span><div><b>Review real route options</b><p>Compare route distance and estimated time before choosing.</p></div></div>
+          <div class="travel-step"><span>03</span><div><b>Approve and travel</b><p>Start monitoring only after you approve the route and sharing settings.</p></div></div>
+          <div class="travel-step"><span>04</span><div><b>Check in safely</b><p>Confirm arrival. If you’re overdue, Reva can request a check-in and notify authorized contacts when delivery is possible.</p></div></div>
+        </section>
+        <section class="travel-offline-card">
+          <span class="offline-symbol" aria-hidden="true">⌁</span>
+          <div><h3>Even when signal fades</h3><p>Your phone may queue progress while offline if GPS and background permissions allow it. Friends will see the last server-confirmed location until an update can be delivered.</p></div>
+        </section>
+      </aside>
+    </div>
+    <footer class="travel-footer"><span>Reva Safety Travel</span><span>Private by choice · You stay in control</span></footer>
+  </main>
+  <script src="/js/safety-travel.js"></script>
+</body>
+</html>
