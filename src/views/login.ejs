@@ -85,16 +85,18 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
     zoomControl: false, scrollWheelZoom: false, dragging: false, doubleClickZoom: false,
     touchZoom: false, keyboard: false, attributionControl: true, zoomAnimation: true,
     fadeAnimation: true
-  }).setView([52.3728, 4.8936], 13);
+  }).setView([22.8, 79.0], 5);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 18, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
+    maxZoom: 18, minZoom: 4, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
   }).addTo(map);
   const pin = (tone) => L.divIcon({className:"",html:'<span class="auth-map-pin '+tone+'"></span>',iconSize:[15,15],iconAnchor:[7,7]});
   const spots = [
-    {p:[52.3728,4.8936],tone:"",label:"Your circle"},
-    {p:[52.3676,4.9041],tone:"auth-map-pin-lavender",label:"Meet nearby"},
-    {p:[52.3791,4.8797],tone:"auth-map-pin-gold",label:"A familiar place"},
-    {p:[52.3602,4.8852],tone:"",label:"Shared moments"}
+    {p:[28.6139,77.2090],tone:"",label:"Your circle"},
+    {p:[19.0760,72.8777],tone:"auth-map-pin-lavender",label:"Meet nearby"},
+    {p:[12.9716,77.5946],tone:"auth-map-pin-gold",label:"A familiar place"},
+    {p:[22.5726,88.3639],tone:"",label:"Shared moments"},
+    {p:[26.9124,75.7873],tone:"auth-map-pin-lavender",label:"New connections"},
+    {p:[17.3850,78.4867],tone:"auth-map-pin-gold",label:"Around your world"}
   ];
   spots.forEach((spot,i) => {
     L.marker(spot.p,{icon:pin(spot.tone),interactive:false}).addTo(map);
@@ -103,13 +105,27 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
       interactive:false
     }).addTo(map);
   });
-  const views = [[52.3728,4.8936],[52.3675,4.8862],[52.3782,4.9010],[52.3658,4.9002]];
+  // Slowly drift across India; keep the movement continuous and cinematic.
+  const views = [
+    {center:[22.8,79.0],zoom:5},
+    {center:[28.6139,77.2090],zoom:6},
+    {center:[19.0760,72.8777],zoom:5.8},
+    {center:[12.9716,77.5946],zoom:6},
+    {center:[22.5726,88.3639],zoom:5.8},
+    {center:[26.9124,75.7873],zoom:6}
+  ];
   let index=0;
   const move = () => {
     index=(index+1)%views.length;
-    map.flyTo(views[index],13,{animate:true,duration:11,easeLinearity:.18});
+    map.flyTo(views[index].center,views[index].zoom,{
+      animate:true,duration:13,easeLinearity:.12
+    });
   };
-  window.setInterval(move,15000);
+  // Wait until tiles have had a moment to render before starting the camera movement.
+  window.setTimeout(() => {
+    move();
+    window.setInterval(move,16000);
+  },2500);
   window.addEventListener("resize",()=>map.invalidateSize({pan:false}));
 })();
 </script>\n</body>
