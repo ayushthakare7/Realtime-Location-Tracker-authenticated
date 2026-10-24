@@ -4,7 +4,8 @@ const cors = require("cors");
 const morgan = require("morgan");
 const authRoutes = require("./routes/authRoutes");
 const trackerRoutes = require("./routes/trackerRoutes");
-const safetyJourneyRoutes = require("./routes/safetyJourneyRoutes");\nconst { journeyServiceProxy } = require("../reva-journey-service/proxy");
+const safetyJourneyRoutes = require("./routes/safetyJourneyRoutes");
+const { journeyServiceProxy } = require("../reva-journey-service/proxy");
 
 const app = express();
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || `http://localhost:${process.env.PORT || 3000}` }));
