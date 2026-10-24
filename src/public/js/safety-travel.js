@@ -9,6 +9,8 @@ const gpsStatus = document.getElementById("gpsStatus");
 
 let offlineQueue = null;
 let queueReady = false;
+let trackingJourneyId = null;
+let gpsWatchId = null;
 
 function setConnectionStatus() {
   if (!connectionStatus) return;
@@ -97,6 +99,29 @@ window.RevaSafetyTravelOffline = Object.freeze({
   async recordConnection(journeyId, online) {
     return this.recordEvent(journeyId, { type: online ? "online" : "offline", recordedAt: new Date().toISOString() });
   },
+  startTracking(journeyId) {
+    if (!navigator.geolocation) throw new Error("GPS is not supported by this browser.");
+    if (!/^[a-f\\d]{24}$/i.test(String(journeyId || ""))) throw new Error("Start tracking only after the backend confirms an approved journey.");
+    if (gpsWatchId !== null) navigator.geolocation.clearWatch(gpsWatchId);
+    trackingJourneyId = String(journeyId);
+    void this.recordConnection(trackingJourneyId, navigator.onLine).catch(() => {});
+    gpsWatchId = navigator.geolocation.watchPosition(
+      position => { void this.recordLocation(trackingJourneyId, position).catch(error => { if (gpsStatus) gpsStatus.textContent = "GPS was received, but saving the journey update failed: " + error.message; }); },
+      error => {
+        if (!gpsStatus) return;
+        gpsStatus.textContent = error.code === 1 ? "GPS permission denied. Enable location permission to track this journey." : error.code === 2 ? "GPS signal unavailable. The last saved location is retained." : "GPS timed out. Reva will keep the last saved location until another fix is available.";
+      },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+    );
+    if (gpsStatus) gpsStatus.textContent = "Journey tracking is active. GPS updates are saved locally if the internet disconnects.";
+    return { journeyId: trackingJourneyId, watchId: gpsWatchId };
+  },
+  stopTracking() {
+    if (gpsWatchId !== null && navigator.geolocation) navigator.geolocation.clearWatch(gpsWatchId);
+    gpsWatchId = null;
+    trackingJourneyId = null;
+    if (gpsStatus) gpsStatus.textContent = "Journey tracking is stopped. GPS is no longer being recorded.";
+  },
   async flush() {
     if (!offlineQueue) throw new Error("Local offline storage is unavailable.");
     const result = await offlineQueue.flush();
@@ -121,10 +146,14 @@ if (queueReady) {
 }
 window.addEventListener("online", () => {
   setConnectionStatus();
-  if (offlineQueue) offlineQueue.flush().then(refreshQueueStatus);
+  if (offlineQueue) {
+    if (trackingJourneyId) void window.RevaSafetyTravelOffline.recordConnection(trackingJourneyId, true).catch(() => {});
+    offlineQueue.flush().then(refreshQueueStatus);
+  }
 });
 window.addEventListener("offline", () => {
   setConnectionStatus();
+  if (trackingJourneyId) void window.RevaSafetyTravelOffline.recordConnection(trackingJourneyId, false).catch(() => {});
   refreshQueueStatus();
 });
 
