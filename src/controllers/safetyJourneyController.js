@@ -2,6 +2,44 @@ const { listTravelModes } = require("../services/travelMode.service");
 const { appendJourneyEvents, approveJourneyRoute, createJourneyDraft, getJourneyForViewer, prepareRouteOptions } = require("../services/safetyJourney.service");
 const User = require("../models/User");
 const SafetyJourney = require("../models/SafetyJourney");
+const SafetyNotification = require("../models/SafetyNotification");
+const { notifyJourneyRecipients } = require("../services/safetyNotification.service");
+
+
+exports.listNotifications = async (req, res) => {
+  try {
+    const notifications = await SafetyNotification.find({ recipientId: req.user.userId })
+      .sort({ createdAt: -1 }).limit(100).lean();
+    return res.json({
+      success: true,
+      notifications: notifications.map(item => ({
+        id: String(item._id), type: item.type, title: item.title, body: item.body,
+        payload: item.payload, createdAt: item.createdAt, readAt: item.readAt
+      }))
+    });
+  } catch (error) {
+    console.error("Load safety notifications failed:", error.message);
+    return res.status(500).json({ success: false, message: "Could not load notifications." });
+  }
+};
+
+exports.markNotificationRead = async (req, res) => {
+  try {
+    if (!/^[a-f\\d]{24}$/i.test(String(req.params.notificationId || ""))) {
+      return res.status(400).json({ success: false, message: "Invalid notification ID." });
+    }
+    const notification = await SafetyNotification.findOneAndUpdate(
+      { _id: req.params.notificationId, recipientId: req.user.userId },
+      { $set: { readAt: new Date() } },
+      { new: true }
+    ).lean();
+    if (!notification) return res.status(404).json({ success: false, message: "Notification not found." });
+    return res.json({ success: true, id: String(notification._id), readAt: notification.readAt });
+  } catch (error) {
+    console.error("Mark notification read failed:", error.message);
+    return res.status(500).json({ success: false, message: "Could not update notification." });
+  }
+};
 
 exports.listTravelModes = (req, res) => {
   res.json({ success: true, modes: listTravelModes() });
@@ -61,15 +99,41 @@ exports.approveRoute = async (req, res) => {
 
 exports.appendEvents = async (req, res) => {
   try {
+    const incomingEvents = Array.isArray(req.body?.events) ? req.body.events : [req.body?.event || req.body];
+    const beforeJourney = await SafetyJourney.findOne({ _id: req.params.id, travellerId: req.user.userId }).lean();
     const result = await appendJourneyEvents({
       journeyId: req.params.id,
       travellerId: req.user.userId,
-      events: Array.isArray(req.body?.events) ? req.body.events : [req.body?.event || req.body]
+      events: incomingEvents
     });
     if (result.status >= 400) return res.status(result.status).json(result.body);
 
     const journey = await SafetyJourney.findOne({ _id: req.params.id, travellerId: req.user.userId }).lean();
     if (journey && result.body.acceptedCount > 0) {
+      const io = req.app.get("io");
+      if (journey.status === "ARRIVED") {
+        await notifyJourneyRecipients({
+          io,
+          journey,
+          recipients: journey.sharedWith,
+          type: "journey_arrived",
+          title: "Your friend has arrived",
+          body: journey.travellerUsername + " has arrived at " + (journey.destination?.label || journey.destinationText) + ".",
+          payload: { journeyId: String(journey._id), status: journey.status, arrivedAt: journey.arrivedAt, destination: journey.destination?.label || journey.destinationText },
+          keySuffix: "arrived"
+        });
+      } else if (beforeJourney?.status === "ALERT_SENT" && incomingEvents.some(event => event?.type === "check_in")) {
+        await notifyJourneyRecipients({
+          io,
+          journey,
+          recipients: journey.sharedWith,
+          type: "journey_safe_followup",
+          title: "Your friend checked in",
+          body: journey.travellerUsername + " has responded to the safety check-in. Their journey may still be in progress.",
+          payload: { journeyId: String(journey._id), status: journey.status },
+          keySuffix: "safe-followup"
+        });
+      }
       const payload = {
         journeyId: String(journey._id),
         travellerId: String(journey.travellerId),
@@ -87,7 +151,6 @@ exports.appendEvents = async (req, res) => {
         locationFreshness: result.body.locationFreshness,
         arrivedAt: journey.arrivedAt
       };
-      const io = req.app.get("io");
       for (const recipientId of journey.sharedWith || []) {
         io?.to("user:" + recipientId).emit("journey-update", payload);
         if (journey.status === "ARRIVED") io?.to("user:" + recipientId).emit("journey-arrived", {
@@ -115,6 +178,12 @@ exports.cancelJourney = async (req, res) => {
     journey.status = "CANCELLED";
     journey.cancelledAt = new Date();
     await journey.save();
+    await notifyJourneyRecipients({
+      io: req.app.get("io"), journey, recipients: journey.sharedWith,
+      type: "journey_cancelled", title: "Journey cancelled",
+      body: journey.travellerUsername + " cancelled their shared journey.",
+      payload: { journeyId: String(journey._id), status: journey.status }, keySuffix: "cancelled"
+    });
     const io = req.app.get("io");
     for (const recipientId of journey.sharedWith || []) {
       io?.to("user:" + recipientId).emit("journey-update", {
