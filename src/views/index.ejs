@@ -41,6 +41,12 @@
   <div class="map-frame"><div id="map"></div><div class="map-overlay"><span class="radar-pulse"></span><span><strong>THE RADAR</strong><small>Finding your people, one pin at a time</small></span></div><div class="map-hint" id="mapHint">Turn on sharing to start your map sequence</div></div>
 </section>
   <section class="map-stack">
+    <section class="panel shared-journeys-panel">
+      <div class="section-heading"><span class="section-icon safety-icon" aria-hidden="true">➤</span><div><p class="eyebrow">SAFETY TRAVEL</p><h2>Friends' shared journeys</h2></div></div>
+      <p class="muted">Only journeys explicitly shared with you appear here. Locations refresh automatically when the traveller's device syncs GPS updates.</p>
+      <p id="sharedJourneysStatus" class="muted" role="status" aria-live="polite">Checking journeys shared with you…</p>
+      <div id="sharedJourneysList" class="shared-journeys-list"></div>
+    </section>
     <section class="panel reva-card">
       <div class="reva-brand"><div class="reva-avatar" aria-hidden="true">✦</div><div><h2 class="reva-title">Ask Reva</h2><div class="reva-subtitle">Your location sidekick for places, distances and shared adventures.</div></div></div>
       <p class="muted">Ask about shared visits, time spent at a place, recent movements, current locations, distances, or your location history. Reva retrieves only authorized semantic events before generating an answer.</p>
