@@ -148,7 +148,7 @@ async function loadSharedJourneys() {
     for (const journey of journeys) {
       const id = String(journey.id);
       const point = journey.lastConfirmedLocation;
-      const hasPoint = point && Number.isFinite(Number(point.latitude)) && Number.isFinite(Number(point.longitude));
+      const hasPoint = point && point.latitude != null && point.longitude != null && Number.isFinite(Number(point.latitude)) && Number.isFinite(Number(point.longitude));
       const name = String(journey.travellerUsername || "A friend");
       const state = journeyStatusLabel(journey.status);
       const updatedAt = point && point.recordedAt && Number.isFinite(Date.parse(point.recordedAt))
