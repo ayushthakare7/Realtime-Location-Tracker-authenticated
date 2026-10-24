@@ -14,8 +14,24 @@ const api = async (path, options = {}) => {
 const map = L.map("map").setView([20.5937, 78.9629], 5);
 const baseTiles = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap contributors" }).addTo(map);
 
+// Keep camera movement at a consistent visual pace even when locations are far apart.
+function flyToAtSteadyPace(target, zoom) {
+  const targetPoint = L.latLng(target);
+  const startPoint = map.getCenter();
+  const startPixel = map.project(startPoint, zoom);
+  const targetPixel = map.project(targetPoint, zoom);
+  const pixelDistance = startPixel.distanceTo(targetPixel);
+  const zoomDistance = Math.abs(map.getZoom() - zoom);
+  // Scale travel time with projected distance so distant friends do not get a rushed flyover.
+  const seconds = Math.max(1.9, Math.min(3.8, pixelDistance / 430 + zoomDistance * 0.16));
+  map.flyTo(targetPoint, zoom, {
+    duration: window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : seconds,
+    easeLinearity: 0.22
+  });
+}
+
 // Give visible map tiles time to finish loading after each camera move.
-function waitForMapTiles(maxWait = 2600) {
+function waitForMapTiles(maxWait = 4200) {
   return new Promise(resolve => {
     let settled = false;
     let settleTimer;
@@ -30,7 +46,7 @@ function waitForMapTiles(maxWait = 2600) {
     };
     const finishAfterBreathingRoom = () => {
       clearTimeout(settleTimer);
-      settleTimer = setTimeout(cleanup, 550);
+      settleTimer = setTimeout(cleanup, 650);
     };
     const onTilesLoaded = () => finishAfterBreathingRoom();
     const onMoveEnd = () => {
@@ -42,6 +58,7 @@ function waitForMapTiles(maxWait = 2600) {
     if (!baseTiles.isLoading()) finishAfterBreathingRoom();
   });
 }
+
 const markers = new Map();
 const accuracyCircles = new Map();
 let sharing = false;
@@ -106,9 +123,8 @@ async function animateCrewReveal() {
   try {
     if (!radarFocusedOnMe) {
       hint.textContent = "Finding your signal…";
-      map.flyTo(ownMarker.getLatLng(), 15, { duration: duration(2.0), easeLinearity: 0.22 });
+      flyToAtSteadyPace(ownMarker.getLatLng(), 15);
       radarFocusedOnMe = true;
-      await wait(reducedMotion ? 0 : 350);
       await waitForMapTiles();
     }
 
@@ -126,19 +142,19 @@ async function animateCrewReveal() {
       hint.textContent = "Connecting the dots · " + friendName;
       const markerElement = marker.getElement();
       if (markerElement) markerElement.classList.add("radar-targeted");
-      map.flyTo(marker.getLatLng(), 13, { duration: duration(1.85), easeLinearity: 0.22 });
-      await wait(reducedMotion ? 0 : 300);
+      flyToAtSteadyPace(marker.getLatLng(), 13);
       await waitForMapTiles();
-      // Keep the friend in view long enough for their pin and label to register.
-      await wait(reducedMotion ? 0 : 450);
+      // Keep every friend's pin and label visible for the same amount of time.
+      await wait(reducedMotion ? 0 : 650);
       if (markerElement) markerElement.classList.remove("radar-targeted");
     }
 
     const bounds = L.latLngBounds([...markers.values()].map(marker => marker.getLatLng()));
     if (bounds.isValid()) {
       hint.textContent = "There you are. Your crew, all in one little world.";
-      map.flyToBounds(bounds, { padding: [55, 55], maxZoom: 8, duration: duration(2.0), easeLinearity: 0.22 });
-      await wait(reducedMotion ? 0 : 350);
+      const boundsCenter = bounds.getCenter();
+      const boundsZoom = Math.min(map.getBoundsZoom(bounds, false, L.point(55, 55)), 8);
+      flyToAtSteadyPace(boundsCenter, boundsZoom);
       await waitForMapTiles();
     }
     hint.textContent = crew.length + " friend" + (crew.length === 1 ? "" : "s") + " on your radar · shared locations only";
