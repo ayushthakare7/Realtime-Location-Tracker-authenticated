@@ -114,17 +114,16 @@ def index_event(event_id: str) -> bool:
     return True
 
 def classify_node(state: GraphState) -> GraphState:
-    response = llm().invoke([
-        SystemMessage(content=(
-            "Classify the location question. Return one word only: history, summary, shared_presence, or other. "
-            "Do not answer the question. History means questions about past visits, places, duration, or movement."
-        )),
-        HumanMessage(content=state["question"]),
-    ])
-    intent = str(response.content).strip().lower().split()[0].strip(".,:;") if response.content else "other"
-    if intent not in {"history", "summary", "shared_presence", "other"}:
-        intent = "other"
-    return {"intent": intent}
+    # Classification is advisory only. Do not let a transient Groq/model issue
+    # prevent retrieval of location history.
+    question = state["question"].lower()
+    if any(term in question for term in ("summarize", "summary", "most visited", "usual", "frequently")):
+        return {"intent": "summary"}
+    if any(term in question for term in ("right now", "currently", "current location", "where is")):
+        return {"intent": "shared_presence"}
+    if any(term in question for term in ("yesterday", "today", "last week", "this week", "visited", "visit", "where did", "how long", "when did", "history", "spent")):
+        return {"intent": "history"}
+    return {"intent": "other"}
 
 def retrieve_node(state: GraphState) -> GraphState:
     """Retrieve authorized history semantically first, with a MongoDB fallback.
@@ -273,11 +272,38 @@ class RevaRAGHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        if urlparse(self.path).path == "/health":
+        path = urlparse(self.path).path.rstrip("/") or "/"
+        if path == "/":
             self.send_json(200, {
                 "success": True,
                 "service": "reva-rag",
-                "configured": bool(TOKEN and MONGO_URI and GROQ_API_KEY),
+                "message": "Reva Python RAG service is running. Use /health for diagnostics; POST /ask is the authenticated question endpoint.",
+                "health": "/health",
+                "ask": "POST /ask",
+                "framework": "Python standard library HTTP server (no FastAPI)",
+            })
+            return
+        if path == "/health":
+            configured = bool(TOKEN and MONGO_URI and GROQ_API_KEY)
+            mongo_ok = False
+            mongo_error = None
+            try:
+                if mongo is None:
+                    raise RuntimeError("MONGO_URI is missing")
+                mongo.admin.command("ping")
+                mongo_ok = True
+            except Exception as exc:
+                mongo_error = type(exc).__name__
+            healthy = configured and mongo_ok
+            self.send_json(200 if healthy else 503, {
+                "success": healthy,
+                "service": "reva-rag",
+                "configured": configured,
+                "mongoConnected": mongo_ok,
+                "mongoError": mongo_error,
+                "vectorIndex": VECTOR_INDEX,
+                "embeddingModel": EMBEDDING_MODEL,
+                "answerModelConfigured": bool(GROQ_API_KEY),
             })
             return
         self.send_json(404, {"success": False, "detail": "Not found"})
