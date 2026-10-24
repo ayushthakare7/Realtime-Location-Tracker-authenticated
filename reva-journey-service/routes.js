@@ -135,7 +135,9 @@ router.post("/:id/sync", async (req, res) => {
   if (!validId(req.params.id)) return res.status(400).json({ success: false, message: "Invalid journey ID." });
   const j = await Journey.findOne({ _id: req.params.id, travellerId: req.authUser.id });
   if (!j) return res.status(404).json({ success: false, message: "Journey not found." });
-  if (!Array.isArray(req.body?.events) || req.body.events.length < 1 || req.body.events.length > 100) return res.status(400).json({ success: false, message: "events must contain between 1 and 100 items." });\n  if (j.status === "DRAFT" && req.body.events.some(e => e.type !== "cancelled")) return res.status(409).json({ success: false, message: "Calculate and explicitly approve the route before tracking events." });\n  if (terminal.includes(j.status) && req.body.events.some(e => !known.has(e?.eventId))) return res.status(409).json({ success: false, message: "A completed journey cannot accept new events." });
+  if (!Array.isArray(req.body?.events) || req.body.events.length < 1 || req.body.events.length > 100) return res.status(400).json({ success: false, message: "events must contain between 1 and 100 items." });
+  if (j.status === "DRAFT" && req.body.events.some(e => e.type !== "cancelled")) return res.status(409).json({ success: false, message: "Calculate and explicitly approve the route before tracking events." });
+  if (terminal.includes(j.status) && req.body.events.some(e => !known.has(e?.eventId))) return res.status(409).json({ success: false, message: "A completed journey cannot accept new events." });
   const known = new Set(j.eventIds); let acceptedCount = 0;
   for (const event of req.body.events) {
     if (!event || typeof event.eventId !== "string" || !event.eventId.trim() || event.eventId.length > 128 || !["location","check_in","arrival","offline","online","emergency","cancelled"].includes(event.type)) return res.status(400).json({ success: false, message: "Each event needs an eventId and supported type." });
