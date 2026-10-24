@@ -5,6 +5,7 @@ const locationQueryController = require('../controllers/locationQueryController'
 const router = express.Router();
 router.use(auth);
 router.get('/friends', controller.listFriends);
+router.delete('/friends/:id', controller.removeFriend);
 router.post('/friends/request', controller.sendFriendRequest);
 router.post('/friends/requests/:id/respond', controller.respondToRequest);
 router.patch('/sharing', controller.setSharing);
