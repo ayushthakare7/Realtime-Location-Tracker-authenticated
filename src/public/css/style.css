@@ -1180,3 +1180,181 @@ input:focus, textarea:focus {
     box-shadow: 0 18px 46px rgba(0, 0, 0, .3);
   }
 }
+
+
+/* Spotify-inspired Reva: deep charcoal, signature green, editorial spacing */
+:root {
+  color-scheme: dark;
+  --canvas: #121212;
+  --surface: #181818;
+  --ink: #ffffff;
+  --muted: #b3b3b3;
+  --line: #303030;
+  --sage: #243b2c;
+  --sage-strong: #1ed760;
+  --sage-dark: #1ed760;
+  --lavender: #252525;
+  --shadow: 0 12px 32px rgba(0, 0, 0, .24);
+}
+html, body { background: #121212; color: #fff; }
+body {
+  background:
+    radial-gradient(ellipse at 10% 0%, rgba(30, 215, 96, .10), transparent 32rem),
+    linear-gradient(180deg, #171717 0%, #121212 38rem, #121212 100%);
+}
+.app-header {
+  background: rgba(18, 18, 18, .96);
+  border-bottom: 1px solid #292929;
+  box-shadow: none;
+}
+.wordmark { color: #fff; }
+.wordmark-mark {
+  background: #1ed760;
+  color: #121212;
+  border: 0;
+  border-radius: 50%;
+}
+.wordmark strong { color: #fff; }
+.wordmark small { color: #b3b3b3; }
+.header-tagline { color: #fff; font-weight: 700; letter-spacing: -.25px; }
+.header-tagline em { color: #1ed760; }
+.gps-pill {
+  color: #d0d0d0;
+  background: #242424;
+  border-color: #3a3a3a;
+}
+.status-dot { background: #1ed760; }
+.logout-button, .secondary, #stop {
+  color: #fff;
+  background: #282828;
+  border-color: #3d3d3d;
+  border-radius: 999px;
+}
+.logout-button:hover, .secondary:hover, #stop:hover { background: #333; }
+.page-intro h1 { color: #fff; }
+.page-intro h1 em { color: #1ed760; }
+.page-intro .eyebrow,
+.section-heading .eyebrow,
+.map-heading .eyebrow { color: #b3b3b3; }
+.intro-copy, .muted { color: #b3b3b3; }
+.privacy-note {
+  color: #d6f9e1;
+  background: #1b3325;
+  border: 1px solid #28583a;
+  border-radius: 999px;
+}
+.panel {
+  color: #fff;
+  background: linear-gradient(145deg, #1b1b1b, #181818);
+  border-color: #2d2d2d;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .2);
+  border-radius: 16px;
+}
+.section-icon {
+  color: #1ed760;
+  background: #23352a;
+  border: 0;
+  border-radius: 12px;
+}
+.friends-panel .section-icon {
+  color: #b7e8c7;
+  background: #223027;
+}
+.privacy-panel .section-icon {
+  color: #d7e8dc;
+  background: #292e2a;
+}
+input, textarea {
+  color: #fff;
+  background: #242424;
+  border-color: #3a3a3a;
+  border-radius: 8px;
+}
+input::placeholder, textarea::placeholder { color: #929292; }
+input:focus, textarea:focus {
+  border-color: #1ed760;
+  outline-color: rgba(30, 215, 96, .2);
+}
+#start, #friendForm button, #askForm button[type=submit] {
+  color: #101810;
+  background: #1ed760;
+  border: 0;
+  border-radius: 999px;
+  font-weight: 700;
+  box-shadow: none;
+}
+#start:hover, #friendForm button:hover, #askForm button[type=submit]:hover {
+  background: #3be477;
+  transform: scale(1.02);
+}
+#status {
+  color: #c6c6c6;
+  background: #222;
+  border: 1px solid #343434;
+  border-radius: 8px;
+}
+.friend { border-bottom-color: #303030; }
+.friend strong { color: #fff; }
+.switch-row { color: #ededed; }
+.switch-row input { accent-color: #1ed760; }
+.map-heading h2 { color: #fff; }
+.map-caption { color: #b3b3b3; }
+.map-frame {
+  border-color: #202020;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, .32);
+  border-radius: 16px;
+}
+.leaflet-container { background: #242424; }
+.map-overlay {
+  background: rgba(24, 24, 24, .94);
+  border-color: #3a3a3a;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .28);
+  border-radius: 10px;
+}
+.map-overlay strong { color: #1ed760; }
+.map-overlay small { color: #b3b3b3; }
+.radar-pulse { background: #1ed760; }
+.radar-pulse:before, .radar-pulse:after { border-color: rgba(30, 215, 96, .5); }
+.map-hint {
+  color: #fff;
+  background: rgba(24, 24, 24, .93);
+  border-color: #393939;
+  border-radius: 9px;
+}
+.reva-card {
+  background: linear-gradient(145deg, #1d1d1d, #181818 78%);
+  border-color: #303030;
+}
+.reva-avatar {
+  color: #121212;
+  background: #1ed760;
+  border-color: #1ed760;
+  border-radius: 50%;
+}
+.reva-subtitle { color: #b3b3b3; }
+.reva-prompts button {
+  color: #e7e7e7;
+  background: #292929;
+  border-color: #3b3b3b;
+  border-radius: 999px;
+}
+.reva-prompts button:hover {
+  color: #fff;
+  background: #3a3a3a;
+  border-color: #555;
+}
+#answer { color: #e2e2e2; }
+#answer:not(:empty) {
+  background: #222;
+  border-color: #353535;
+  border-radius: 10px;
+}
+#askForm label { color: #b3b3b3 !important; }
+#askForm label input { accent-color: #1ed760; }
+@media (prefers-reduced-motion: no-preference) {
+  .panel { transition: background .2s ease, border-color .2s ease, transform .2s ease; }
+  .panel:hover {
+    background: #222;
+    border-color: #414141;
+  }
+}
