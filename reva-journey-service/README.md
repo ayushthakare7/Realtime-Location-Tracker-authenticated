@@ -1,6 +1,6 @@
 # Reva Journey Service
 
-Standalone Node.js microservice for Safety Travel journey lifecycle and event ingestion. It runs as a separate process on port 3001 by default and stores its data in the `JourneyServiceJourney` MongoDB collection, separate from the existing API's `SafetyJourney` collection.
+Standalone Node.js microservice for Reva Safety Travel. It runs as a separate process (port 3001 by default) and stores journeys and notifications in dedicated `JourneyServiceJourney` and `JourneyServiceNotification` MongoDB collections. It does not modify the existing app's `SafetyJourney` collection.
 
 ## Run locally
 
@@ -8,24 +8,25 @@ Standalone Node.js microservice for Safety Travel journey lifecycle and event in
 cd reva-journey-service
 npm install
 cp .env.example .env
-# Set MONGO_URI and the same JWT_SECRET used by Reva's existing API.
+# Use the same JWT_SECRET and MONGO_URI as Reva's existing app.
 npm start
 ```
 
-Health check: `GET http://localhost:3001/health`
+Health check: `GET http://localhost:3001/health`. All `/api/journeys` endpoints require a Reva JWT as `Authorization: Bearer <token>`.
 
-All journey API routes require the existing Reva JWT in `Authorization: Bearer <token>`. The service verifies the signature itself; it does not trust a user ID supplied in request JSON.
+## Main endpoints
 
-## Endpoints
+- `GET /api/journeys/modes` — supported transport modes and matching avatar keys.
+- `POST /api/journeys` — create a draft from coordinates or place text; shared recipients must be accepted Reva friends in the shared MongoDB.
+- `POST /api/journeys/:id/routes` — calculate a route with the free public OpenStreetMap-based Valhalla service. Public endpoint has rate limits/no SLA; no API key or paid routing account is required.
+- `POST /api/journeys/:id/approve` — explicitly approve the route before sharing/tracking begins.
+- `POST /api/journeys/:id/sync` — idempotently ingest 1–100 location, offline/online, check-in, arrival, emergency, or cancellation events; event IDs prevent duplicate sync.
+- `GET /api/journeys`, `GET /api/journeys/shared`, `GET /api/journeys/:id` — list own journeys, shared journeys, or a permitted journey.
+- `PATCH /api/journeys/:id/sharing`, `POST /api/journeys/:id/cancel` — stop sharing or cancel a journey.
+- `GET /api/journeys/notifications`, `PATCH /api/journeys/notifications/:notificationId/read` — durable notification inbox and read receipts.
 
-- `GET /api/journeys/modes` — supported travel modes and matching avatar keys.
-- `POST /api/journeys` — create an active journey using explicit origin/destination coordinates and a supported travel mode.
-- `GET /api/journeys` — list journeys owned by the authenticated user.
-- `GET /api/journeys/:id` — read an owned journey or a journey explicitly shared with the authenticated user while sharing is enabled.
-- `POST /api/journeys/:id/sync` — idempotently ingest 1–100 offline/online, location, check-in, arrival, emergency, or cancellation events.
-- `PATCH /api/journeys/:id/sharing` — enable/disable sharing for the journey's preconfigured recipients.
-- `POST /api/journeys/:id/cancel` — cancel a journey and stop sharing.
+A background worker requests a traveller check-in when an enabled shared journey reaches its ETA, then notifies shared friends if the grace period expires. An overdue status is not itself proof of an emergency. Emergency alerts are created only after an explicit emergency event.
 
-## Current boundaries
+## Important integration notes
 
-This is the first independently runnable service boundary. It intentionally does not modify the existing `/api/journeys` routes or `main` branch. The existing app integration, friendship-validated recipient provisioning, route/geocoding provider, ETA monitor, persisted notification delivery, and end-to-end tests are follow-up integration work on the same feature branch. Do not expose this service publicly until the gateway validates friend relationships before provisioning `sharedWith` recipients.
+This service is independently runnable and its journey data is isolated from the existing `SafetyJourney` model. It shares the existing MongoDB database initially so it can verify accepted friendships and validate Reva JWTs. The main app has not yet been switched to proxy these endpoints; integration is a separate step. Do not deploy it publicly until the gateway/client integration, friend-recipient validation, and deployment CORS/origin settings are reviewed. The free public geocoder/router is best effort and may rate-limit requests.
