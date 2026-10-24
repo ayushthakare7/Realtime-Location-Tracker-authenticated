@@ -1,5 +1,5 @@
 const { listTravelModes } = require("../services/travelMode.service");
-const { createJourneyDraft, getJourneyForViewer } = require("../services/safetyJourney.service");
+const { approveJourneyRoute, createJourneyDraft, getJourneyForViewer, prepareRouteOptions } = require("../services/safetyJourney.service");
 const User = require("../models/User");
 const SafetyJourney = require("../models/SafetyJourney");
 
@@ -20,6 +20,41 @@ exports.createDraft = async (req, res) => {
   } catch (error) {
     console.error("Create safety journey draft failed:", error.message);
     return res.status(500).json({ success: false, message: "Could not create the journey draft." });
+  }
+};
+
+
+exports.getRoutes = async (req, res) => {
+  try {
+    const result = await prepareRouteOptions({
+      journeyId: req.params.id,
+      travellerId: req.user.userId
+    });
+    return res.status(result.status).json(result.body);
+  } catch (error) {
+    console.error("Resolve safety journey routes failed:", error.message);
+    const status = error.code === "ROUTING_NOT_CONFIGURED" ? 503
+      : ["ROUTING_MODE_UNSUPPORTED", "INVALID_TRAVEL_MODE", "ORIGIN_UNRESOLVED", "DESTINATION_UNRESOLVED", "SAME_ENDPOINT"].includes(error.code) ? 422
+      : error.code === "NO_ROUTE_FOUND" ? 404 : 502;
+    return res.status(status).json({
+      success: false,
+      code: error.code || "ROUTING_ERROR",
+      message: error.message || "Could not resolve route options."
+    });
+  }
+};
+
+exports.approveRoute = async (req, res) => {
+  try {
+    const result = await approveJourneyRoute({
+      journeyId: req.params.id,
+      travellerId: req.user.userId,
+      optionId: req.body?.optionId
+    });
+    return res.status(result.status).json(result.body);
+  } catch (error) {
+    console.error("Approve safety journey route failed:", error.message);
+    return res.status(500).json({ success: false, message: "Could not approve this route." });
   }
 };
 
