@@ -12,8 +12,7 @@ async function queueNotification({ recipientId, journeyId, type, title, body, pa
         type,
         title,
         body,
-        payload,
-        deliveredAt: new Date()
+        payload
       }
     },
     { upsert: true, new: true, setDefaultsOnInsert: true }
