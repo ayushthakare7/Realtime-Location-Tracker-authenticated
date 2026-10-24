@@ -220,7 +220,10 @@ Deploy the Python service before the Node service. Then test sign-in, live locat
 | `RAG_SERVICE_TOKEN` | Shared secret for Node-to-Python requests |
 | `EMBEDDING_MODEL` | Python Sentence Transformers model |
 | `RAG_VECTOR_INDEX` | MongoDB Atlas vector index name |
-| `RAG_TOP_K` | Maximum number of relevant events retrieved |\n| `GOOGLE_MAPS_API_KEY` | Server-only Google Routes API key for supported walking, cycling, road, and transit route alternatives |\n| `JOURNEY_CHECKIN_GRACE_MINUTES` | Minutes after an overdue check-in prompt before trusted contacts are notified (default 5) |\n| `JOURNEY_WORKER_INTERVAL_MS` | Safety deadline polling interval (default 30000 ms; minimum 10000 ms) |
+| `RAG_TOP_K` | Maximum number of relevant events retrieved |
+| `GOOGLE_MAPS_API_KEY` | Server-only Google Routes API key for supported walking, cycling, road, and transit route alternatives |
+| `JOURNEY_CHECKIN_GRACE_MINUTES` | Minutes after an overdue check-in prompt before trusted contacts are notified (default 5) |
+| `JOURNEY_WORKER_INTERVAL_MS` | Safety deadline polling interval (default 30000 ms; minimum 10000 ms) |
 
 ## Privacy and security
 
