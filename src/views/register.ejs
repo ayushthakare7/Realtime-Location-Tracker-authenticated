@@ -87,7 +87,7 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
       fadeAnimation: false,
       markerZoomAnimation: false,
       inertia: false
-    }).setView([20.5937, 78.9629], 5);
+    }).setView([18, 0], 2);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© OpenStreetMap contributors",
       subdomains: "abc",
@@ -105,12 +105,12 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
           driftTimer = setTimeout(drift, 3000);
           return;
         }
-        authMap.panBy(driftForward ? [26, 12] : [-26, -12], {
+        authMap.panBy(driftForward ? [150, 58] : [-150, -58], {
           animate: true,
-          duration: 7
+          duration: 12
         });
         driftForward = !driftForward;
-        driftTimer = setTimeout(drift, 9000);
+        driftTimer = setTimeout(drift, 14500);
       };
       driftTimer = setTimeout(drift, 1800);
       document.addEventListener("visibilitychange", () => {
