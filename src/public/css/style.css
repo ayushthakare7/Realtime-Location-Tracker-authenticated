@@ -1384,3 +1384,59 @@ body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.3
     overflow-x: hidden;
   }
 }
+
+
+/* Compact desktop dashboard: bring Ask Reva closer to the map and keep
+   the Your Circle card modest while its friend list scrolls internally. */
+@media (min-width: 781px) {
+  .dashboard-grid {
+    column-gap: 18px;
+    row-gap: 10px;
+    align-items: start;
+    grid-template-rows: auto auto;
+  }
+  .dashboard-grid > .map-stage,
+  .dashboard-grid > .map-stack {
+    min-width: 0;
+    margin: 0;
+    align-self: start;
+  }
+  .dashboard-grid > .map-stack {
+    padding-top: 0;
+    margin-top: 0;
+  }
+  .dashboard-grid > .map-stack > .reva-card {
+    margin-top: 0;
+  }
+  .dashboard-grid > aside {
+    gap: 12px;
+  }
+  .dashboard-grid > aside > .friends-panel {
+    min-height: 0;
+    padding-bottom: 15px;
+  }
+  .dashboard-grid > aside > .friends-panel #friends,
+  .dashboard-grid > aside > .friends-panel #requests {
+    max-height: 170px;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    padding-right: 5px;
+  }
+}
+@media (max-width: 780px) {
+  .dashboard-grid > .map-stack {
+    margin-top: 0;
+    padding-top: 0;
+  }
+  .dashboard-grid > aside > .friends-panel #friends,
+  .dashboard-grid > aside > .friends-panel #requests {
+    max-height: 220px;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+  }
+}
