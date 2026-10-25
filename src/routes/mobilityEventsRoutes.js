@@ -12,12 +12,16 @@ function secretMatches(provided, expected) {
   const right = Buffer.from(String(expected));
   return left.length === right.length && crypto.timingSafeEqual(left, right);
 }
-const copy = {
-  journey_started: ["Journey started", "Your friend has started a shared journey."],
-  journey_delayed: ["Journey delayed", "Your friend’s latest arrival estimate has shifted. Check the shared route for updates."],
-  journey_arrived: ["Arrival confirmed", "Your friend has confirmed arrival at the destination."],
-  journey_ended: ["Journey ended", "Your friend’s shared journey has ended."]
-};
+function travellerNotification(type, name) {
+  // Spooky-cute copy: personal and memorable, without sounding threatening.
+  const copy = {
+    journey_started: [`👁️ ${name} is on the move`, `The map noticed: ${name} just started a journey. Keep an eye on their route.`],
+    journey_delayed: [`🕯️ ${name} is running late`, `${name} has not arrived yet. Their shared route is still worth a look.`],
+    journey_arrived: [`🌙 ${name} made it safely`, `${name} reached the destination. All quiet on the map—for now.`],
+    journey_ended: [`🫥 ${name}'s journey went quiet`, `${name}'s shared journey has ended. The trail fades from here.`]
+  };
+  return copy[type] || [`👀 Update from ${name}`, `${name} has a new journey update in Reva.`];
+}
 
 router.post("/mobility-events", async (req, res) => {
   if (!secretMatches(req.get("x-mobility-secret"), process.env.MOBILITY_CALLBACK_SECRET)) {
@@ -38,11 +42,13 @@ router.post("/mobility-events", async (req, res) => {
     expectedArrivalAt: event.expectedArrivalAt || null, arrivedAt: event.arrivedAt || null,
     lastLocation: event.lastLocation || null, occurredAt: event.occurredAt || new Date().toISOString()
   };
+  const traveller = await User.findById(payload.travellerId).select("sharingEnabled username").lean();
+  const travellerName = String(traveller?.username || payload.travellerUsername || "A Reva user").trim().slice(0, 60) || "A Reva user";
+  payload.travellerUsername = travellerName;
   io.to("user:" + payload.travellerId).emit("mobility-trip-update", payload);
 
   let recipients = [...new Set((Array.isArray(event.recipientIds) ? event.recipientIds : []).map(String))]
     .filter(id => /^[a-f\d]{24}$/i.test(id) && id !== payload.travellerId);
-  const traveller = await User.findById(payload.travellerId).select("sharingEnabled").lean();
   if (!traveller || !traveller.sharingEnabled) recipients = [];
   if (recipients.length) {
     const links = await Friendship.find({
@@ -58,7 +64,7 @@ router.post("/mobility-events", async (req, res) => {
     recipients = recipients.filter(id => stillFriends.has(id));
   }
 
-  const [title, baseBody] = copy[event.type];
+  const [title, baseBody] = travellerNotification(event.type, travellerName);
   for (const recipientId of recipients) {
     const destinationLabel = String(event.destination?.label || "").slice(0, 180);
     const body = destinationLabel ? baseBody + " Destination: " + destinationLabel : baseBody;
@@ -85,8 +91,8 @@ router.post("/mobility-events", async (req, res) => {
   }
   if (["journey_delayed", "journey_arrived"].includes(event.type) && traveller && traveller.sharingEnabled) {
     const travellerCopy = event.type === "journey_delayed"
-      ? ["Your journey is delayed", "Your expected arrival time has shifted or passed. Check the latest route and GPS update."]
-      : ["Arrival confirmed", "Your arrival has been confirmed. Your journey is complete."];
+      ? ["🕰️ Your journey is taking longer", "Your expected arrival time has shifted or passed. Check the latest route and GPS update."]
+      : ["🌙 You made it", "Arrival confirmed. Your journey is complete—time to breathe easy."];
     const notificationKey = String(event.tripId) + ":" + event.type + ":" + payload.travellerId;
     const wasAlreadyCreated = await MobilityNotification.exists({ notificationKey });
     const notification = await MobilityNotification.findOneAndUpdate(
