@@ -71,3 +71,55 @@
 .vehicle-marker svg{width:100%;height:100%;max-width:none;overflow:visible;display:block;filter:drop-shadow(0 3px 3px #263d3a2b)}
 .leaflet-marker-icon.vehicle-icon-shell{background:transparent!important;border:0!important}
 @media(max-width:380px){.transport-mode-card{min-height:120px}.mode-art{height:76px}}
+
+/* Match My Journey's shell, header, spacing and panel rhythm to the home dashboard */
+.mobility-page .app-header{min-height:78px;padding:14px clamp(18px,5vw,72px);display:flex;align-items:center;justify-content:space-between;gap:18px}
+.mobility-page .header-tagline{margin:0 auto 0 0;color:var(--muted);font-size:13px}
+.mobility-page .header-tagline em{font-style:normal;color:#6f917b}
+.mobility-page .mobility-header-link{display:inline-flex;align-items:center;justify-content:center;padding:9px 13px;border:1px solid #e6e9e1;border-radius:999px;background:#f0f2ec;color:#52635a;text-decoration:none;font-size:12px;font-weight:700;white-space:nowrap}
+.mobility-page .mobility-header-link:hover{background:#e6ebe2}
+.mobility-page .mobility-shell{max-width:1440px;padding:0 clamp(18px,5vw,72px) 48px}
+.mobility-page .mobility-intro{max-width:none;min-height:132px;margin:0 auto 4px;padding:30px 0 24px;display:flex;align-items:end;justify-content:space-between;gap:20px}
+.mobility-page .mobility-intro .intro-center{min-width:0}
+.mobility-page .mobility-intro h1{font:600 clamp(28px,4vw,42px)/1.2 'Manrope',sans-serif;letter-spacing:-1.5px}
+.mobility-page .mobility-intro h1 em{color:#6f917b;font-style:normal}
+.mobility-page .mobility-intro .intro-copy{margin:10px 0 0;max-width:570px;font-size:14px;line-height:1.6}
+.mobility-page .mobility-privacy{flex:0 0 auto;padding:9px 13px;border-radius:999px;background:#e9efe7;border-color:transparent}
+.mobility-page .mobility-privacy>span{width:auto;height:auto;background:transparent;color:#597360;font-size:17px}
+.mobility-page .mobility-layout{grid-template-columns:minmax(270px,330px) minmax(0,1fr);gap:22px;align-items:stretch}
+.mobility-page .mobility-controls{align-content:start;gap:16px}
+.mobility-page .journey-form-panel,.mobility-page .journey-status-panel{padding:20px;border-radius:20px;margin:0;box-shadow:var(--shadow)}
+.mobility-page .journey-map-section{display:flex;flex-direction:column;min-width:0}
+.mobility-page .journey-map-section .map-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:44px;margin:0 0 12px}
+.mobility-page .journey-map-frame{height:clamp(460px,65vh,760px);min-height:420px;margin:0;border:5px solid var(--surface);border-radius:20px;box-shadow:var(--shadow)}
+.mobility-page .route-legend{margin:0;padding:13px 3px;min-height:42px}
+.mobility-page .mobility-explainer{margin-top:auto;border-radius:18px}
+.mobility-page .journey-form-panel .section-heading,.mobility-page .journey-status-panel .section-heading{align-items:center;margin-bottom:15px}
+.mobility-page .journey-form-panel form{gap:10px}
+.mobility-page .journey-form-panel form>label{line-height:1.4}
+.mobility-page .destination-search input,.mobility-page .journey-form-panel select{min-width:0;min-height:42px}
+.mobility-page .transport-mode-grid{gap:8px}
+.mobility-page .transport-mode-card{border-radius:14px}
+.mobility-page .journey-status-panel{display:flex;flex-direction:column;gap:10px}
+.mobility-page .journey-status-panel .section-heading{margin-bottom:0}
+.mobility-page .journey-status-panel .eta-grid{margin-top:0}
+.mobility-page .journey-status-panel .last-location-info{margin:0}
+.mobility-page .journey-status-panel .journey-actions{margin-top:2px}
+@media(max-width:900px){
+  .mobility-page .mobility-layout{grid-template-columns:minmax(260px,.85fr) minmax(0,1.15fr);gap:16px}
+  .mobility-page .mobility-shell{padding-left:22px;padding-right:22px}
+}
+@media(max-width:720px){
+  .mobility-page .app-header{flex-wrap:wrap;gap:10px;padding:13px 16px}
+  .mobility-page .header-tagline{display:none}
+  .mobility-page .header-actions{margin-left:auto;gap:8px}
+  .mobility-page .mobility-shell{padding:0 14px 35px}
+  .mobility-page .mobility-intro{min-height:0;align-items:flex-start;flex-direction:column;gap:12px;padding:25px 0 20px;margin-bottom:0}
+  .mobility-page .mobility-intro h1{font-size:clamp(29px,8vw,38px)}
+  .mobility-page .mobility-privacy{width:100%;white-space:normal}
+  .mobility-page .mobility-layout{grid-template-columns:minmax(0,1fr);gap:15px}
+  .mobility-page .journey-map-section{grid-row:auto}
+  .mobility-page .mobility-controls{grid-row:auto}
+  .mobility-page .journey-map-frame{height:52vh;min-height:320px;border-radius:18px}
+  .mobility-page .journey-form-panel,.mobility-page .journey-status-panel{padding:17px;border-radius:18px}
+}
