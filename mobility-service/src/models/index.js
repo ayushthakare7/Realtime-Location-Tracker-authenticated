@@ -19,7 +19,7 @@ const mobilityTripSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
   username: { type: String, required: true, maxlength: 80 },
   status: { type: String, enum: ["ACTIVE", "DELAYED", "ARRIVED", "CANCELLED", "COMPLETED"], default: "ACTIVE", index: true },
-  transportMode: { type: String, enum: ["driving-car", "cycling-regular", "foot-walking", "bus", "train"], required: true },
+  transportMode: { type: String, enum: ["driving-car", "cycling-regular", "motorbike", "foot-walking", "bus", "train"], required: true },
   origin: { type: coordinateSchema, required: true },
   destination: { type: coordinateSchema, required: true },
   route: { type: routeSchema, required: true },
