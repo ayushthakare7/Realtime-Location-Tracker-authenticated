@@ -365,9 +365,32 @@
         if (previousStatus && previousStatus !== activeTrip.status) message("Journey status updated: " + activeTrip.status.toLowerCase().replaceAll("_", " ") + ".");
       } else if (sharedTripId) {
         activeTrip = null; updateStatus(null); $("journeyHeading").textContent = "Journey unavailable"; $("journeyStatus").textContent = "This journey is no longer shared with you."; $("journeyStatus").dataset.state = "";
-      } else if (!activeTrip || ["ACTIVE","DELAYED"].includes(activeTrip.status)) {
-        if (activeTrip && ["ARRIVED","CANCELLED","COMPLETED"].includes(activeTrip.status)) return;
-        activeTrip = null; updateStatus(null); $("startJourney").disabled = false;
+      } else if (!sharedTripId) {
+        // No active trip means the previous ride is over. Reset the page for a new journey.
+        activeTrip = null;
+        if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+        if (vehicleMarker) { map.removeLayer(vehicleMarker); vehicleMarker = null; }
+        if (destinationMarker) { map.removeLayer(destinationMarker); destinationMarker = null; }
+        currentRouteCoordinates = [];
+        lastRenderedRouteAt = null;
+        selectedDestination = null;
+        pendingMapDestination = null;
+        $("destinationQuery").value = "";
+        $("selectedDestination").textContent = "Your destination will appear here.";
+        $("etaValue").textContent = "—";
+        $("distanceValue").textContent = "—";
+        $("durationValue").textContent = "—";
+        $("lastLocationInfo").textContent = "Waiting for journey location.";
+        $("journeyHeading").textContent = "Ready when you are";
+        $("journeyStatus").textContent = "Choose a vehicle and destination to start a new journey.";
+        $("journeyStatus").dataset.state = "";
+        $("arrivedButton").disabled = true;
+        $("endJourney").disabled = true;
+        $("startJourney").disabled = false;
+        $("startJourney").textContent = "Start journey ↗";
+        $("routeSource").textContent = "Route will appear after you start.";
+        $("mapSubtitle").textContent = "Your city, your route";
+        $("journeyMessage").textContent = "";
       }
     } catch (error) {
       $("mobilityConnection").textContent = "Service unavailable";
