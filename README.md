@@ -270,3 +270,12 @@ Offline event batches are idempotent by `eventId`, accept up to 100 events per r
 - **Existing events have no embeddings:** after enabling embeddings, call the authenticated `POST /reindex` endpoint using the repository's `npm run rag:setup` script to backfill events and ensure the Atlas Vector Search index is ready.
 - **First query is slow:** the model should be preloaded during the build; check logs for the exact stage if initialization still stalls.
 - **Road distance vs. straight-line distance:** deterministic routing remains in the JavaScript location-query layer; semantic RAG should not estimate route distances.
+
+
+## Reva Mobility Context (new feature branch)
+
+The standalone Node.js service lives in `mobility-service/`. It owns the `mobilitytrips` collection, calculates routes and ETA through the configured OpenRouteService free tier, and reads the main app's existing `users`, `friendships`, and `locations` collections. The existing GPS/socket pipeline remains the source of live positions; GPS accuracy is carried through the existing location updates for more cautious arrival detection.
+
+The authenticated main app exposes `/mobility` as the dedicated My Journey page and `/mobility/shared/:tripId` as a read-only road-route view for an authorized recipient. The main dashboard includes a My Journey entry link. The service sends authenticated internal callbacks to the main app for real-time trip notifications. Configure `MOBILITY_SERVICE_URL` and the same `MOBILITY_CALLBACK_SECRET` in both services, plus `ORS_API_KEY` and `MONGODB_URI` in `mobility-service/.env`. See `mobility-service/README.md` for the standalone setup and free-tier constraints.
+
+This is a separate, unmerged feature branch. It does not change `main`.
