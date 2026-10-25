@@ -460,19 +460,32 @@
       message("Journey started. Watch the route animation from your location to your destination.");
       await animateJourneyStart(activeTrip);
       await refreshTrip();
-      // Explicitly move the page viewport to the Journey in Progress panel after the map finishes.
+
+      // Use the exact same route-rendering path as the working Recenter button.
+      // refreshTrip can decide the line is already present by point count even when
+      // the animated line is visually incomplete, so explicitly redraw the full route.
+      if (activeTrip?.route?.coordinates?.length) {
+        showRoute(activeTrip);
+        updateStatus(activeTrip);
+        map.invalidateSize();
+      }
+
+      // Only hand off to the live status panel after the complete route has been redrawn.
       const progressPanel = document.querySelector(".journey-status-panel");
       const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      window.setTimeout(() => {
-        if (progressPanel) {
-          const top = progressPanel.getBoundingClientRect().top + window.scrollY - 16;
-          window.scrollTo({ top: Math.max(0, top), behavior: reducedMotion ? "auto" : "smooth" });
-          progressPanel.setAttribute("tabindex", "-1");
-          progressPanel.focus({ preventScroll: true });
-        } else {
-          window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
-        }
-      }, 250);
+      if (progressPanel) {
+        progressPanel.setAttribute("tabindex", "-1");
+        progressPanel.style.scrollMarginTop = "18px";
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const top = progressPanel.getBoundingClientRect().top + window.scrollY - 18;
+        window.scrollTo({ top: Math.max(0, top), behavior: reducedMotion ? "auto" : "smooth" });
+        progressPanel.focus({ preventScroll: true });
+        // Re-align once the smooth scroll has had time to begin, especially on mobile.
+        window.setTimeout(() => {
+          const currentTop = progressPanel.getBoundingClientRect().top + window.scrollY - 18;
+          window.scrollTo({ top: Math.max(0, currentTop), behavior: reducedMotion ? "auto" : "smooth" });
+        }, reducedMotion ? 0 : 500);
+      }
     } catch (error) { message(error.message); $("startJourney").disabled = false; }
   }
 
