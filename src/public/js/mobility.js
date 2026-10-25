@@ -321,9 +321,10 @@
   async function init() {
     $("mobilityConnection").textContent = "Checking sharing…";
     if (sharedTripId) {
-      document.querySelector(".journey-form-panel").hidden = true;
+      $("journeyForm").hidden = true;
       $("arrivedButton").hidden = true; $("endJourney").hidden = true;
-      document.querySelector(".mobility-intro h1").innerHTML = "A journey shared<br><em>with you.</em>";
+      $("journeyHeading").textContent = "A journey shared with you";
+      $("journeyStatus").textContent = "Viewing a friend's shared journey.";
       $("mapSubtitle").textContent = "Shared route";
       socket = io({ auth: { token } });
       socket.on("connect", () => $("mobilityConnection").textContent = "Live connection");
