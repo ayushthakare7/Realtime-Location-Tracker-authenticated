@@ -25,8 +25,8 @@ router.post("/mobility-events", async (req, res) => {
   }
   const event = req.body || {};
   if (!["journey_started", "journey_delayed", "journey_arrived", "journey_ended"].includes(event.type)
-      || !/^[a-f\\d]{24}$/i.test(String(event.travellerId || ""))
-      || !/^[a-f\\d]{24}$/i.test(String(event.tripId || ""))) {
+      || !/^[a-f\d]{24}$/i.test(String(event.travellerId || ""))
+      || !/^[a-f\d]{24}$/i.test(String(event.tripId || ""))) {
     return res.status(400).json({ success: false, message: "Invalid mobility event." });
   }
   const io = req.app.get("io");
@@ -41,7 +41,7 @@ router.post("/mobility-events", async (req, res) => {
   io.to("user:" + payload.travellerId).emit("mobility-trip-update", payload);
 
   let recipients = [...new Set((Array.isArray(event.recipientIds) ? event.recipientIds : []).map(String))]
-    .filter(id => /^[a-f\\d]{24}$/i.test(id) && id !== payload.travellerId);
+    .filter(id => /^[a-f\d]{24}$/i.test(id) && id !== payload.travellerId);
   const traveller = await User.findById(payload.travellerId).select("sharingEnabled").lean();
   if (!traveller || !traveller.sharingEnabled) recipients = [];
   if (recipients.length) {
