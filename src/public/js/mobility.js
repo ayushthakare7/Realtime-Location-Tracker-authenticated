@@ -107,10 +107,30 @@
     $("mapSubtitle").textContent = trip.destination?.label || "Your city, your route";
   }
 
+  function normalizeRouteCoordinates(rawCoordinates, origin, destination) {
+    if (!Array.isArray(rawCoordinates)) return [];
+    const candidates = [
+      rawCoordinates.map(point => Array.isArray(point) ? [Number(point[1]), Number(point[0])] : [Number(point?.latitude), Number(point?.longitude)]),
+      rawCoordinates.map(point => Array.isArray(point) ? [Number(point[0]), Number(point[1])] : [Number(point?.latitude), Number(point?.longitude)])
+    ].map(points => points.filter(point => Number.isFinite(point[0]) && Number.isFinite(point[1])
+      && Math.abs(point[0]) <= 90 && Math.abs(point[1]) <= 180));
+
+    if (candidates[0].length < 2) return candidates[1].length >= 2 ? candidates[1] : [];
+    if (candidates[1].length < 2) return candidates[0];
+    const distance = (a, b) => {
+      if (!a || !b) return 0;
+      const lat = (a[0] - b[0]) * Math.PI / 180;
+      const lon = (a[1] - b[1]) * Math.PI / 180;
+      return lat * lat + lon * lon * Math.cos((a[0] + b[0]) * Math.PI / 360) ** 2;
+    };
+    const score = points => distance(points[0], origin) + distance(points[points.length - 1], destination);
+    return score(candidates[0]) <= score(candidates[1]) ? candidates[0] : candidates[1];
+  }
+
   function showRoute(trip) {
     if (!trip?.route?.coordinates?.length) return;
     if (animationGuideLine) { map.removeLayer(animationGuideLine); animationGuideLine = null; }
-    currentRouteCoordinates = trip.route.coordinates.map(point => [Number(point[1]), Number(point[0])]);
+    currentRouteCoordinates = normalizeRouteCoordinates(trip.route.coordinates, [Number(trip.origin?.latitude), Number(trip.origin?.longitude)], [Number(trip.destination?.latitude), Number(trip.destination?.longitude)]);\n    if (currentRouteCoordinates.length < 2) return;
     if (routeLine) map.removeLayer(routeLine);
     lastRenderedRouteAt = trip.route.calculatedAt || null;
     routeLine = L.polyline(currentRouteCoordinates, { color: "#263746", weight: 7, opacity: 1, lineCap: "round", lineJoin: "round" }).addTo(map);
@@ -133,10 +153,12 @@
   const waitForAnimation = milliseconds => new Promise(resolve => window.setTimeout(resolve, milliseconds));
 
   async function animateJourneyStart(trip) {
-    const coordinates = (trip?.route?.coordinates || [])
-      .map(point => [Number(point[1]), Number(point[0])])
-      .filter(point => Number.isFinite(point[0]) && Number.isFinite(point[1])
-        && Math.abs(point[0]) <= 90 && Math.abs(point[1]) <= 180);
+    const routeOrigin = trip?.lastLocation && Number.isFinite(Number(trip.lastLocation.latitude))
+      ? [Number(trip.lastLocation.latitude), Number(trip.lastLocation.longitude)]
+      : latestPosition ? [latestPosition.latitude, latestPosition.longitude]
+      : [Number(trip?.origin?.latitude), Number(trip?.origin?.longitude)];
+    const routeDestination = [Number(trip?.destination?.latitude), Number(trip?.destination?.longitude)];
+    const coordinates = normalizeRouteCoordinates(trip?.route?.coordinates, routeOrigin, routeDestination);
     const statusPanel = document.querySelector(".journey-status-panel");
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const destination = [Number(trip?.destination?.latitude), Number(trip?.destination?.longitude)];
@@ -436,13 +458,19 @@
       message("Journey started. Watch the route animation from your location to your destination.");
       await animateJourneyStart(activeTrip);
       await refreshTrip();
-      // Hand off to Journey in Progress only after map and status updates have settled.
+      // Explicitly move the page viewport to the Journey in Progress panel after the map finishes.
       const progressPanel = document.querySelector(".journey-status-panel");
-      const heading = document.getElementById("journeyHeading");
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       window.setTimeout(() => {
-        progressPanel?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
-        heading?.focus({ preventScroll: true });
-      }, 120);
+        if (progressPanel) {
+          const top = progressPanel.getBoundingClientRect().top + window.scrollY - 16;
+          window.scrollTo({ top: Math.max(0, top), behavior: reducedMotion ? "auto" : "smooth" });
+          progressPanel.setAttribute("tabindex", "-1");
+          progressPanel.focus({ preventScroll: true });
+        } else {
+          window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
+        }
+      }, 250);
     } catch (error) { message(error.message); $("startJourney").disabled = false; }
   }
 
