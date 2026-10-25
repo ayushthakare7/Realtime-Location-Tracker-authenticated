@@ -14,6 +14,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from fastembed import TextEmbedding
 from langchain_groq import ChatGroq
 from langgraph.graph import END, START, StateGraph
+from time_queries import answer_time_question
 
 load_dotenv()
 
@@ -411,6 +412,19 @@ class RevaRAGHandler(BaseHTTPRequestHandler):
                 if not isinstance(context, dict):
                     raise RequestError(400, "context must be an object")
                 try:
+                    # Exact clock-time and closest-together questions must use timestamped GPS
+                    # records, not approximate semantic vector matches.
+                    direct_answer = answer_time_question(
+                        question.strip(), user_ids, context, mongo[DB_NAME]
+                    )
+                    if direct_answer is not None:
+                        self.send_json(200, {
+                            "success": True,
+                            "answer": direct_answer,
+                            "intent": "time_query",
+                            "retrievedEvents": 0,
+                        })
+                        return
                     print("[Reva RAG] /ask invoking LangGraph workflow", flush=True)
                     result = workflow.invoke({
                         "question": question.strip(),
