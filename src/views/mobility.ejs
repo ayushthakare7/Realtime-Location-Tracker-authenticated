@@ -40,6 +40,15 @@
         <div id="destinationResults" class="destination-results" role="listbox"></div>
         <p id="selectedDestination" class="selected-destination">Search for a place or pick a point directly on the map.</p>
         <div class="destination-tip"><span aria-hidden="true">✦</span><p><strong>Choose your exact destination</strong><small>Search for a place, or pick a pin on the map. Your destination stays fixed while your live position updates.</small></p></div>
+        <aside class="start-journey-panel">
+            <p class="eyebrow">READY TO GO?</p>
+            <h3>Start your journey</h3>
+            <label for="recipientMode">Share updates with</label>
+            <select id="recipientMode"><option value="ALL_FRIENDS">All eligible friends</option><option value="SELECTED_FRIENDS">Selected friends</option><option value="ONE_FRIEND">One friend</option></select>
+            <div id="friendChoices" class="friend-choices" hidden></div>
+            <button id="startJourney" class="mobility-primary" type="submit">Start journey ↗</button>
+            <p class="form-note">Location sharing must be enabled on the main Reva page. Bus and train ETAs are road estimates, not live transit schedules.</p>
+          </aside>
       </section>
 
       <section class="journey-map-section">
@@ -63,15 +72,7 @@
           <div class="transport-mode-select-wrap"><select id="transportMode" class="transport-mode-source" aria-label="Selected travel mode" tabindex="-1">
             <option value="driving-car" selected>Car / road vehicle</option><option value="cycling-regular">Bicycle</option><option value="motorbike">Bike / motorbike</option><option value="foot-walking">Walking</option><option value="bus">Bus (road estimate)</option><option value="train">Train (route estimate)</option>
           </select></div>
-          <aside class="start-journey-panel">
-            <p class="eyebrow">READY TO GO?</p>
-            <h3>Start your journey</h3>
-            <label for="recipientMode">Share updates with</label>
-            <select id="recipientMode"><option value="ALL_FRIENDS">All eligible friends</option><option value="SELECTED_FRIENDS">Selected friends</option><option value="ONE_FRIEND">One friend</option></select>
-            <div id="friendChoices" class="friend-choices" hidden></div>
-            <button id="startJourney" class="mobility-primary" type="submit">Start journey ↗</button>
-            <p class="form-note">Location sharing must be enabled on the main Reva page. Bus and train ETAs are road estimates, not live transit schedules.</p>
-          </aside>
+          
         </div>
       </section>
     </form>
