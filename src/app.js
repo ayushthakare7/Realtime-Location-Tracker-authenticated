@@ -24,6 +24,7 @@ app.get("/", (req, res) => res.redirect("/login"));
 app.get("/login", (req, res) => res.render("login"));
 app.get("/register", (req, res) => res.render("register"));
 app.get("/tracker", (req, res) => res.render("index"));
-app.get("/mobility", (req, res) => res.render("mobility"));
+app.get("/mobility", (req, res) => res.render("mobility", { sharedTripId: null }));
+app.get("/mobility/shared/:tripId", (req, res) => res.render("mobility", { sharedTripId: req.params.tripId }));
 
 module.exports = app;
