@@ -133,20 +133,26 @@
     const coordinates = (trip?.route?.coordinates || [])
       .map(point => [Number(point[1]), Number(point[0])])
       .filter(point => Number.isFinite(point[0]) && Number.isFinite(point[1]));
+    const statusPanel = document.querySelector(".journey-status-panel");
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
     if (coordinates.length < 2) {
       showRoute(trip);
-      document.querySelector(".journey-status-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      statusPanel?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+      message("Journey started. Your live journey status is ready.");
       return;
     }
 
     const origin = trip.lastLocation && Number.isFinite(Number(trip.lastLocation.latitude))
       ? [Number(trip.lastLocation.latitude), Number(trip.lastLocation.longitude)]
-      : coordinates[0];
+      : latestPosition
+        ? [latestPosition.latitude, latestPosition.longitude]
+        : coordinates[0];
     const destination = [Number(trip.destination.latitude), Number(trip.destination.longitude)];
     const routeBounds = L.latLngBounds(coordinates);
     if (routeLine) map.removeLayer(routeLine);
     if (destinationMarker) map.removeLayer(destinationMarker);
-    routeLine = L.polyline([], { color: "#4d83c6", weight: 6, opacity: .92, lineCap: "round", lineJoin: "round" }).addTo(map);
+    routeLine = L.polyline([], { color: "#4d83c6", weight: 6, opacity: .94, lineCap: "round", lineJoin: "round" }).addTo(map);
     lastRenderedRouteAt = trip.route?.calculatedAt || null;
     destinationMarker = L.marker(destination, { icon: destinationIcon, keyboard: false }).addTo(map)
       .bindTooltip(trip.destination.label || "Destination");
@@ -160,11 +166,21 @@
 
     map.stop();
     map.invalidateSize();
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    // Begin with a clear close-up of the traveller's actual starting position.
+
+    // Phase 1: hold a close, clear view of the real starting point.
     map.setView(origin, 17, { animate: !reducedMotion, duration: reducedMotion ? 0 : 0.85 });
     await new Promise(resolve => window.setTimeout(resolve, reducedMotion ? 0 : 950));
-    const duration = reducedMotion ? 0 : 3600;
+
+    // Phase 2: ease back just enough to follow the route while keeping the vehicle visible.
+    if (!reducedMotion) {
+      map.setZoom(15, { animate: true, duration: 0.7 });
+      await new Promise(resolve => window.setTimeout(resolve, 760));
+    } else {
+      map.setZoom(15, { animate: false });
+    }
+
+    // Phase 3: progressively trace the road route and keep the camera following the vehicle.
+    const duration = reducedMotion ? 0 : 4600;
     await new Promise(resolve => {
       if (!duration) {
         routeLine.setLatLngs(coordinates);
@@ -172,7 +188,9 @@
         resolve();
         return;
       }
+
       const startedAt = performance.now();
+      let lastCameraAt = 0;
       const frame = now => {
         const progress = Math.min(1, (now - startedAt) / duration);
         const scaled = progress * (coordinates.length - 1);
@@ -187,21 +205,41 @@
         const traced = coordinates.slice(0, Math.min(segment + 1, coordinates.length));
         if (progress < 1) traced.push(current);
         else traced.push(coordinates[coordinates.length - 1]);
+
         routeLine?.setLatLngs(traced);
         vehicleMarker?.setLatLng(current);
+
+        // Throttle camera updates so Leaflet can animate each pan smoothly without jitter.
+        if (progress < 1 && now - lastCameraAt >= 180) {
+          map.panTo(current, { animate: true, duration: 0.18, easeLinearity: 0.25, noMoveStart: true });
+          lastCameraAt = now;
+        }
         if (progress < 1) requestAnimationFrame(frame);
         else resolve();
       };
       requestAnimationFrame(frame);
     });
 
+    // Phase 4: zoom out to the complete route, then restore the marker to the latest real GPS fix.
     routeLine?.setLatLngs(coordinates);
-    vehicleMarker?.setLatLng(origin);
     const bounds = routeBounds.extend(destinationMarker.getLatLng());
-    map.fitBounds(bounds, { paddingTopLeft: [42, 42], paddingBottomRight: [42, 42], maxZoom: 12, animate: !reducedMotion, duration: 1.1 });
-    await new Promise(resolve => window.setTimeout(resolve, reducedMotion ? 0 : 1150));
-    document.querySelector(".journey-status-panel")?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
-    message("Route preview complete. Your live journey is now tracking; arrival will be confirmed automatically when fresh GPS readings show you're near the destination.");
+    map.fitBounds(bounds, {
+      paddingTopLeft: [42, 42],
+      paddingBottomRight: [42, 42],
+      maxZoom: 12,
+      animate: !reducedMotion,
+      duration: reducedMotion ? 0 : 1.2
+    });
+    await new Promise(resolve => window.setTimeout(resolve, reducedMotion ? 0 : 1300));
+
+    const livePosition = latestPosition
+      ? [latestPosition.latitude, latestPosition.longitude]
+      : trip.lastLocation && Number.isFinite(Number(trip.lastLocation.latitude))
+        ? [Number(trip.lastLocation.latitude), Number(trip.lastLocation.longitude)]
+        : origin;
+    vehicleMarker?.setLatLng(livePosition);
+    statusPanel?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+    message("Journey started. The route preview is complete and your live journey is in progress; arrival is confirmed automatically when fresh GPS readings show you're near the destination.");
   }
 
   function setVehiclePosition(latitude, longitude, animate = true) {
