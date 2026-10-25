@@ -57,6 +57,7 @@ router.post("/trips", async (req, res) => {
       Location.findOne({ userId }).lean()
     ]);
     if (!user || !user.sharingEnabled || !location) return res.status(409).json({ success: false, message: "Turn on location sharing from the Reva main page before starting a journey." });
+    if (!location.lastSeen || Date.now() - new Date(location.lastSeen).getTime() > 120000) return res.status(409).json({ success: false, message: "Your latest GPS position is stale. Keep Reva open with sharing enabled until a fresh location arrives, then retry." });
     const origin = { latitude: Number(location.latitude), longitude: Number(location.longitude), label: "Current location" };
     const destinationPoint = {
       latitude: Number(destination.latitude), longitude: Number(destination.longitude),
@@ -140,6 +141,7 @@ router.post("/trips/:id/arrive", async (req, res) => {
     trip.arrivedAt = new Date();
     trip.endedAt = trip.arrivedAt;
     await trip.save();
+    await emitMobilityEvent(trip, "journey_arrived");
     res.json({ success: true, trip: cleanTrip(trip) });
   } catch (error) { fail(res, error); }
 });
@@ -152,6 +154,7 @@ router.post("/trips/:id/end", async (req, res) => {
     trip.status = req.body.cancel === true ? "CANCELLED" : "COMPLETED";
     trip.endedAt = new Date();
     await trip.save();
+    await emitMobilityEvent(trip, "journey_ended");
     res.json({ success: true, trip: cleanTrip(trip) });
   } catch (error) { fail(res, error); }
 });
