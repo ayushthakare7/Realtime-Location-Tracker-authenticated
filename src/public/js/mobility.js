@@ -378,6 +378,12 @@
     card.addEventListener("click", () => {
       $("transportMode").value = card.dataset.mode;
       syncTransportModeCards();
+      if (sharedTripId) return;
+      message((modeLabels[card.dataset.mode] || "Vehicle") + " selected. Continue to Plan a Journey below.");
+      const destinationPanel = document.querySelector(".destination-panel");
+      destinationPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+      destinationPanel?.classList.add("plan-next-highlight");
+      window.setTimeout(() => destinationPanel?.classList.remove("plan-next-highlight"), 1400);
     });
   });
   $("transportMode").addEventListener("change", syncTransportModeCards);
