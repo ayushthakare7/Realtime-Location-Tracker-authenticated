@@ -534,6 +534,8 @@
     }
   }
 
+  let hasAdvancedToDestination = false;
+
   function syncTransportModeCards() {
     const mode = $("transportMode").value;
     document.querySelectorAll(".transport-mode-card").forEach(card => {
@@ -558,11 +560,17 @@
       $("transportMode").value = card.dataset.mode;
       syncTransportModeCards();
       if (sharedTripId) return;
-      message((modeLabels[card.dataset.mode] || "Vehicle") + " selected. Continue to Plan a Journey below.");
-      const destinationPanel = document.querySelector(".destination-panel");
-      destinationPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
-      destinationPanel?.classList.add("plan-next-highlight");
-      window.setTimeout(() => destinationPanel?.classList.remove("plan-next-highlight"), 1400);
+      message((modeLabels[card.dataset.mode] || "Vehicle") + " selected.");
+      // Advance to destination planning only on the first selection. If the user
+      // comes back to change their mind, update the selected card/vehicle in place
+      // without pulling the page away from the vehicle choices again.
+      if (!hasAdvancedToDestination) {
+        hasAdvancedToDestination = true;
+        const destinationPanel = document.querySelector(".destination-panel");
+        destinationPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+        destinationPanel?.classList.add("plan-next-highlight");
+        window.setTimeout(() => destinationPanel?.classList.remove("plan-next-highlight"), 1400);
+      }
     });
   });
   $("transportMode").addEventListener("change", syncTransportModeCards);
