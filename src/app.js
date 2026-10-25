@@ -7,6 +7,7 @@ const trackerRoutes = require("./routes/trackerRoutes");
 const mobilityProxyRoutes = require("./routes/mobilityProxyRoutes");
 const mobilityEventsRoutes = require("./routes/mobilityEventsRoutes");
 const mobilityNotificationRoutes = require("./routes/mobilityNotificationRoutes");
+const pushRoutes = require("./routes/pushRoutes");
 
 const app = express();
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || `http://localhost:${process.env.PORT || 3000}` }));
@@ -21,6 +22,7 @@ app.use("/api/tracker", trackerRoutes);
 app.use("/api/mobility", mobilityProxyRoutes);
 app.use("/api/internal", mobilityEventsRoutes);
 app.use("/api/mobility-notifications", mobilityNotificationRoutes);
+app.use("/api/push", pushRoutes);
 
 app.get("/", (req, res) => res.redirect("/login"));
 app.get("/login", (req, res) => res.render("login"));
