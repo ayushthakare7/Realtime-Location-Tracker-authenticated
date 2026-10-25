@@ -17,7 +17,7 @@ function travellerNotification(type, name) {
   const copy = {
     journey_started: [`👁️ ${name} is on the move`, `The map noticed: ${name} just started a journey. Keep an eye on their route.`],
     journey_delayed: [`🕯️ ${name} is running late`, `${name} has not arrived yet. Their shared route is still worth a look.`],
-    journey_arrived: [`🌙 ${name} made it safely`, `${name} reached the destination. All quiet on the map—for now.`],
+    journey_arrived: [`🌙 ${name} made it safely`, `${name} reached the destination. All quiet on the map . for now.`],
     journey_ended: [`🫥 ${name}'s journey went quiet`, `${name}'s shared journey has ended. The trail fades from here.`]
   };
   return copy[type] || [`👀 Update from ${name}`, `${name} has a new journey update in Reva.`];
@@ -92,7 +92,7 @@ router.post("/mobility-events", async (req, res) => {
   if (["journey_delayed", "journey_arrived"].includes(event.type) && traveller && traveller.sharingEnabled) {
     const travellerCopy = event.type === "journey_delayed"
       ? ["🕰️ Your journey is taking longer", "Your expected arrival time has shifted or passed. Check the latest route and GPS update."]
-      : ["🌙 You made it", "Arrival confirmed. Your journey is complete—time to breathe easy."];
+      : ["🌙 You made it", "Arrival confirmed. Your journey is complete . time to breathe easy."];
     const notificationKey = String(event.tripId) + ":" + event.type + ":" + payload.travellerId;
     const wasAlreadyCreated = await MobilityNotification.exists({ notificationKey });
     const notification = await MobilityNotification.findOneAndUpdate(
