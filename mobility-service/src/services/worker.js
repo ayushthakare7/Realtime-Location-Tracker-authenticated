@@ -22,12 +22,17 @@ async function tick(now = new Date()) {
       const confirmations = Math.max(2, Number(process.env.MOBILITY_ARRIVAL_CONFIRMATIONS) || 2);
       const gpsAge = now.getTime() - new Date(location.lastSeen).getTime();
       const fresh = gpsAge >= 0 && gpsAge <= 120000;
+      const maxArrivalAccuracy = Math.max(20, Number(process.env.MOBILITY_MAX_ARRIVAL_ACCURACY_METERS) || 80);
+      const accurateEnough = Number.isFinite(Number(location.accuracyMeters)) && Number(location.accuracyMeters) <= maxArrivalAccuracy;
       const newSample = !trip.lastArrivalSampleAt || new Date(location.lastSeen).getTime() > new Date(trip.lastArrivalSampleAt).getTime();
-      if (fresh && newSample) {
+      if (fresh && accurateEnough && newSample) {
         trip.nearDestinationCount = remainingMeters <= radius ? trip.nearDestinationCount + 1 : 0;
         trip.lastArrivalSampleAt = location.lastSeen;
+      } else if (fresh && newSample) {
+        trip.nearDestinationCount = 0;
+        trip.lastArrivalSampleAt = location.lastSeen;
       }
-      if (trip.nearDestinationCount >= confirmations && fresh) {
+      if (trip.nearDestinationCount >= confirmations && fresh && accurateEnough) {
         trip.status = "ARRIVED"; trip.arrivedAt = now; trip.endedAt = now;
         await trip.save(); await emitMobilityEvent(trip, "journey_arrived"); continue;
       }
