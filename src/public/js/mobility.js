@@ -119,6 +119,79 @@
     $("mapSubtitle").textContent = trip.destination?.label || "Your route";
   }
 
+  async function animateJourneyStart(trip) {
+    const coordinates = (trip?.route?.coordinates || [])
+      .map(point => [Number(point[1]), Number(point[0])])
+      .filter(point => Number.isFinite(point[0]) && Number.isFinite(point[1]));
+    if (coordinates.length < 2) {
+      showRoute(trip);
+      document.querySelector(".journey-status-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
+    const origin = trip.lastLocation && Number.isFinite(Number(trip.lastLocation.latitude))
+      ? [Number(trip.lastLocation.latitude), Number(trip.lastLocation.longitude)]
+      : coordinates[0];
+    const destination = [Number(trip.destination.latitude), Number(trip.destination.longitude)];
+    const routeBounds = L.latLngBounds(coordinates);
+    if (routeLine) map.removeLayer(routeLine);
+    if (destinationMarker) map.removeLayer(destinationMarker);
+    routeLine = L.polyline([], { color: "#4d83c6", weight: 6, opacity: .92, lineCap: "round", lineJoin: "round" }).addTo(map);
+    lastRenderedRouteAt = trip.route?.calculatedAt || null;
+    destinationMarker = L.marker(destination, { icon: destinationIcon, keyboard: false }).addTo(map)
+      .bindTooltip(trip.destination.label || "Destination");
+    if (!vehicleMarker) {
+      vehicleMarker = L.marker(origin, { icon: vehicleIconForMode(trip.transportMode), keyboard: false, zIndexOffset: 1000 })
+        .addTo(map).bindTooltip((modeLabels[trip.transportMode] || "Your") + " live position");
+    } else {
+      vehicleMarker.setIcon(vehicleIconForMode(trip.transportMode));
+      vehicleMarker.setLatLng(origin);
+    }
+
+    map.stop();
+    map.setView(origin, 16, { animate: false });
+    map.invalidateSize();
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const duration = reducedMotion ? 0 : 3600;
+    await new Promise(resolve => {
+      if (!duration) {
+        routeLine.setLatLngs(coordinates);
+        vehicleMarker?.setLatLng(destination);
+        resolve();
+        return;
+      }
+      const startedAt = performance.now();
+      const frame = now => {
+        const progress = Math.min(1, (now - startedAt) / duration);
+        const scaled = progress * (coordinates.length - 1);
+        const segment = Math.min(coordinates.length - 2, Math.floor(scaled));
+        const fraction = progress >= 1 ? 1 : scaled - segment;
+        const current = progress >= 1
+          ? coordinates[coordinates.length - 1]
+          : [
+              coordinates[segment][0] + (coordinates[segment + 1][0] - coordinates[segment][0]) * fraction,
+              coordinates[segment][1] + (coordinates[segment + 1][1] - coordinates[segment][1]) * fraction
+            ];
+        const traced = coordinates.slice(0, Math.min(segment + 1, coordinates.length));
+        if (progress < 1) traced.push(current);
+        else traced.push(coordinates[coordinates.length - 1]);
+        routeLine?.setLatLngs(traced);
+        vehicleMarker?.setLatLng(current);
+        if (progress < 1) requestAnimationFrame(frame);
+        else resolve();
+      };
+      requestAnimationFrame(frame);
+    });
+
+    routeLine?.setLatLngs(coordinates);
+    vehicleMarker?.setLatLng(origin);
+    const bounds = routeBounds.extend(destinationMarker.getLatLng());
+    map.fitBounds(bounds, { paddingTopLeft: [42, 42], paddingBottomRight: [42, 42], maxZoom: 12, animate: !reducedMotion, duration: 1.1 });
+    await new Promise(resolve => window.setTimeout(resolve, reducedMotion ? 0 : 1150));
+    document.querySelector(".journey-status-panel")?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+    message("Route preview complete. Your live journey is now tracking; arrival will be confirmed automatically when fresh GPS readings show you're near the destination.");
+  }
+
   function setVehiclePosition(latitude, longitude, animate = true) {
     const mode = activeTrip?.transportMode || $("transportMode")?.value || "driving-car";
     vehicleIcon = vehicleIconForMode(mode);
@@ -268,7 +341,11 @@
         transportMode: $("transportMode").value,
         ...recipients
       }) });
-      activeTrip = data.trip; setMapPickMode(false); updateStatus(activeTrip); showRoute(activeTrip); message("Journey started. Reva is using the road route and your live location.");
+      activeTrip = data.trip;
+      setMapPickMode(false);
+      updateStatus(activeTrip);
+      message("Journey started. Watch the route animation from your location to your destination.");
+      await animateJourneyStart(activeTrip);
       await refreshTrip();
     } catch (error) { message(error.message); $("startJourney").disabled = false; }
   }
