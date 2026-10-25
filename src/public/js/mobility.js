@@ -46,7 +46,9 @@
   };
 
   function updateStatus(trip) {
-    if (trip && ["ACTIVE", "DELAYED"].includes(trip.status)) setMapPickMode(false);
+    const tripOngoing = Boolean(trip && ["ACTIVE", "DELAYED"].includes(trip.status));
+    if (tripOngoing) setMapPickMode(false);
+    $("pickDestinationOnMap").disabled = tripOngoing;
     if (!trip) {
       $("journeyHeading").textContent = "Ready when you are";
       $("journeyStatus").textContent = "Choose a destination to get started.";
