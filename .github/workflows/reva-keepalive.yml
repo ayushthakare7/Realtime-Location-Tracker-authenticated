@@ -1,0 +1,63 @@
+name: Reva service keep-alive
+
+on:
+  schedule:
+    # Runs every 8 minutes (GitHub may delay scheduled runs).
+    - cron: "*/8 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: reva-service-keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping-services:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping all configured Reva services
+        env:
+          NODE_HEALTH_URL: ${{ vars.REVA_NODE_HEALTH_URL }}
+          RAG_HEALTH_URL: ${{ vars.REVA_RAG_HEALTH_URL }}
+          MOBILITY_HEALTH_URL: ${{ vars.REVA_MOBILITY_HEALTH_URL }}
+        shell: bash
+        run: |
+          set +e
+          failures=0
+          configured=0
+
+          ping_service() {
+            local name="$1"
+            local url="$2"
+
+            if [[ -z "$url" ]]; then
+              echo "::warning::$name health URL is not configured. Add the matching GitHub Actions repository variable."
+              failures=$((failures + 1))
+              return
+            fi
+
+            configured=$((configured + 1))
+            echo "Pinging $name health endpoint..."
+            if curl --fail --silent --show-error --location \
+              --connect-timeout 10 --max-time 25 \
+              --retry 2 --retry-delay 2 "$url" >/dev/null; then
+              echo "OK: $name responded successfully."
+            else
+              echo "::warning::$name health check failed. Check its URL and service logs."
+              failures=$((failures + 1))
+            fi
+          }
+
+          ping_service "Node.js" "$NODE_HEALTH_URL"
+          ping_service "Python RAG" "$RAG_HEALTH_URL"
+          ping_service "Mobility" "$MOBILITY_HEALTH_URL"
+
+          if [[ "$configured" -eq 0 ]]; then
+            echo "::error::No health URLs are configured. Set repository variables before relying on this workflow."
+            exit 1
+          fi
+
+          if [[ "$failures" -gt 0 ]]; then
+            echo "::warning::$failures health check(s) failed or are unconfigured."
+          fi
+          echo "Keep-alive checks completed."
