@@ -387,3 +387,23 @@
 /* Brief visual confirmation after choosing a vehicle */
 .mobility-page .destination-panel.plan-next-highlight{outline:2px solid #8bab83;outline-offset:2px;transition:outline-color .25s ease}
 @media(prefers-reduced-motion:reduce){.mobility-page .destination-panel.plan-next-highlight{transition:none}}
+
+/* Destination card owns the journey-start controls; vehicle selector spans the full row */
+@media(min-width:721px){
+ .mobility-page .journey-planner-form{grid-template-columns:minmax(300px,.72fr) minmax(0,1.5fr);grid-template-areas:"travel travel" "destination map";align-items:stretch}
+ .mobility-page .travel-options-panel{grid-area:travel;width:100%;min-width:0}
+ .mobility-page .travel-options-content{display:block!important;width:100%;min-width:0}
+ .mobility-page #transportModeCards{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-template-rows:1fr;gap:12px;width:100%;min-width:0}
+ .mobility-page #transportModeCards .transport-mode-card{width:100%;min-width:0;min-height:150px;height:100%;padding:12px 8px}
+ .mobility-page .transport-mode-select-wrap{display:none!important}
+ .mobility-page .start-journey-panel{display:flex;flex-direction:column;gap:9px;margin-top:14px;padding:15px;border:1px solid #e1e7dd;border-radius:14px;background:#f7f8f3;box-sizing:border-box}
+ .mobility-page .start-journey-panel h3{margin:0}
+ .mobility-page .start-journey-panel .form-note{margin:0;line-height:1.5}
+ .mobility-page .destination-panel{grid-area:destination;display:flex;flex-direction:column;min-width:0}
+ .mobility-page .destination-panel .destination-tip{margin-top:12px}
+}
+@media(max-width:720px){
+ .mobility-page #transportModeCards{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+ .mobility-page #transportModeCards .transport-mode-card{min-height:112px}
+ .mobility-page .start-journey-panel{margin-top:12px;padding:13px;border:1px solid #e1e7dd;border-radius:13px;background:#f7f8f3}
+}
