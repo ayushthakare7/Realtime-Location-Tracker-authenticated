@@ -86,7 +86,7 @@ async function geocode(query) {
     error.status = 503;
     throw error;
   }
-  const cacheKey = query.toLowerCase().replace(/\\s+/g, " ");
+  const cacheKey = query.toLowerCase().replace(/\s+/g, " ");
   const cached = cacheRead(geocodeCache, cacheKey);
   if (cached) return cached;
   const url = new URL("https://api.openrouteservice.org/geocode/search");
