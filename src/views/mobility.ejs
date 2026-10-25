@@ -39,13 +39,14 @@
         <div id="mapPickActions" class="map-pick-actions" hidden><p>Tap anywhere on the map to place your destination pin. You can zoom and pan first.</p><div><button id="confirmMapDestination" type="button" disabled>Use This Destination</button><button id="cancelMapPick" type="button" class="secondary">Cancel</button></div></div>
         <div id="destinationResults" class="destination-results" role="listbox"></div>
         <p id="selectedDestination" class="selected-destination">Search for a place or pick a point directly on the map.</p>
+        <div class="destination-tip"><span aria-hidden="true">✦</span><p><strong>Choose your exact destination</strong><small>Search for a place, or pick a pin on the map. Your destination stays fixed while your live position updates.</small></p></div>
       </section>
 
       <section class="journey-map-section">
         <div class="map-heading"><div><p class="eyebrow">ROAD ROUTE</p><h2>Follow your journey</h2></div><span id="routeSource" class="map-caption">Waiting for route</span></div>
         <div class="journey-map-frame"><div id="journeyMap" aria-label="Live journey road map"></div><div class="journey-map-overlay"><span class="journey-map-pulse"></span><span><strong>MY JOURNEY</strong><small id="mapSubtitle">Your city, your route</small></span></div><button id="recenterMap" type="button" class="recenter-button">◎ Recenter</button></div>
         <div class="route-legend"><span><i class="legend-dot legend-you"></i> Your live position</span><span><i class="legend-line"></i> Road route</span><span><i class="legend-dot legend-destination"></i> Destination</span></div>
-        <div class="panel mobility-explainer"><strong>How ETA works</strong><p>ETA comes from road-network routing, not straight-line distance. Reva refreshes the estimate as your location changes. Traffic-aware timing is only available if a future routing provider supports it on a free plan.</p></div>
+        <div class="panel mobility-explainer"><strong>How ETA works</strong><p>ETA is based on the road route, not straight-line distance. Reva refreshes the estimate as your location changes.</p></div>
       </section>
 
       <section class="panel journey-form-panel travel-options-panel">
