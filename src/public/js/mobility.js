@@ -38,7 +38,7 @@
   let vehicleIcon = vehicleIconForMode("driving-car");
   const destinationIcon = L.divIcon({ className: "", html: '<div class="destination-marker"><span>●</span></div>', iconSize: [34,34], iconAnchor: [17,34] });
   let vehicleMarker = null, destinationMarker = null, routeLine = null, socket = null;
-  let selectedDestination = null, activeTrip = null, latestPosition = null, watchId = null;
+  let selectedDestination = null, activeTrip = null, latestPosition = null, watchId = null, vehiclePreviewEnabled = false;
   let mapPickMode = false, pendingMapDestination = null, mapPickMarker = null;
   let friendList = [], currentRouteCoordinates = [], pollHandle = null, lastGpsSentAt = 0, lastGpsSent = null, lastRenderedRouteAt = null;
   const sharedTripId = window.REVA_SHARED_TRIP_ID || null;
@@ -149,9 +149,11 @@
     }
 
     map.stop();
-    map.setView(origin, 16, { animate: false });
     map.invalidateSize();
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Begin with a clear close-up of the traveller's actual starting position.
+    map.setView(origin, 17, { animate: !reducedMotion, duration: reducedMotion ? 0 : 0.85 });
+    await new Promise(resolve => window.setTimeout(resolve, reducedMotion ? 0 : 950));
     const duration = reducedMotion ? 0 : 3600;
     await new Promise(resolve => {
       if (!duration) {
@@ -193,9 +195,9 @@
   }
 
   function setVehiclePosition(latitude, longitude, animate = true) {
-    // Do not render a vehicle/location pin while the user is only planning a journey.
-    // The vehicle marker appears only for an active trip or a friend's shared trip.
-    if (!activeTrip && !sharedTripId) return;
+    // During planning, show the current position only after the user explicitly selects a vehicle.
+    // A vehicle selection must never create or restore a destination marker.
+    if (!activeTrip && !sharedTripId && !vehiclePreviewEnabled) return;
     const mode = activeTrip?.transportMode || $("transportMode")?.value || "driving-car";
     vehicleIcon = vehicleIconForMode(mode);
     const target = L.latLng(Number(latitude), Number(longitude));
@@ -368,6 +370,7 @@
       } else if (!sharedTripId) {
         // No active trip means the previous ride is over. Reset the page for a new journey.
         activeTrip = null;
+        vehiclePreviewEnabled = false;
         if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
         if (vehicleMarker) { map.removeLayer(vehicleMarker); vehicleMarker = null; }
         if (destinationMarker) { map.removeLayer(destinationMarker); destinationMarker = null; }
@@ -473,8 +476,17 @@
       card.classList.toggle("is-selected", selected);
       card.setAttribute("aria-pressed", String(selected));
     });
-    // Selecting a vehicle changes the selected mode only; it must not place a GPS pin.
-    if (vehicleMarker && activeTrip) vehicleMarker.setIcon(vehicleIconForMode(mode));
+    // Selecting a vehicle previews the chosen vehicle at the user's current GPS position.
+    // Keep destination pins out of this action; they belong to explicit destination selection.
+    if (vehicleMarker && activeTrip) {
+      vehicleMarker.setIcon(vehicleIconForMode(mode));
+    } else if (!sharedTripId) {
+      vehiclePreviewEnabled = true;
+      if (latestPosition) {
+        setVehiclePosition(latestPosition.latitude, latestPosition.longitude, false);
+        map.setView([latestPosition.latitude, latestPosition.longitude], 16, { animate: true, duration: 0.7 });
+      }
+    }
   }
   document.querySelectorAll(".transport-mode-card").forEach(card => {
     card.addEventListener("click", () => {
