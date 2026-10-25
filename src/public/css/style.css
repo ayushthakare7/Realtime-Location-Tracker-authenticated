@@ -1039,3 +1039,99 @@ body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.3
 .shared-journey-dismiss{display:inline-flex;align-items:center;justify-content:center;margin-top:2px;padding:8px 12px;border:1px solid #d2e0d2;border-radius:10px;background:#fff;color:#315e43;font:700 11px Manrope,sans-serif;cursor:pointer}
 .shared-journey-dismiss:hover{background:#e8f2e7}
 .shared-journey-dismiss:disabled{opacity:.6;cursor:wait}
+
+
+/* Friends' Journey cards: keep every label, status and action inside its own card. */
+.dashboard-grid > aside > .shared-journeys-panel {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+.shared-journeys-panel #sharedJourneys {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.shared-journeys-panel #sharedJourneys > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.shared-journeys-panel .shared-journey-item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 13px;
+  border: 1px solid #e7e9e1;
+  border-radius: 13px;
+  background: #fffefa;
+  overflow: hidden;
+}
+.shared-journeys-panel .shared-journey-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+.shared-journeys-panel .shared-journey-top strong {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+  line-height: 1.45;
+}
+.shared-journeys-panel .shared-journey-status {
+  justify-self: end;
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+.shared-journeys-panel .shared-journey-item p {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+.shared-journeys-panel .shared-journey-open,
+.shared-journeys-panel .shared-journey-dismiss {
+  align-self: flex-start;
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  white-space: normal;
+  text-align: center;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+.shared-journeys-panel .shared-journey-dismiss {
+  margin-top: 0;
+}
+.shared-journeys-panel .shared-journeys-empty {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 520px) {
+  .shared-journeys-panel .shared-journey-item { padding: 12px; }
+  .shared-journeys-panel .shared-journey-top { grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+  .shared-journeys-panel .shared-journey-status { font-size: 9px; padding: 3px 6px; }
+}
