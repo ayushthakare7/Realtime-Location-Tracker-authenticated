@@ -84,7 +84,15 @@
     destinationMarker = L.marker([trip.destination.latitude, trip.destination.longitude], { icon: destinationIcon, keyboard: false }).addTo(map).bindTooltip(trip.destination.label || "Destination");
     if (trip.lastLocation && Number.isFinite(Number(trip.lastLocation.latitude))) setVehiclePosition(trip.lastLocation.latitude, trip.lastLocation.longitude, false);
     const bounds = routeLine.getBounds().extend(destinationMarker.getLatLng());
-    map.fitBounds(bounds, { paddingTopLeft: [36, 36], paddingBottomRight: [36, 36], maxZoom: 15, animate: true });
+    const fitZoom = map.getBoundsZoom(bounds, false, L.point(36, 36));
+    if (fitZoom < 12) {
+      const focus = trip.lastLocation && Number.isFinite(Number(trip.lastLocation.latitude))
+        ? [trip.lastLocation.latitude, trip.lastLocation.longitude]
+        : [trip.origin.latitude, trip.origin.longitude];
+      map.setView(focus, 13, { animate: true });
+    } else {
+      map.fitBounds(bounds, { paddingTopLeft: [36, 36], paddingBottomRight: [36, 36], maxZoom: 15, animate: true });
+    }
     $("mapSubtitle").textContent = trip.destination?.label || "Your route";
   }
 
