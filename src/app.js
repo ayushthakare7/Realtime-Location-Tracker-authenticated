@@ -26,7 +26,7 @@ app.get("/register", (req, res) => res.render("register"));
 app.get("/tracker", (req, res) => res.render("index"));
 app.get("/mobility", (req, res) => res.render("mobility", { sharedTripId: null }));
 app.get("/mobility/shared/:tripId", (req, res) => {
-  if (!/^[a-f\\d]{24}$/i.test(req.params.tripId)) return res.status(400).send("Invalid journey ID.");
+  if (!/^[a-f\d]{24}$/i.test(req.params.tripId)) return res.status(400).send("Invalid journey ID.");
   res.render("mobility", { sharedTripId: req.params.tripId });
 });
 
