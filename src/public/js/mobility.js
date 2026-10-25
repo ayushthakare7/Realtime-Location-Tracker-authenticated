@@ -4,6 +4,47 @@
 
   const $ = id => document.getElementById(id);
   const message = text => { $("mobilityMessage").textContent = text || ""; };
+
+  // Landscape is opt-in: browsers only permit orientation locking in supported
+  // mobile contexts, commonly after entering fullscreen or when installed as a PWA.
+  const landscapeToggle = $("landscapeModeToggle");
+  if (landscapeToggle) {
+    const updateLandscapeButton = () => {
+      const locked = screen.orientation && screen.orientation.type && screen.orientation.type.startsWith("landscape");
+      landscapeToggle.textContent = locked ? "↻ Return to portrait" : "↻ Landscape mode";
+      landscapeToggle.setAttribute("aria-pressed", locked ? "true" : "false");
+    };
+    landscapeToggle.addEventListener("click", async () => {
+      const orientation = screen.orientation;
+      const currentlyLandscape = orientation?.type?.startsWith("landscape") ||
+        (window.matchMedia && window.matchMedia("(orientation: landscape)").matches);
+      try {
+        if (currentlyLandscape && orientation?.unlock) {
+          orientation.unlock();
+          if (document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen().catch(() => {});
+          message("Landscape lock released. Rotate your phone to return to portrait.");
+          updateLandscapeButton();
+          return;
+        }
+        if (!orientation?.lock) throw new Error("orientation-lock-unavailable");
+        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+          await document.documentElement.requestFullscreen();
+        }
+        await orientation.lock("landscape");
+        message("Landscape mode enabled. Turn your phone sideways for the best journey view.");
+        updateLandscapeButton();
+      } catch (_) {
+        if (document.fullscreenElement && document.exitFullscreen) {
+          try { await document.exitFullscreen(); } catch (_) {}
+        }
+        message("Your browser does not allow automatic rotation here. Turn on Auto-rotate in your phone's quick settings, then rotate your phone sideways. For best support, open Reva from an installed home-screen app.");
+        updateLandscapeButton();
+      }
+    });
+    if (screen.orientation?.addEventListener) screen.orientation.addEventListener("change", updateLandscapeButton);
+    window.addEventListener("resize", updateLandscapeButton);
+    updateLandscapeButton();
+  }
   const api = async (path, options = {}) => {
     const response = await fetch("/api/mobility" + path, {
       ...options,
