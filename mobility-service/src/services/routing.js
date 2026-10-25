@@ -1,6 +1,25 @@
 const PROFILES = new Set(["driving-car", "cycling-regular", "foot-walking"]);
 const routeCache = new Map();
 const geocodeCache = new Map();
+const RoutingUsage = require("../models/RoutingUsage");
+
+async function reserveRequest(kind) {
+  const dayKey = new Date().toISOString().slice(0, 10);
+  const limit = kind === "directions"
+    ? Math.max(1, Number(process.env.MOBILITY_MAX_DIRECTIONS_PER_DAY) || 1500)
+    : Math.max(1, Number(process.env.MOBILITY_MAX_GEOCODE_PER_DAY) || 500);
+  const current = await RoutingUsage.findOne({ dayKey, kind }).lean();
+  if (current && current.requests >= limit) {
+    const error = new Error("Reva reached its configured daily free-tier " + kind + " budget. Try again tomorrow or lower usage by reusing a recent route.");
+    error.status = 429;
+    throw error;
+  }
+  await RoutingUsage.findOneAndUpdate(
+    { dayKey, kind },
+    { $inc: { requests: 1 }, $setOnInsert: { dayKey, kind } },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+}
 function cacheRead(cache, key) {
   const item = cache.get(key);
   if (!item) return null;
@@ -27,7 +46,8 @@ async function routeBetween(origin, destination, profile) {
   const cacheKey = [profile, origin.latitude.toFixed(5), origin.longitude.toFixed(5), destination.latitude.toFixed(5), destination.longitude.toFixed(5)].join(":");
   const cached = cacheRead(routeCache, cacheKey);
   if (cached) return cached;
-  const response = await fetch("https://api.openrouteservice.org/v2/directions/" + profile + "/geojson", {
+  await reserveRequest("directions");
+  const response = await fetch("https://api.openrouteservice.org/v2/directions/" + profile + "/geojson",
     method: "POST",
     headers: {
       Authorization: process.env.ORS_API_KEY,
@@ -89,6 +109,7 @@ async function geocode(query) {
   const cacheKey = query.toLowerCase().replace(/\s+/g, " ");
   const cached = cacheRead(geocodeCache, cacheKey);
   if (cached) return cached;
+  await reserveRequest("geocode");
   const url = new URL("https://api.openrouteservice.org/geocode/search");
   url.searchParams.set("text", query);
   url.searchParams.set("size", "5");
