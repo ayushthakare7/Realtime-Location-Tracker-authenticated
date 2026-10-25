@@ -67,7 +67,7 @@ jobs:
               cleartext: false,
               allowNavigation: [new URL(url).hostname]
             }
-          }, null, 2) + "\\n");
+          }, null, 2) + "\n");
           NODE
 
       - name: Generate Android project
