@@ -26,6 +26,7 @@
   const destinationIcon = L.divIcon({ className: "", html: '<div class="destination-marker"><span>●</span></div>', iconSize: [34,34], iconAnchor: [17,34] });
   let vehicleMarker = null, destinationMarker = null, routeLine = null, socket = null;
   let selectedDestination = null, activeTrip = null, latestPosition = null, watchId = null;
+  let mapPickMode = false, pendingMapDestination = null, mapPickMarker = null;
   let friendList = [], currentRouteCoordinates = [], pollHandle = null, lastGpsSentAt = 0, lastGpsSent = null, lastRenderedRouteAt = null;
   const sharedTripId = window.REVA_SHARED_TRIP_ID || null;
 
@@ -45,6 +46,7 @@
   };
 
   function updateStatus(trip) {
+    if (trip && ["ACTIVE", "DELAYED"].includes(trip.status)) setMapPickMode(false);
     if (!trip) {
       $("journeyHeading").textContent = "Ready when you are";
       $("journeyStatus").textContent = "Choose a destination to get started.";
@@ -126,6 +128,55 @@
     requestAnimationFrame(frame);
   }
 
+  function setMapPickMode(enabled) {
+    mapPickMode = Boolean(enabled) && !activeTrip;
+    $("mapPickActions").hidden = !mapPickMode;
+    $("pickDestinationOnMap").textContent = mapPickMode ? "⌖ Map selection active" : "⌖ Pick on Map";
+    $("pickDestinationOnMap").disabled = Boolean(activeTrip);
+    $("destinationQuery").disabled = mapPickMode;
+    $("searchDestination").disabled = mapPickMode;
+    $("destinationResults").replaceChildren();
+    map.getContainer().classList.toggle("map-pick-active", mapPickMode);
+    if (!mapPickMode) {
+      pendingMapDestination = null;
+      $("confirmMapDestination").disabled = true;
+      if (mapPickMarker) { map.removeLayer(mapPickMarker); mapPickMarker = null; }
+    } else {
+      $("selectedDestination").textContent = "Tap a point on the map. Zoom and pan to find the exact place.";
+      message("Map selection mode is on. Tap the map to place a destination pin.");
+    }
+  }
+
+  map.on("click", event => {
+    if (!mapPickMode || activeTrip) return;
+    const latitude = Number(event.latlng.lat.toFixed(6));
+    const longitude = Number(event.latlng.lng.toFixed(6));
+    pendingMapDestination = {
+      label: "Pinned destination (" + latitude.toFixed(5) + ", " + longitude.toFixed(5) + ")",
+      latitude,
+      longitude
+    };
+    if (mapPickMarker) map.removeLayer(mapPickMarker);
+    mapPickMarker = L.marker([latitude, longitude], { icon: destinationIcon, keyboard: false }).addTo(map)
+      .bindTooltip("Selected map point").openTooltip();
+    $("confirmMapDestination").disabled = false;
+    $("selectedDestination").textContent = "Map point ready: " + latitude.toFixed(5) + ", " + longitude.toFixed(5) + ". Choose “Use This Destination” to confirm.";
+    message("Destination pin placed. Confirm it or tap another point to move the pin.");
+  });
+
+  function confirmMapDestination() {
+    if (!pendingMapDestination) return;
+    selectedDestination = { ...pendingMapDestination };
+    $("destinationQuery").value = selectedDestination.label;
+    $("selectedDestination").textContent = "Destination selected: " + selectedDestination.label;
+    if (destinationMarker) map.removeLayer(destinationMarker);
+    destinationMarker = L.marker([selectedDestination.latitude, selectedDestination.longitude], { icon: destinationIcon, keyboard: false })
+      .addTo(map).bindTooltip(selectedDestination.label);
+    setMapPickMode(false);
+    $("selectedDestination").textContent = "Destination selected: " + selectedDestination.label;
+    message("Map destination confirmed. Start journey when you're ready.");
+  }
+
   function renderDestinationResults(results) {
     const root = $("destinationResults"); root.replaceChildren();
     results.forEach((item, index) => {
@@ -190,7 +241,8 @@
 
   async function startJourney(event) {
     event.preventDefault();
-    if (!selectedDestination) { message("Search for a destination and choose one of the results first."); return; }
+    if (mapPickMode) { message("Confirm or cancel your map selection before starting the journey."); return; }
+    if (!selectedDestination) { message("Search for a destination and choose a result, or use Pick on Map to select a point."); return; }
     if (!latestPosition) { message("Waiting for a GPS fix. Make sure location permission is allowed and location sharing is enabled on the main Reva page."); return; }
     let recipients;
     try { recipients = recipientSelection(); } catch (error) { message(error.message); return; }
@@ -201,7 +253,7 @@
         transportMode: $("transportMode").value,
         ...recipients
       }) });
-      activeTrip = data.trip; updateStatus(activeTrip); showRoute(activeTrip); message("Journey started. Reva is using the road route and your live location.");
+      activeTrip = data.trip; setMapPickMode(false); updateStatus(activeTrip); showRoute(activeTrip); message("Journey started. Reva is using the road route and your live location.");
       await refreshTrip();
     } catch (error) { message(error.message); $("startJourney").disabled = false; }
   }
@@ -301,6 +353,15 @@
     if (latestPosition && !activeTrip) setVehiclePosition(latestPosition.latitude, latestPosition.longitude, false);
   });
   $("searchDestination").addEventListener("click", searchDestination);
+  $("pickDestinationOnMap").addEventListener("click", () => setMapPickMode(!mapPickMode));
+  $("confirmMapDestination").addEventListener("click", confirmMapDestination);
+  $("cancelMapPick").addEventListener("click", () => {
+    setMapPickMode(false);
+    $("selectedDestination").textContent = selectedDestination
+      ? "Destination selected: " + selectedDestination.label
+      : "Search for a place or pick a point directly on the map.";
+    message("Map selection cancelled.");
+  });
   $("destinationQuery").addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); searchDestination(); } });
   $("recipientMode").addEventListener("change", () => { $("friendChoices").hidden = $("recipientMode").value === "ALL_FRIENDS"; });
   $("journeyForm").addEventListener("submit", startJourney);
