@@ -122,6 +122,32 @@ router.get("/trips/active", async (req, res) => {
 });
 
 
+router.get("/trips/shared", async (req, res) => {
+  try {
+    const friendIds = await acceptedFriendIds(req.user.userId);
+    if (!friendIds.length) return res.json({ success: true, trips: [] });
+    const [trips, sharingUsers] = await Promise.all([
+      MobilityTrip.find({
+        userId: { $in: friendIds },
+        recipients: req.user.userId,
+        status: { $in: ["ACTIVE", "DELAYED"] }
+      }).sort({ updatedAt: -1 }).limit(30).lean(),
+      User.find({ _id: { $in: friendIds }, sharingEnabled: true }).select("_id").lean()
+    ]);
+    const currentlySharing = new Set(sharingUsers.map(user => String(user._id)));
+    const visible = trips.filter(trip => currentlySharing.has(String(trip.userId))).map(trip => ({
+      id: String(trip._id),
+      travellerUsername: trip.username || "Your friend",
+      status: trip.status,
+      transportMode: trip.transportMode,
+      destination: { label: trip.destination?.label || "Destination" },
+      expectedArrivalAt: trip.expectedArrivalAt,
+      updatedAt: trip.updatedAt
+    }));
+    res.json({ success: true, trips: visible });
+  } catch (error) { fail(res, error); }
+});
+
 router.get("/trips/shared/:id", async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ success: false, message: "Invalid journey ID." });
   try {
