@@ -23,8 +23,11 @@ def _distance_m(a_lat, a_lon, b_lat, b_lon):
     return 6371000 * 2 * atan2(sqrt(a), sqrt(max(0.0, 1 - a)))
 
 
-def _requested_clock(question, now):
-    match = re.search(r"\b(?:at|around|about)\s+(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\b", question, re.I)
+def _requested_clock(question, now, extracted_intent=None):
+    extracted_intent = extracted_intent or {}
+    time_text = extracted_intent.get("time_text") if isinstance(extracted_intent, dict) else None
+    source = str(time_text or question)
+    match = re.search(r"(?:\b(?:at|around|about)\s+)?(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\b", source, re.I)
     if not match:
         return None
     hour, minute = int(match.group(1)), int(match.group(2) or 0)
@@ -48,8 +51,10 @@ def _as_utc(value):
     return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
 
 
-def answer_time_question(question, authorized_user_ids, context, database):
-    """Return an exact, evidence-based answer, or None when this isn't a supported time query."""
+def answer_time_question(question, authorized_user_ids, context, database, extracted_intent=None):
+    """Answer open-ended temporal location questions from authorized timestamped evidence."""
+    extracted_intent = extracted_intent or {}
+    intent = extracted_intent.get("intent", "other")
     ids = [str(value) for value in authorized_user_ids if re.fullmatch(r"[a-fA-F0-9]{24}", str(value))]
     current_id = str(context.get("currentUserId") or "")
     if not re.fullmatch(r"[a-fA-F0-9]{24}", current_id):
@@ -60,10 +65,15 @@ def answer_time_question(question, authorized_user_ids, context, database):
         return None
 
     # "When were we closest today/yesterday?" compares contemporaneous GPS samples.
-    if (re.search(r"\b(?:closer|closest|nearest)\b", question, re.I)
-            and re.search(r"\b(?:when|what time|which time)\b", question, re.I)
-            and re.search(r"\b(?:today|yesterday)\b", question, re.I)):
-        day = datetime.now(LOCAL_TZ).date() - (timedelta(days=1) if re.search(r"\byesterday\b", question, re.I) else timedelta())
+    if (intent == "closest_people"
+            or (re.search(r"\b(?:closer|closest|nearest)\b", question, re.I)
+                and re.search(r"\b(?:today|yesterday)\b", question, re.I))):
+        date_text = str(extracted_intent.get("date_text") or question).lower()
+        day = datetime.now(LOCAL_TZ).date()
+        if "day before yesterday" in date_text:
+            day -= timedelta(days=2)
+        elif "yesterday" in date_text or "last night" in date_text:
+            day -= timedelta(days=1)
         start, end = _bounds(day)
         points = database["locationpoints"]
         mine = list(points.find({"userId": _oid(current_id), "recordedAt": {"$gte": start, "$lt": end}},
@@ -105,11 +115,13 @@ def answer_time_question(question, authorized_user_ids, context, database):
         return f"You were closest to {name} at about {local_time} on {day:%d %b %Y}. The nearest contemporaneous GPS samples were {best['distance'] / 1000:.2f} km apart in a straight line; the samples were no more than 5 minutes apart."
 
     # "Where was I at 1 AM?" and similar explicit clock-time questions.
-    if not re.search(r"\b(?:where|what place|which place)\b", question, re.I):
+    location_intent = intent == "location_at_time"
+    has_explicit_time = bool(extracted_intent.get("time_text")) or bool(
+        re.search(r"(?:at|around|about)s+d{1,2}(?::d{2})?s*(?:a.?m.?|p.?m.?)", question, re.I)
+    )
+    if not location_intent and not (re.search(r"(?:where|what place|which place)", question, re.I) and has_explicit_time):
         return None
-    if not re.search(r"\b(?:at|around|about)\s+\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)\b", question, re.I):
-        return None
-    clock = _requested_clock(question, datetime.now(LOCAL_TZ))
+    clock = _requested_clock(question, datetime.now(LOCAL_TZ), extracted_intent)
     if clock is None:
         return None
     subject_id = current_id
