@@ -32,3 +32,16 @@
 .destination-marker{display:grid;place-items:center;width:34px;height:34px;border:3px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#a27bb8;box-shadow:0 4px 12px #4a355b44;color:white;font-size:14px}.destination-marker span{transform:rotate(45deg)}
 @media(max-width:900px){.mobility-layout{grid-template-columns:minmax(260px,.8fr) minmax(0,1.2fr);gap:14px}.mobility-privacy{white-space:normal}.journey-map-frame{min-height:380px;height:62vh}}
 @media(max-width:720px){.mobility-shell{padding:22px 14px 35px}.mobility-intro{align-items:flex-start;flex-direction:column;gap:10px}.mobility-intro h1{font-size:38px}.mobility-privacy{width:100%}.mobility-layout{grid-template-columns:1fr}.journey-map-section{grid-row:1}.journey-map-frame{height:52vh;min-height:320px;border-radius:18px}.mobility-controls{grid-row:2}.journey-form-panel,.journey-status-panel{padding:17px}.journey-map-overlay{top:9px;left:9px;padding:8px 10px}}
+
+/* Direct destination picking on the map */
+.map-pick-button{width:100%;padding:10px 12px;border:1px solid #d7e0d5;border-radius:11px;background:#edf3ec;color:#315748;font-size:12px;font-weight:800;text-align:center}
+.map-pick-button:disabled{opacity:.5;cursor:not-allowed}
+.map-pick-actions{padding:11px;border:1px solid #d7e0d5;border-radius:12px;background:#f6f8f3}
+.map-pick-actions p{margin:0 0 9px;color:#52635a;font-size:11px;line-height:1.55}
+.map-pick-actions>div{display:flex;gap:8px;flex-wrap:wrap}
+.map-pick-actions button{padding:9px 11px;border:0;border-radius:9px;background:var(--sage-dark);color:white;font-size:11px;font-weight:800}
+.map-pick-actions button:disabled{opacity:.45;cursor:not-allowed}
+.map-pick-actions button.secondary{border:1px solid var(--line);background:white;color:var(--ink)}
+#journeyMap.map-pick-active{cursor:crosshair}
+#journeyMap.map-pick-active .leaflet-interactive{cursor:crosshair}
+@media(max-width:720px){.map-pick-actions>div button{flex:1}}
