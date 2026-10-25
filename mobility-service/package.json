@@ -1,0 +1,19 @@
+{
+  "name": "reva-mobility-context-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Standalone Reva journey routing, ETA and arrival-monitoring microservice",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.7.2"
+  }
+}
