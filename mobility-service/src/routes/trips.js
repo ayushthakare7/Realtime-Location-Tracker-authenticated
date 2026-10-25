@@ -66,7 +66,7 @@ router.post("/trips", async (req, res) => {
     const destination = req.body.destination;
     const profile = String(req.body.transportMode || "driving-car");
     if (!validCoordinate(destination)) return res.status(400).json({ success: false, message: "Choose a valid destination from search results." });
-    if (!["driving-car", "cycling-regular", "foot-walking"].includes(profile)) return res.status(400).json({ success: false, message: "Unsupported transport mode." });
+    if (!["driving-car", "cycling-regular", "foot-walking", "bus", "train"].includes(profile)) return res.status(400).json({ success: false, message: "Unsupported transport mode." });
 
     const active = await MobilityTrip.findOne({ userId, status: { $in: ["ACTIVE", "DELAYED"] } });
     if (active) return res.status(409).json({ success: false, message: "You already have an active journey.", trip: cleanTrip(active) });
