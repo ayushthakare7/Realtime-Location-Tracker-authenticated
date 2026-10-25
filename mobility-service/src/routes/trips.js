@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const auth = require("../middleware/auth");
 const { MobilityTrip, User, Location, Friendship } = require("../models");
 const { routeBetween, geocode } = require("../services/routing");
+const { emitMobilityEvent } = require("../services/notifications");
 
 const router = express.Router();
 router.use(auth);
@@ -88,6 +89,7 @@ router.post("/trips", async (req, res) => {
       recipientMode, recipients, lastLocation: { latitude: origin.latitude, longitude: origin.longitude, lastSeen: location.lastSeen },
       gracePeriodMinutes: Math.min(60, Math.max(0, Number(req.body.gracePeriodMinutes) || Number(process.env.MOBILITY_ETA_GRACE_MINUTES) || 8))
     });
+    await emitMobilityEvent(trip, "journey_started");
     res.status(201).json({ success: true, trip: cleanTrip(trip) });
   } catch (error) { fail(res, error); }
 });
