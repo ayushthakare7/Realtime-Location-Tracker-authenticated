@@ -121,13 +121,8 @@ async function animateCrewReveal() {
   const wait = ms => new Promise(resolve => setTimeout(resolve, reducedMotion ? 0 : ms));
   const duration = seconds => reducedMotion ? 0 : seconds;
   try {
-    if (!radarFocusedOnMe) {
-      hint.textContent = "Finding your signal…";
-      flyToAtSteadyPace(ownMarker.getLatLng(), 15);
-      radarFocusedOnMe = true;
-      await waitForMapTiles();
-    }
-
+    // Reveal friends first, then finish by focusing on the user's own location.
+    // This avoids the old own → friends → own camera sequence.
     const crew = [...markers.entries()].filter(([id, marker]) =>
       id !== "me" && marker && marker.getLatLng()
     );
@@ -147,10 +142,10 @@ async function animateCrewReveal() {
       }
     }
 
-    // Always finish at the user's own location and city-level zoom.
-    // Never fit all friends into the viewport: that can zoom the map too far out.
+    // Finish on the user's own position at a useful close city/neighbourhood zoom.
+    // Never fit all friends into the viewport or zoom out to the whole country.
     hint.textContent = "Returning to your location…";
-    flyToAtSteadyPace(ownMarker.getLatLng(), 13);
+    flyToAtSteadyPace(ownMarker.getLatLng(), 15);
     await waitForMapTiles();
 
     hint.textContent = crew.length
