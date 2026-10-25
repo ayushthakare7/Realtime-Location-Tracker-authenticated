@@ -36,6 +36,7 @@ const mobilityTripSchema = new mongoose.Schema({
   lastArrivalSampleAt: { type: Date, default: null },
   recipientMode: { type: String, enum: ["ALL_FRIENDS", "SELECTED_FRIENDS", "ONE_FRIEND"], default: "ALL_FRIENDS" },
   recipients: [{ type: mongoose.Schema.Types.ObjectId }],
+  dismissedBy: [{ type: mongoose.Schema.Types.ObjectId }],
   gracePeriodMinutes: { type: Number, min: 0, max: 60, default: 8 },
   delayNotifiedAt: { type: Date, default: null },
   arrivedAt: { type: Date, default: null },
