@@ -200,6 +200,10 @@ exports.askMap = async (req, res) => {
     const context = {
       currentUserId: String(uid),
       currentUsername: req.user.username || "you",
+      authorizedPeople: users.filter(user => user.historyEnabled !== false).map(user => ({
+        id: String(user._id),
+        username: user.username
+      })),
       currentLocations: [
         ...(mine ? [{ username: "you", placeName: visitByUser.get(String(uid))?.placeName || null, lastSeen: mine.lastSeen }] : []),
         ...others.map(p => ({
