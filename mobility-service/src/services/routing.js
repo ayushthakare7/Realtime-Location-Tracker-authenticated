@@ -50,7 +50,9 @@ async function routeBetween(origin, destination, profile) {
   const cached = cacheRead(routeCache, cacheKey);
   if (cached) return cached;
   await reserveRequest("directions");
-  const response = await fetch("https://api.openrouteservice.org/v2/directions/" + routingProfile + "/geojson", {
+  let response;
+  try {
+    response = await fetch("https://api.openrouteservice.org/v2/directions/" + routingProfile + "/geojson", {
     method: "POST",
     headers: {
       Authorization: process.env.ORS_API_KEY,
@@ -65,8 +67,19 @@ async function routeBetween(origin, destination, profile) {
       instructions: false,
       elevation: false
     }),
-    signal: AbortSignal.timeout(12000)
-  });
+      signal: AbortSignal.timeout(12000)
+    });
+  } catch (cause) {
+    console.error("[MobilityRouting] ORS directions network failure", {
+      requestedMode,
+      routingProfile,
+      errorName: cause?.name || "Error",
+      errorMessage: String(cause?.message || cause || "unknown").slice(0, 240)
+    });
+    const error = new Error("Could not contact the road-routing provider. Please retry in a moment.");
+    error.status = 502;
+    throw error;
+  }
 
   if (response.status === 429) {
     const error = new Error("The free road-routing quota is temporarily exhausted. Please try again later.");
