@@ -390,7 +390,6 @@
         $("startJourney").textContent = "Start journey ↗";
         $("routeSource").textContent = "Route will appear after you start.";
         $("mapSubtitle").textContent = "Your city, your route";
-        $("journeyMessage").textContent = "";
       }
     } catch (error) {
       $("mobilityConnection").textContent = "Service unavailable";
