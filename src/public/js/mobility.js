@@ -37,7 +37,7 @@
   const vehicleIconForMode = mode => L.divIcon({ className: "vehicle-icon-shell", html: '<div class="vehicle-marker vehicle-marker-' + (mode || "driving-car") + '">' + (modeArt[mode] || modeArt["driving-car"]) + '</div>', iconSize: [74,64], iconAnchor: [37,32] });
   let vehicleIcon = vehicleIconForMode("driving-car");
   const destinationIcon = L.divIcon({ className: "", html: '<div class="destination-marker"><span>●</span></div>', iconSize: [34,34], iconAnchor: [17,34] });
-  let vehicleMarker = null, destinationMarker = null, routeLine = null, socket = null;
+  let vehicleMarker = null, animationMarker = null, destinationMarker = null, routeLine = null, socket = null;
   let selectedDestination = null, activeTrip = null, latestPosition = null, watchId = null, vehiclePreviewEnabled = false;
   let mapPickMode = false, pendingMapDestination = null, mapPickMarker = null;
   let friendList = [], currentRouteCoordinates = [], pollHandle = null, lastGpsSentAt = 0, lastGpsSent = null, lastRenderedRouteAt = null;
@@ -163,6 +163,15 @@
       vehicleMarker.setIcon(vehicleIconForMode(trip.transportMode));
       vehicleMarker.setLatLng(origin);
     }
+    // Keep the real GPS marker independent from the cinematic route preview.
+    if (animationMarker) map.removeLayer(animationMarker);
+    animationMarker = L.marker(origin, {
+      icon: vehicleIconForMode(trip.transportMode),
+      keyboard: false,
+      zIndexOffset: 2000,
+      interactive: false
+    }).addTo(map);
+    vehicleMarker.setOpacity(0);
 
     map.stop();
     map.invalidateSize();
@@ -184,7 +193,7 @@
     await new Promise(resolve => {
       if (!duration) {
         routeLine.setLatLngs(coordinates);
-        vehicleMarker?.setLatLng(destination);
+        animationMarker?.setLatLng(destination);
         resolve();
         return;
       }
@@ -207,7 +216,7 @@
         else traced.push(coordinates[coordinates.length - 1]);
 
         routeLine?.setLatLngs(traced);
-        vehicleMarker?.setLatLng(current);
+        animationMarker?.setLatLng(current);
 
         // Throttle camera updates so Leaflet can animate each pan smoothly without jitter.
         if (progress < 1 && now - lastCameraAt >= 180) {
@@ -237,7 +246,12 @@
       : trip.lastLocation && Number.isFinite(Number(trip.lastLocation.latitude))
         ? [Number(trip.lastLocation.latitude), Number(trip.lastLocation.longitude)]
         : origin;
+    if (animationMarker) {
+      map.removeLayer(animationMarker);
+      animationMarker = null;
+    }
     vehicleMarker?.setLatLng(livePosition);
+    vehicleMarker?.setOpacity(1);
     statusPanel?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
     message("Journey started. The route preview is complete and your live journey is in progress; arrival is confirmed automatically when fresh GPS readings show you're near the destination.");
   }
