@@ -46,6 +46,30 @@ jobs:
           npm run mobile:build
           npm run mobile:push-build
 
+      - name: Create Capacitor configuration for the remote Reva app
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p www
+          printf '<!doctype html><html><head><meta charset="utf-8"><title>Reva</title></head><body></body></html>\n' > www/index.html
+          node - <<'NODE'
+          const fs = require("fs");
+          const url = process.env.REVA_WEB_URL;
+          if (!url || !url.startsWith("https://")) {
+            throw new Error("REVA_WEB_URL must be a valid HTTPS URL.");
+          }
+          fs.writeFileSync("capacitor.config.json", JSON.stringify({
+            appId: "com.reva.locationtracker",
+            appName: "Reva",
+            webDir: "www",
+            server: {
+              url,
+              cleartext: false,
+              allowNavigation: [new URL(url).hostname]
+            }
+          }, null, 2) + "\\n");
+          NODE
+
       - name: Generate Android project
         run: npx cap add android
 
