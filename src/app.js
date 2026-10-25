@@ -24,14 +24,9 @@ app.use("/api/internal", mobilityEventsRoutes);
 app.use("/api/mobility-notifications", mobilityNotificationRoutes);
 app.use("/api/push", pushRoutes);
 
-app.get("/", (req, res) => res.redirect("/login"));
-app.get("/login", (req, res) => res.render("login"));
-app.get("/register", (req, res) => res.render("register"));
-app.get("/tracker", (req, res) => res.render("index"));
-app.get("/mobility", (req, res) => res.render("mobility", { sharedTripId: null }));
-app.get("/mobility/shared/:tripId", (req, res) => {
-  if (!/^[a-f\d]{24}$/i.test(req.params.tripId)) return res.status(400).send("Invalid journey ID.");
-  res.render("mobility", { sharedTripId: req.params.tripId });
+// Lightweight liveness endpoint for uptime checks; does not invoke user APIs.
+app.get("/health", (req, res) => {
+  res.status(200).json({ success: true, service: "reva-node" });
 });
 
-module.exports = app;
+app.get("/", (req, res) => res.redirect("/login"));
