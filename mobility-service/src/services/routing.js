@@ -1,4 +1,16 @@
 const PROFILES = new Set(["driving-car", "cycling-regular", "foot-walking"]);
+const routeCache = new Map();
+const geocodeCache = new Map();
+function cacheRead(cache, key) {
+  const item = cache.get(key);
+  if (!item) return null;
+  if (item.expiresAt <= Date.now()) { cache.delete(key); return null; }
+  return item.value;
+}
+function cacheWrite(cache, key, value, ttlMs) {
+  if (cache.size >= 400) cache.delete(cache.keys().next().value);
+  cache.set(key, { value, expiresAt: Date.now() + ttlMs });
+}
 
 async function routeBetween(origin, destination, profile) {
   if (!process.env.ORS_API_KEY) {
@@ -12,6 +24,9 @@ async function routeBetween(origin, destination, profile) {
     throw error;
   }
 
+  const cacheKey = [profile, origin.latitude.toFixed(5), origin.longitude.toFixed(5), destination.latitude.toFixed(5), destination.longitude.toFixed(5)].join(":");
+  const cached = cacheRead(routeCache, cacheKey);
+  if (cached) return cached;
   const response = await fetch("https://api.openrouteservice.org/v2/directions/" + profile + "/geojson", {
     method: "POST",
     headers: {
@@ -53,7 +68,7 @@ async function routeBetween(origin, destination, profile) {
     throw error;
   }
 
-  return {
+  const result = {
     provider: "openrouteservice",
     profile,
     distanceMeters: Math.round(summary.distance),
@@ -61,6 +76,8 @@ async function routeBetween(origin, destination, profile) {
     coordinates,
     calculatedAt: new Date()
   };
+  cacheWrite(routeCache, cacheKey, result, 2 * 60 * 1000);
+  return result;
 }
 
 async function geocode(query) {
@@ -69,6 +86,9 @@ async function geocode(query) {
     error.status = 503;
     throw error;
   }
+  const cacheKey = query.toLowerCase().replace(/\\s+/g, " ");
+  const cached = cacheRead(geocodeCache, cacheKey);
+  if (cached) return cached;
   const url = new URL("https://api.openrouteservice.org/geocode/search");
   url.searchParams.set("text", query);
   url.searchParams.set("size", "5");
@@ -87,7 +107,7 @@ async function geocode(query) {
     throw error;
   }
   const data = await response.json();
-  return (data.features || []).map(feature => {
+  const results = (data.features || []).map(feature => {
     const p = feature.properties || {};
     const c = feature.geometry && feature.geometry.coordinates || [];
     return {
@@ -96,6 +116,8 @@ async function geocode(query) {
       longitude: Number(c[0])
     };
   }).filter(item => Number.isFinite(item.latitude) && Number.isFinite(item.longitude));
+  cacheWrite(geocodeCache, cacheKey, results, 10 * 60 * 1000);
+  return results;
 }
 
 module.exports = { routeBetween, geocode };
