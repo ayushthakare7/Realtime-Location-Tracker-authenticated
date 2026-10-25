@@ -555,3 +555,33 @@
     position: static !important;
   }
 }
+
+
+/* Portrait is intentionally gated on small screens: journey UI is landscape-first. */
+.landscape-required[hidden] { display: none !important; }
+.landscape-required {
+  display: none;
+  position: fixed;
+  z-index: 99999;
+  inset: 0;
+  width: 100vw;
+  min-height: 100dvh;
+  padding: 24px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  background: #f3f0e9;
+  color: #263d3a;
+  text-align: center;
+}
+@media screen and (max-width: 720px) and (orientation: portrait) {
+  .landscape-required:not([hidden]) { display: flex; }
+}
+.landscape-required-card { width: min(100%, 420px); margin: auto; }
+.landscape-phone-icon { position: relative; display: inline-grid; place-items: center; width: 100px; height: 72px; margin: 0 auto 18px; font-size: 70px; line-height: 1; color: #718e78; transform: rotate(90deg); }
+.landscape-phone-icon span { position: absolute; right: -20px; top: -10px; font-size: 26px; transform: rotate(-90deg); }
+.landscape-required .eyebrow { font-size: 11px; letter-spacing: .16em; font-weight: 800; color: #718e78; }
+.landscape-required h1 { margin: 8px 0 12px; font-size: clamp(27px, 7vw, 36px); line-height: 1.08; letter-spacing: -.04em; }
+.landscape-required p:not(.eyebrow) { max-width: 340px; margin: 0 auto 22px; color: #63736a; font-size: 14px; line-height: 1.6; }
+.landscape-required button { width: 100%; min-height: 48px; border: 0; border-radius: 13px; padding: 12px 16px; background: #344f43; color: white; font-weight: 800; font-size: 14px; }
+.landscape-required small { display: block; max-width: 340px; margin: 14px auto 0; color: #68766e; font-size: 11px; line-height: 1.55; }
