@@ -6,6 +6,7 @@
   <title>Reva: Stay close, feel connected.</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>.mobility-entry-button{display:flex;align-items:center;gap:11px;margin-top:13px;padding:12px 13px;border:1px solid #dce6dc;border-radius:13px;background:linear-gradient(120deg,#edf3eb,#f4eef8);color:#294d40;text-decoration:none;box-shadow:0 7px 18px rgba(41,77,64,.08)}.mobility-entry-button>span:first-child{display:grid;place-items:center;width:34px;height:34px;border-radius:11px;background:#dce8dd;font-size:19px}.mobility-entry-button strong,.mobility-entry-button small{display:block}.mobility-entry-button strong{font:700 13px Manrope,sans-serif}.mobility-entry-button small{margin-top:2px;color:#78847d;font-size:10px}.mobility-entry-arrow{margin-left:auto;font-size:19px}.mobility-entry-button:hover{transform:translateY(-1px);border-color:#b8cfba}</style>
 </head>
 <body class="app-shell">
 <header class="app-header"><a class="wordmark header-choice" href="/tracker" aria-label="Shared by choice"><span class="privacy-note"><span aria-hidden="true">◈</span> Shared by choice</span></a><p class="header-tagline">Stay close, <em>feel connected.</em></p><div class="header-actions"><span id="gpsInfo" class="gps-pill"><span class="status-dot"></span> GPS idle</span><button id="logout" class="secondary logout-button">Log out</button></div></header>
@@ -17,6 +18,7 @@
       <p class="muted">Your location is off by default. Turn it on only when you want accepted friends to see your latest location.</p>
       <button id="start">Start sharing</button> <button id="stop" class="secondary">Stop sharing</button>
       <div id="status">Sharing is off until you opt in.</div>
+      <a class="mobility-entry-button" href="/mobility"><span aria-hidden="true">↗</span><span><strong>My Journey</strong><small>Road route · live progress · ETA</small></span><span class="mobility-entry-arrow">→</span></a>
     </section>
   <section class="panel friends-panel">
       <div class="section-heading"><span class="section-icon" aria-hidden="true">♡</span><div><p class="eyebrow">YOUR CIRCLE</p><h2>Friends</h2></div></div>
