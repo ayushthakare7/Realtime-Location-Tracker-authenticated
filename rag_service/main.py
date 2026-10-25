@@ -151,6 +151,47 @@ def index_event(event_id: str) -> bool:
     print(f"[Reva RAG] indexing event {event_id}: completed", flush=True)
     return True
 
+def extract_question_intent(question: str) -> dict[str, Any]:
+    """Use the configured LLM to map natural language to a small, validated query plan."""
+    prompt = (
+        "Extract the user's intent from a question to a personal location-history assistant. "
+        "Return ONLY one JSON object with keys intent, subject, date_text, time_text, start_time_text, "
+        "end_time_text, place, second_place, comparison, and needs_history. "
+        "Allowed intent values: location_at_time, closest_people, visit_duration, movement_between_places, "
+        "location_timeline, history_summary, current_presence, other. "
+        "subject is self, a friend name if explicitly named, or unknown. "
+        "Use short natural-language values copied/normalized from the question; do not invent missing dates or times. "
+        "For 'last night around one' use date_text='last night', time_text='1 AM'. "
+        "For 'when was my friend closest to me today' use intent='closest_people', date_text='today', "
+        "subject='friend' unless a name is given, comparison='minimum_distance'. "
+        "For 'where was I at 1am' use intent='location_at_time', subject='self', time_text='1 AM'. "
+        "needs_history must be true for questions that require saved location records. "
+        "Do not answer the question; only extract its meaning.\nQuestion: " + question
+    )
+    try:
+        response = llm().invoke([
+            SystemMessage(content="You are a strict intent and slot extractor. Output valid JSON only."),
+            HumanMessage(content=prompt),
+        ])
+        raw = str(response.content).strip()
+        raw = raw.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        parsed = json.loads(raw)
+        allowed = {"location_at_time", "closest_people", "visit_duration", "movement_between_places",
+                   "location_timeline", "history_summary", "current_presence", "other"}
+        if not isinstance(parsed, dict) or parsed.get("intent") not in allowed:
+            return {"intent": "other"}
+        keys = ("subject", "date_text", "time_text", "start_time_text", "end_time_text",
+                "place", "second_place", "comparison")
+        result = {"intent": parsed["intent"], "needs_history": bool(parsed.get("needs_history", True))}
+        for key in keys:
+            value = parsed.get(key)
+            result[key] = value.strip()[:100] if isinstance(value, str) else ""
+        return result
+    except Exception as exc:
+        print(f"[Reva RAG] intent extraction unavailable ({type(exc).__name__}); using fallback intent rules", flush=True)
+        return {"intent": "other"}
+
+
 def classify_node(state: GraphState) -> GraphState:
     # Classification is advisory only. Do not let a transient Groq/model issue
     # prevent retrieval of location history.
@@ -412,16 +453,18 @@ class RevaRAGHandler(BaseHTTPRequestHandler):
                 if not isinstance(context, dict):
                     raise RequestError(400, "context must be an object")
                 try:
-                    # Exact clock-time and closest-together questions must use timestamped GPS
-                    # records, not approximate semantic vector matches.
+                    # Extract meaning and time/place slots from natural language first. The LLM
+                    # plans the query; deterministic MongoDB calculations answer from actual records.
+                    extracted_intent = extract_question_intent(question.strip())
                     direct_answer = answer_time_question(
-                        question.strip(), user_ids, context, mongo[DB_NAME]
+                        question.strip(), user_ids, context, mongo[DB_NAME], extracted_intent
                     )
                     if direct_answer is not None:
                         self.send_json(200, {
                             "success": True,
                             "answer": direct_answer,
-                            "intent": "time_query",
+                            "intent": extracted_intent.get("intent", "time_query"),
+                            "extractedIntent": extracted_intent,
                             "retrievedEvents": 0,
                         })
                         return
@@ -430,12 +473,14 @@ class RevaRAGHandler(BaseHTTPRequestHandler):
                         "question": question.strip(),
                         "authorized_user_ids": user_ids,
                         "context": context,
+                        "intent": extracted_intent.get("intent", "other"),
                     })
                     print("[Reva RAG] /ask workflow completed; sending response", flush=True)
                     response = {
                         "success": True,
                         "answer": result.get("answer", ""),
-                        "intent": result.get("intent", "other"),
+                        "intent": result.get("intent", extracted_intent.get("intent", "other")),
+                        "extractedIntent": extracted_intent,
                         "retrievedEvents": len(result.get("events", [])),
                     }
                 except Exception as exc:
