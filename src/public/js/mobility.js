@@ -42,6 +42,31 @@
   let mapPickMode = false, pendingMapDestination = null, mapPickMarker = null;
   let friendList = [], currentRouteCoordinates = [], pollHandle = null, lastGpsSentAt = 0, lastGpsSent = null, lastRenderedRouteAt = null;
   const sharedTripId = window.REVA_SHARED_TRIP_ID || null;
+  let nativeTrackingRequested = false;
+  let nativeTrackingToken = null;
+  async function syncNativeBackgroundTracking(trip) {
+    const bridge = window.RevaNativeBackground;
+    const shouldTrack = Boolean(!sharedTripId && bridge?.supported && locationSharingEnabled && trip && ["ACTIVE", "DELAYED"].includes(trip.status));
+    if (shouldTrack) {
+      if (nativeTrackingRequested && nativeTrackingToken === token) return;
+      nativeTrackingRequested = true;
+      nativeTrackingToken = token;
+      try {
+        await bridge.start({ token, endpoint: window.location.origin + "/api/tracker/location-native" });
+        message("Background journey tracking is active. Android will show a persistent notification while your journey is being tracked.");
+      } catch (error) {
+        nativeTrackingRequested = false;
+        nativeTrackingToken = null;
+        message("Could not start Android background tracking. Check location and notification permissions: " + (error?.message || "permission required"));
+      }
+      return;
+    }
+    if (nativeTrackingRequested) {
+      nativeTrackingRequested = false;
+      nativeTrackingToken = null;
+      try { await bridge?.stop?.(); } catch (error) { console.warn("Could not stop native journey tracking cleanly.", error); }
+    }
+  }
 
   const formatDistance = meters => meters >= 1000 ? (meters / 1000).toFixed(meters >= 10000 ? 0 : 1) + " km" : Math.round(meters) + " m";
   const formatDuration = seconds => {
@@ -69,6 +94,7 @@
       $("etaValue").textContent = "—"; $("distanceValue").textContent = "—"; $("durationValue").textContent = "—";
       $("lastLocationInfo").textContent = "Waiting for journey location.";
       $("arrivedButton").disabled = true; $("endJourney").disabled = true;
+      void syncNativeBackgroundTracking(null);
       return;
     }
     const isSharedView = Boolean(sharedTripId);
@@ -105,6 +131,7 @@
     if (vehicleMarker) vehicleMarker.setIcon(vehicleIcon);
     $("routeSource").textContent = (modeLabels[mode] || "Journey") + (["bus", "train"].includes(mode) ? " · road-network estimate" : " · " + (trip.route?.provider || "road route"));
     $("mapSubtitle").textContent = trip.destination?.label || "Your city, your route";
+    void syncNativeBackgroundTracking(trip);
   }
 
   function normalizeRouteCoordinates(rawCoordinates, origin, destination) {
