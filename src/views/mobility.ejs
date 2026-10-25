@@ -36,12 +36,13 @@
           <div id="transportModeCards" class="transport-mode-grid" role="group" aria-label="Choose travel mode">
             <button type="button" class="transport-mode-card is-selected" data-mode="driving-car" aria-pressed="true"><span class="mode-art mode-art-car" aria-hidden="true"></span><strong>Car</strong><small>Road vehicle</small></button>
             <button type="button" class="transport-mode-card" data-mode="cycling-regular" aria-pressed="false"><span class="mode-art mode-art-bicycle" aria-hidden="true"></span><strong>Bicycle</strong><small>Cycle route</small></button>
+            <button type="button" class="transport-mode-card" data-mode="motorbike" aria-pressed="false"><span class="mode-art mode-art-motorbike" aria-hidden="true"></span><strong>Bike</strong><small>Motorbike</small></button>
             <button type="button" class="transport-mode-card" data-mode="foot-walking" aria-pressed="false"><span class="mode-art mode-art-walking" aria-hidden="true"></span><strong>Walking</strong><small>On foot</small></button>
             <button type="button" class="transport-mode-card" data-mode="bus" aria-pressed="false"><span class="mode-art mode-art-bus" aria-hidden="true"></span><strong>Bus</strong><small>Road estimate</small></button>
             <button type="button" class="transport-mode-card" data-mode="train" aria-pressed="false"><span class="mode-art mode-art-train" aria-hidden="true"></span><strong>Train</strong><small>Route estimate</small></button>
           </div>
           <select id="transportMode" class="transport-mode-source" aria-label="Selected travel mode" tabindex="-1">
-            <option value="driving-car" selected>Car / road vehicle</option><option value="cycling-regular">Bicycle</option><option value="foot-walking">Walking</option><option value="bus">Bus (road estimate)</option><option value="train">Train (route estimate)</option>
+            <option value="driving-car" selected>Car / road vehicle</option><option value="cycling-regular">Bicycle</option><option value="motorbike">Bike / motorbike</option><option value="foot-walking">Walking</option><option value="bus">Bus (road estimate)</option><option value="train">Train (route estimate)</option>
           </select>
           <label for="recipientMode">Who should receive journey updates?</label>
           <select id="recipientMode"><option value="ALL_FRIENDS">All eligible friends</option><option value="SELECTED_FRIENDS">Selected friends</option><option value="ONE_FRIEND">One friend</option></select>
