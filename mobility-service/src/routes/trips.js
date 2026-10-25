@@ -116,7 +116,19 @@ router.post("/trips", async (req, res) => {
 
 router.get("/trips/active", async (req, res) => {
   try {
-    const trip = await MobilityTrip.findOne({ userId: req.user.userId, status: { $in: ["ACTIVE", "DELAYED"] } }).sort({ createdAt: -1 });
+    let trip = await MobilityTrip.findOne({
+      userId: req.user.userId,
+      status: { $in: ["ACTIVE", "DELAYED"] }
+    }).sort({ createdAt: -1 });
+    // Keep the latest successful arrival visible after the worker auto-confirms it.
+    if (!trip) {
+      const recentCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      trip = await MobilityTrip.findOne({
+        userId: req.user.userId,
+        status: { $in: ["ARRIVED", "COMPLETED"] },
+        updatedAt: { $gte: recentCutoff }
+      }).sort({ updatedAt: -1 });
+    }
     res.json({ success: true, trip: cleanTrip(trip) });
   } catch (error) { fail(res, error); }
 });
