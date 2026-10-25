@@ -30,3 +30,5 @@ app.get("/health", (req, res) => {
 });
 
 app.get("/", (req, res) => res.redirect("/login"));
+
+module.exports = app;
