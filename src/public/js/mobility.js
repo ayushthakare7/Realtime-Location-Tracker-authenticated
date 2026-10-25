@@ -19,7 +19,10 @@
     attribution: "© OpenStreetMap contributors", maxZoom: 19
   }).addTo(map);
 
-  const vehicleIcon = L.divIcon({ className: "", html: '<div class="vehicle-marker" aria-label="Your live position">🚗</div>', iconSize: [38,38], iconAnchor: [19,19] });
+  const modeIcons = { "driving-car": "🚗", "cycling-regular": "🚲", "foot-walking": "🚶", bus: "🚌", train: "🚆" };
+  const modeLabels = { "driving-car": "Car", "cycling-regular": "Bicycle", "foot-walking": "Walking", bus: "Bus", train: "Train" };
+  const vehicleIconForMode = mode => L.divIcon({ className: "", html: '<div class="vehicle-marker" aria-label="Your live position">' + (modeIcons[mode] || "📍") + '</div>', iconSize: [42,42], iconAnchor: [21,21] });
+  let vehicleIcon = vehicleIconForMode("driving-car");
   const destinationIcon = L.divIcon({ className: "", html: '<div class="destination-marker"><span>●</span></div>', iconSize: [34,34], iconAnchor: [17,34] });
   let vehicleMarker = null, destinationMarker = null, routeLine = null, socket = null;
   let selectedDestination = null, activeTrip = null, latestPosition = null, watchId = null;
@@ -70,7 +73,10 @@
     $("arrivedButton").disabled = !ongoing; $("endJourney").disabled = !ongoing;
     $("startJourney").disabled = ongoing;
     $("startJourney").textContent = ongoing ? "Journey in progress" : "Start journey ↗";
-    $("routeSource").textContent = trip.route?.provider ? "Road route · " + trip.route.provider : "Road route";
+    const mode = trip.transportMode || "driving-car";
+    vehicleIcon = vehicleIconForMode(mode);
+    if (vehicleMarker) vehicleMarker.setIcon(vehicleIcon);
+    $("routeSource").textContent = (modeLabels[mode] || "Journey") + (["bus", "train"].includes(mode) ? " · road-network estimate" : " · " + (trip.route?.provider || "road route"));
     $("mapSubtitle").textContent = trip.destination?.label || "Your city, your route";
   }
 
@@ -97,10 +103,12 @@
   }
 
   function setVehiclePosition(latitude, longitude, animate = true) {
+    const mode = activeTrip?.transportMode || $("transportMode")?.value || "driving-car";
+    vehicleIcon = vehicleIconForMode(mode);
     const target = L.latLng(Number(latitude), Number(longitude));
     if (!Number.isFinite(target.lat) || !Number.isFinite(target.lng)) return;
     if (!vehicleMarker) {
-      vehicleMarker = L.marker(target, { icon: vehicleIcon, keyboard: false, zIndexOffset: 1000 }).addTo(map).bindTooltip("Your live position");
+      vehicleMarker = L.marker(target, { icon: vehicleIcon, keyboard: false, zIndexOffset: 1000 }).addTo(map).bindTooltip((modeLabels[mode] || "Your") + " live position");
       if (!activeTrip) map.setView(target, 14);
       return;
     }
@@ -288,6 +296,10 @@
     }
   }
 
+  $("transportMode").addEventListener("change", () => {
+    if (vehicleMarker && !activeTrip) vehicleMarker.setIcon(vehicleIconForMode($("transportMode").value));
+    if (latestPosition && !activeTrip) setVehiclePosition(latestPosition.latitude, latestPosition.longitude, false);
+  });
   $("searchDestination").addEventListener("click", searchDestination);
   $("destinationQuery").addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); searchDestination(); } });
   $("recipientMode").addEventListener("change", () => { $("friendChoices").hidden = $("recipientMode").value === "ALL_FRIENDS"; });
