@@ -361,7 +361,7 @@
  .mobility-page .journey-map-section{order:1;width:100%;min-width:0}
  .mobility-page .journey-map-frame{height:clamp(500px,64vh,680px)!important;min-height:500px!important}
  .mobility-page .destination-panel{order:0;width:100%;min-height:0;height:auto;box-sizing:border-box}
- .mobility-page .journey-planner-form{display:grid;grid-template-columns:minmax(280px,.68fr) minmax(0,1.5fr);grid-template-areas:"destination map" "travel travel";align-items:stretch}
+ .mobility-page .journey-planner-form{display:grid;grid-template-columns:minmax(280px,.68fr) minmax(0,1.5fr);grid-template-areas:"travel travel" "destination map";align-items:stretch}
  .mobility-page .destination-panel{grid-area:destination}
  .mobility-page .journey-map-section{grid-area:map}
  .mobility-page .travel-options-panel{grid-area:travel}
