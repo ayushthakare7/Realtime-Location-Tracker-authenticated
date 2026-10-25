@@ -207,5 +207,21 @@
 })();
 </script>
 
+
+<script>
+(() => {
+  // Native Capacitor app can lock orientation immediately on these pages.
+  // Ordinary Chrome browsers do not expose the native plugin and remain unchanged.
+  const lockLandscapeInNativeApp = () => {
+    const plugin = window.Capacitor?.Plugins?.ScreenOrientation;
+    if (plugin?.lock) plugin.lock({ orientation: "landscape" }).catch(() => {});
+  };
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", lockLandscapeInNativeApp, { once: true });
+  } else {
+    lockLandscapeInNativeApp();
+  }
+})();
+</script>
 </body>
 </html>
