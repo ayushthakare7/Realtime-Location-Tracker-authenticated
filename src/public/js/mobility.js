@@ -23,7 +23,8 @@
   const destinationIcon = L.divIcon({ className: "", html: '<div class="destination-marker"><span>●</span></div>', iconSize: [34,34], iconAnchor: [17,34] });
   let vehicleMarker = null, destinationMarker = null, routeLine = null, socket = null;
   let selectedDestination = null, activeTrip = null, latestPosition = null, watchId = null;
-  let friendList = [], currentRouteCoordinates = [], pollHandle = null, lastGpsSentAt = 0, lastGpsSent = null;
+  let friendList = [], currentRouteCoordinates = [], pollHandle = null, lastGpsSentAt = 0, lastGpsSent = null, lastRenderedRouteAt = null;
+  const sharedTripId = window.REVA_SHARED_TRIP_ID || null;
 
   const formatDistance = meters => meters >= 1000 ? (meters / 1000).toFixed(meters >= 10000 ? 0 : 1) + " km" : Math.round(meters) + " m";
   const formatDuration = seconds => {
@@ -77,6 +78,7 @@
     if (!trip?.route?.coordinates?.length) return;
     currentRouteCoordinates = trip.route.coordinates.map(point => [Number(point[1]), Number(point[0])]);
     if (routeLine) map.removeLayer(routeLine);
+    lastRenderedRouteAt = trip.route.calculatedAt || null;
     routeLine = L.polyline(currentRouteCoordinates, { color: "#4d83c6", weight: 6, opacity: .88, lineCap: "round", lineJoin: "round" }).addTo(map);
     if (destinationMarker) map.removeLayer(destinationMarker);
     destinationMarker = L.marker([trip.destination.latitude, trip.destination.longitude], { icon: destinationIcon, keyboard: false }).addTo(map).bindTooltip(trip.destination.label || "Destination");
@@ -150,7 +152,7 @@
       const data = await fetch("/api/tracker/friends", { headers: { Authorization: "Bearer " + token } }).then(async r => {
         const body = await r.json(); if (!r.ok) throw new Error(body.message || "Could not load friends."); return body;
       });
-      friendList = (data.friends || []).filter(friend => friend.sharingEnabled);
+      friendList = data.friends || [];
       const root = $("friendChoices"); root.replaceChildren();
       friendList.forEach(friend => {
         const label = document.createElement("label"); label.className = "friend-choice";
@@ -190,13 +192,16 @@
 
   async function refreshTrip() {
     try {
-      const data = await api("/trips/active");
+      const data = sharedTripId ? await api("/trips/shared/" + encodeURIComponent(sharedTripId)) : await api("/trips/active");
       if (data.trip) {
         const previousStatus = activeTrip?.status;
         activeTrip = data.trip; updateStatus(activeTrip);
-        if (!routeLine || routeLine.getLatLngs().length !== (activeTrip.route?.coordinates || []).length) showRoute(activeTrip);
+        const routeKey = activeTrip.route?.calculatedAt || null;
+        if (!routeLine || routeLine.getLatLngs().length !== (activeTrip.route?.coordinates || []).length || routeKey !== lastRenderedRouteAt) showRoute(activeTrip);
         if (activeTrip.lastLocation && Number.isFinite(Number(activeTrip.lastLocation.latitude))) setVehiclePosition(activeTrip.lastLocation.latitude, activeTrip.lastLocation.longitude, true);
         if (previousStatus && previousStatus !== activeTrip.status) message("Journey status updated: " + activeTrip.status.toLowerCase().replaceAll("_", " ") + ".");
+      } else if (sharedTripId) {
+        activeTrip = null; updateStatus(null); $("journeyHeading").textContent = "Journey unavailable"; $("journeyStatus").textContent = "This journey is no longer shared with you."; $("journeyStatus").dataset.state = "";
       } else if (!activeTrip || ["ACTIVE","DELAYED"].includes(activeTrip.status)) {
         if (activeTrip && ["ARRIVED","CANCELLED","COMPLETED"].includes(activeTrip.status)) return;
         activeTrip = null; updateStatus(null); $("startJourney").disabled = false;
@@ -232,6 +237,17 @@
 
   async function init() {
     $("mobilityConnection").textContent = "Checking sharing…";
+    if (sharedTripId) {
+      document.querySelector(".journey-form-panel").hidden = true;
+      $("arrivedButton").hidden = true; $("endJourney").hidden = true;
+      document.querySelector(".mobility-intro h1").innerHTML = "A journey shared<br><em>with you.</em>";
+      $("mapSubtitle").textContent = "Shared route";
+      socket = io({ auth: { token } });
+      socket.on("connect", () => $("mobilityConnection").textContent = "Live connection");
+      socket.on("disconnect", () => $("mobilityConnection").textContent = "Reconnecting…");
+      socket.on("mobility-trip-update", event => { if (event && String(event.tripId) === String(sharedTripId)) refreshTrip(); });
+      await refreshTrip(); pollHandle = setInterval(refreshTrip, 30000); return;
+    }
     try {
       const data = await fetch("/api/tracker/friends", { headers: { Authorization: "Bearer " + token } }).then(r => r.json());
       if (!data.sharingEnabled) {
@@ -242,6 +258,7 @@
         socket.on("connect", () => $("mobilityConnection").textContent = "Live connection");
         socket.on("disconnect", () => $("mobilityConnection").textContent = "Reconnecting…");
         socket.on("connect_error", () => { $("mobilityConnection").textContent = "Connection issue"; });
+        socket.on("mobility-trip-update", event => { if (event && activeTrip && String(event.tripId) === String(activeTrip.id)) refreshTrip(); });
         if (navigator.geolocation) {
           watchId = navigator.geolocation.watchPosition(sendGps, error => {
             $("mobilityConnection").textContent = "GPS unavailable";
