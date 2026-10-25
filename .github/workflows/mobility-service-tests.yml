@@ -28,3 +28,16 @@ jobs:
       - run: node --check src/routes/trips.js
       - run: node --check src/services/worker.js
       - run: node --check src/services/routing.js
+
+      - run: node --check src/app.js
+        working-directory: .
+      - run: node --check src/routes/mobilityProxyRoutes.js
+        working-directory: .
+      - run: node --check src/routes/mobilityEventsRoutes.js
+        working-directory: .
+      - run: node --check src/sockets/locationSocket.js
+        working-directory: .
+      - run: node --check src/public/js/script.js
+        working-directory: .
+      - run: node --check src/public/js/mobility.js
+        working-directory: .
