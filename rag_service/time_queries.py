@@ -60,7 +60,7 @@ def answer_time_question(question, authorized_user_ids, context, database):
         return None
 
     # "When were we closest today/yesterday?" compares contemporaneous GPS samples.
-    if (re.search(r"\b(?:closest|nearest)\b", question, re.I)
+    if (re.search(r"\b(?:closer|closest|nearest)\b", question, re.I)
             and re.search(r"\b(?:when|what time|which time)\b", question, re.I)
             and re.search(r"\b(?:today|yesterday)\b", question, re.I)):
         day = datetime.now(LOCAL_TZ).date() - (timedelta(days=1) if re.search(r"\byesterday\b", question, re.I) else timedelta())
@@ -107,7 +107,7 @@ def answer_time_question(question, authorized_user_ids, context, database):
     subject_id = current_id
     is_self = bool(re.search(r"\b(?:i|me|my)\b", question, re.I)) and not re.search(r"\bmy friend\b", question, re.I)
     if not is_self:
-        names = [str(x.get("username", "")) for x in context.get("currentLocations", []) if x.get("username") not in ("", "you")]
+        names = [str(x.get("username", "")) for x in context.get("authorizedPeople", context.get("currentLocations", [])) if x.get("username") not in ("", "you")]
         name = next((n for n in names if re.search(r"\b" + re.escape(n) + r"\b", question, re.I)), None)
         if not name:
             return None
