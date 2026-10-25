@@ -75,7 +75,8 @@ jobs:
               @Override
               public void run() {
                 try {
-                  WebView webView = bridge == null ? null : bridge.getWebView();
+                  com.getcapacitor.Bridge currentBridge = getBridge();
+                  WebView webView = currentBridge == null ? null : currentBridge.getWebView();
                   String url = webView == null ? null : webView.getUrl();
                   if (url != null) {
                     String path = android.net.Uri.parse(url).getPath();
