@@ -41,3 +41,10 @@ jobs:
         working-directory: .
       - run: node --check src/public/js/mobility.js
         working-directory: .
+      - run: node --check src/models/RoutingUsage.js
+      - run: node --check src/services/notifications.js
+      - run: node --check src/models/index.js
+      - run: node --check src/models/MobilityNotification.js
+        working-directory: .
+      - run: node --check src/routes/mobilityNotificationRoutes.js
+        working-directory: .
