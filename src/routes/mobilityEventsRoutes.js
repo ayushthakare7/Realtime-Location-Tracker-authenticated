@@ -13,14 +13,14 @@ function secretMatches(provided, expected) {
   return left.length === right.length && crypto.timingSafeEqual(left, right);
 }
 function travellerNotification(type, name) {
-  // Spooky-cute copy: personal and memorable, without sounding threatening.
+  // Short, punchy, delivery-app-style alerts with the traveller's name up front.
   const copy = {
-    journey_started: [`👁️ ${name} is on the move`, `The map noticed: ${name} just started a journey. Keep an eye on their route.`],
-    journey_delayed: [`🕯️ ${name} is running late`, `${name} has not arrived yet. Their shared route is still worth a look.`],
-    journey_arrived: [`🌙 ${name} made it safely`, `${name} reached the destination. All quiet on the map . for now.`],
-    journey_ended: [`🫥 ${name}'s journey went quiet`, `${name}'s shared journey has ended. The trail fades from here.`]
+    journey_started: [`🚀 ${name.toUpperCase()} IS ON THE MOVE!`, `Journey started! Open Reva to follow ${name}'s live route.`],
+    journey_delayed: [`⏰ ${name.toUpperCase()} IS RUNNING LATE`, `${name} has not arrived yet. Check the latest journey update in Reva.`],
+    journey_arrived: [`🎉 ${name.toUpperCase()} REACHED SAFELY!`, `${name} has arrived at the destination. You can relax now.`],
+    journey_ended: [`👋 ${name.toUpperCase()}'S JOURNEY HAS ENDED`, `${name}'s shared trip has ended. Open Reva for the latest details.`]
   };
-  return copy[type] || [`👀 Update from ${name}`, `${name} has a new journey update in Reva.`];
+  return copy[type] || [`✨ REVA UPDATE FOR ${name.toUpperCase()}`, `${name} has a new journey update. Tap to check it out.`];
 }
 
 router.post("/mobility-events", async (req, res) => {
@@ -91,8 +91,8 @@ router.post("/mobility-events", async (req, res) => {
   }
   if (["journey_delayed", "journey_arrived"].includes(event.type) && traveller && traveller.sharingEnabled) {
     const travellerCopy = event.type === "journey_delayed"
-      ? ["🕰️ Your journey is taking longer", "Your expected arrival time has shifted or passed. Check the latest route and GPS update."]
-      : ["🌙 You made it", "Arrival confirmed. Your journey is complete . time to breathe easy."];
+      ? ["⏰ YOUR ARRIVAL IS TAKING LONGER", "Your ETA has shifted or passed. Check your live route for the latest update."]
+      : ["🎉 YOU MADE IT!", "Arrival confirmed. Your journey is complete. Time to relax."];
     const notificationKey = String(event.tripId) + ":" + event.type + ":" + payload.travellerId;
     const wasAlreadyCreated = await MobilityNotification.exists({ notificationKey });
     const notification = await MobilityNotification.findOneAndUpdate(
