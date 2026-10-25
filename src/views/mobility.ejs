@@ -32,8 +32,17 @@
           <div id="mapPickActions" class="map-pick-actions" hidden><p>Tap anywhere on the map to place your destination pin. You can zoom and pan first.</p><div><button id="confirmMapDestination" type="button" disabled>Use This Destination</button><button id="cancelMapPick" type="button" class="secondary">Cancel</button></div></div>
           <div id="destinationResults" class="destination-results" role="listbox"></div>
           <p id="selectedDestination" class="selected-destination">Search for a place or pick a point directly on the map.</p>
-          <label for="transportMode">Travel mode</label>
-          <select id="transportMode"><option value="driving-car">🚗 Car / road vehicle</option><option value="cycling-regular">🚲 Bicycle</option><option value="foot-walking">🚶 Walking</option><option value="bus">🚌 Bus (road estimate)</option><option value="train">🚆 Train (route estimate)</option></select>
+          <label>Choose your travel character</label>
+          <div id="transportModeCards" class="transport-mode-grid" role="group" aria-label="Choose travel mode">
+            <button type="button" class="transport-mode-card is-selected" data-mode="driving-car" aria-pressed="true"><span class="mode-art mode-art-car" aria-hidden="true"></span><strong>Car</strong><small>Road vehicle</small></button>
+            <button type="button" class="transport-mode-card" data-mode="cycling-regular" aria-pressed="false"><span class="mode-art mode-art-bicycle" aria-hidden="true"></span><strong>Bicycle</strong><small>Cycle route</small></button>
+            <button type="button" class="transport-mode-card" data-mode="foot-walking" aria-pressed="false"><span class="mode-art mode-art-walking" aria-hidden="true"></span><strong>Walking</strong><small>On foot</small></button>
+            <button type="button" class="transport-mode-card" data-mode="bus" aria-pressed="false"><span class="mode-art mode-art-bus" aria-hidden="true"></span><strong>Bus</strong><small>Road estimate</small></button>
+            <button type="button" class="transport-mode-card" data-mode="train" aria-pressed="false"><span class="mode-art mode-art-train" aria-hidden="true"></span><strong>Train</strong><small>Route estimate</small></button>
+          </div>
+          <select id="transportMode" class="transport-mode-source" aria-label="Selected travel mode" tabindex="-1">
+            <option value="driving-car" selected>Car / road vehicle</option><option value="cycling-regular">Bicycle</option><option value="foot-walking">Walking</option><option value="bus">Bus (road estimate)</option><option value="train">Train (route estimate)</option>
+          </select>
           <label for="recipientMode">Who should receive journey updates?</label>
           <select id="recipientMode"><option value="ALL_FRIENDS">All eligible friends</option><option value="SELECTED_FRIENDS">Selected friends</option><option value="ONE_FRIEND">One friend</option></select>
           <div id="friendChoices" class="friend-choices" hidden></div>
