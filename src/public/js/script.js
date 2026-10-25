@@ -224,7 +224,7 @@ function showMobilityNotice(data) {
   open.href = "/mobility/shared/" + encodeURIComponent(data.tripId);
   open.textContent = "View shared journey →";
   open.style.cssText = "display:inline-block;padding:8px 11px;border-radius:10px;background:#294d40;color:white;text-decoration:none;font-size:12px;font-weight:700";
-  open.addEventListener("click", () => { void markMobilityNotificationRead(data.notificationId || data.id); });
+  open.addEventListener("click", async event => { event.preventDefault(); await markMobilityNotificationRead(data.notificationId || data.id); window.location.href = open.href; });
   const close = document.createElement("button");
   close.type = "button"; close.textContent = "Dismiss";
   close.style.cssText = "float:right;border:0;background:transparent;color:#78847d;padding:8px;font-size:12px";
@@ -253,7 +253,8 @@ function connectSocket() {
   socket.on("sharing-stopped", data => { if (data && data.userId) removeMarker(data.userId); });
   socket.on("friend-removed", data => { if (data && data.userId) { removeMarker(data.userId); loadFriends({ quiet: true }); } });
   socket.on("friend-request-received", data => { if (data && data.username) setStatus("New friend request from " + data.username + "."); loadFriends(); });
-  socket.on("mobility-notification", showMobilityNotice);}
+  socket.on("mobility-notification", showMobilityNotice);
+}
 connectSocket();
 loadMobilityNotifications();
 
