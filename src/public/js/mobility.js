@@ -38,7 +38,7 @@
   let vehicleIcon = vehicleIconForMode("driving-car");
   const destinationIcon = L.divIcon({ className: "", html: '<div class="destination-marker"><span>●</span></div>', iconSize: [34,34], iconAnchor: [17,34] });
   let vehicleMarker = null, animationMarker = null, destinationMarker = null, routeLine = null, socket = null;
-  let selectedDestination = null, activeTrip = null, latestPosition = null, watchId = null, vehiclePreviewEnabled = false;
+  let selectedDestination = null, activeTrip = null, latestPosition = null, watchId = null, vehiclePreviewEnabled = false, journeyAnimationRunning = false;
   let mapPickMode = false, pendingMapDestination = null, mapPickMarker = null;
   let friendList = [], currentRouteCoordinates = [], pollHandle = null, lastGpsSentAt = 0, lastGpsSent = null, lastRenderedRouteAt = null;
   const sharedTripId = window.REVA_SHARED_TRIP_ID || null;
@@ -149,6 +149,7 @@
         ? [latestPosition.latitude, latestPosition.longitude]
         : coordinates[0];
     const destination = [Number(trip.destination.latitude), Number(trip.destination.longitude)];
+    journeyAnimationRunning = true;
     const routeBounds = L.latLngBounds(coordinates);
     if (routeLine) map.removeLayer(routeLine);
     if (destinationMarker) map.removeLayer(destinationMarker);
@@ -252,6 +253,7 @@
     }
     vehicleMarker?.setLatLng(livePosition);
     vehicleMarker?.setOpacity(1);
+    journeyAnimationRunning = false;
     statusPanel?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
     message("Journey started. The route preview is complete and your live journey is in progress; arrival is confirmed automatically when fresh GPS readings show you're near the destination.");
   }
@@ -418,6 +420,8 @@
   }
 
   async function refreshTrip() {
+    // Do not let polling/socket refreshes replace the animated route mid-playback.
+    if (journeyAnimationRunning) return;
     try {
       const data = sharedTripId ? await api("/trips/shared/" + encodeURIComponent(sharedTripId)) : await api("/trips/active");
       if (data.trip) {
