@@ -66,14 +66,26 @@ router.post("/mobility-events", async (req, res) => {
       { notificationKey },
       { $setOnInsert: {
         notificationKey, recipientId, tripId: event.tripId, type: event.type, title, body,
-        payload: { tripId: String(event.tripId), travellerId: payload.travellerId, destination: event.destination || null, expectedArrivalAt: event.expectedArrivalAt || null, status: payload.status }
+        payload: { tripId: String(event.tripId), travellerId: payload.travellerId, destination: event.destination || null, expectedArrivalAt: event.expectedArrivalAt || null, status: payload.status, viewPath: "/mobility/shared/" + String(event.tripId) }
       } },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     ).lean();
     io.to("user:" + recipientId).emit("mobility-notification", {
-      ...payload, notificationId: String(notification._id), title: notification.title, body: notification.body
+      ...payload, notificationId: String(notification._id), title: notification.title, body: notification.body, viewPath: "/mobility/shared/" + String(event.tripId)
     });
     io.to("user:" + recipientId).emit("mobility-trip-update", payload);
+  }
+  if (["journey_delayed", "journey_arrived"].includes(event.type) && traveller && traveller.sharingEnabled) {
+    const travellerCopy = event.type === "journey_delayed"
+      ? ["Your journey is delayed", "Your expected arrival time has shifted or passed. Check the latest route and GPS update."]
+      : ["Arrival confirmed", "Your arrival has been confirmed. Your journey is complete."];
+    const notificationKey = String(event.tripId) + ":" + event.type + ":" + payload.travellerId;
+    const notification = await MobilityNotification.findOneAndUpdate(
+      { notificationKey },
+      { $setOnInsert: { notificationKey, recipientId: payload.travellerId, tripId: event.tripId, type: event.type, title: travellerCopy[0], body: travellerCopy[1], payload: { tripId: String(event.tripId), travellerId: payload.travellerId, destination: event.destination || null, expectedArrivalAt: event.expectedArrivalAt || null, status: payload.status, viewPath: "/mobility" } } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    ).lean();
+    io.to("user:" + payload.travellerId).emit("mobility-notification", { ...payload, notificationId: String(notification._id), title: notification.title, body: notification.body, viewPath: "/mobility" });
   }
   res.json({ success: true, deliveredTo: recipients.length });
 });
