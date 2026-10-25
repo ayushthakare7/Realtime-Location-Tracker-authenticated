@@ -4,6 +4,8 @@ const cors = require("cors");
 const morgan = require("morgan");
 const authRoutes = require("./routes/authRoutes");
 const trackerRoutes = require("./routes/trackerRoutes");
+const mobilityProxyRoutes = require("./routes/mobilityProxyRoutes");
+const mobilityEventsRoutes = require("./routes/mobilityEventsRoutes");
 
 const app = express();
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || `http://localhost:${process.env.PORT || 3000}` }));
@@ -15,10 +17,13 @@ app.set("views", path.join(__dirname, "views"));
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/api/auth", authRoutes);
 app.use("/api/tracker", trackerRoutes);
+app.use("/api/mobility", mobilityProxyRoutes);
+app.use("/api/internal", mobilityEventsRoutes);
 
 app.get("/", (req, res) => res.redirect("/login"));
 app.get("/login", (req, res) => res.render("login"));
 app.get("/register", (req, res) => res.render("register"));
 app.get("/tracker", (req, res) => res.render("index"));
+app.get("/mobility", (req, res) => res.render("mobility"));
 
 module.exports = app;
