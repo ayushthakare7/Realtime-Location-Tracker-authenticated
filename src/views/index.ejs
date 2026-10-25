@@ -25,6 +25,11 @@
       <form id="friendForm"><input id="friendUsername" placeholder="Friend's exact username" required><button>Send request</button></form>
       <div id="requests"></div><div id="friends">Loading friends…</div>
     </section>
+    <section class="panel shared-journeys-panel">
+      <div class="section-heading"><span class="section-icon" aria-hidden="true">↗</span><div><p class="eyebrow">LIVE UPDATES</p><h2>Friends' journeys</h2></div></div>
+      <p class="muted">Active journeys your friends have explicitly shared with you appear here.</p>
+      <div id="sharedJourneys" aria-live="polite"><p class="muted">Checking for shared journeys…</p></div>
+    </section>
     <section class="panel privacy-panel">
       <div class="section-heading"><span class="section-icon" aria-hidden="true">◈</span><div><p class="eyebrow">YOUR CHOICES</p><h2>Privacy controls</h2></div></div>
       <div class="switch-row"><span>Store location history</span><input id="historyToggle" type="checkbox" checked></div>
