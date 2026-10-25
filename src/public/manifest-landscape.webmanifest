@@ -1,0 +1,13 @@
+{
+  "id": "/",
+  "name": "Reva: Stay Close, Feel Connected",
+  "short_name": "Reva",
+  "description": "Private, real-time location sharing with your circle.",
+  "start_url": "/tracker",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#f3f0e9",
+  "theme_color": "#f3f0e9",
+  "categories": ["navigation", "social"]
+}

@@ -48,7 +48,18 @@ async function acceptedFriendIds(userId) {
   return links.map(link => String(link.requester) === String(userId) ? String(link.recipient) : String(link.requester));
 }
 function fail(res, error) {
-  return res.status(error.status || 500).json({ success: false, message: error.status ? error.message : "Mobility request failed." });
+  console.error("[MobilityTrip] Request failed", {
+    status: error.status || 500,
+    errorName: error.name || "Error",
+    errorMessage: String(error.message || "unknown").slice(0, 300),
+    stack: String(error.stack || "").split("\\n").slice(0, 4).join("\\n")
+  });
+  return res.status(error.status || 500).json({
+    success: false,
+    message: error.status && error.status < 500
+      ? error.message
+      : (error.status === 502 ? error.message : "Could not start the journey because a server operation failed. Please retry; if it continues, check Mobility logs.")
+  });
 }
 
 router.get("/health", (_req, res) => res.json({ success: true, service: "reva-mobility-context" }));
@@ -191,7 +202,20 @@ router.get("/trips/shared/:id", async (req, res) => {
     ] }).lean();
     const traveller = await User.findById(trip.userId).select("sharingEnabled").lean();
     if (!friendship || !traveller?.sharingEnabled) return res.status(403).json({ success: false, message: "The journey is no longer shared with you." });
-    res.json({ success: true, trip: cleanTrip(trip) });
+
+    // Read the main app's canonical GPS record on every shared-view request.
+    // The worker refreshes MobilityTrip.lastLocation on a slower interval, which can
+    // leave a friend looking at the journey origin instead of the traveller's current position.
+    const liveLocation = await Location.findOne({ userId: trip.userId }).lean();
+    const sharedTrip = cleanTrip(trip);
+    if (liveLocation && validCoordinate({ latitude: liveLocation.latitude, longitude: liveLocation.longitude }) && liveLocation.lastSeen) {
+      sharedTrip.lastLocation = {
+        latitude: Number(liveLocation.latitude),
+        longitude: Number(liveLocation.longitude),
+        lastSeen: liveLocation.lastSeen
+      };
+    }
+    res.json({ success: true, trip: sharedTrip });
   } catch (error) { fail(res, error); }
 });
 

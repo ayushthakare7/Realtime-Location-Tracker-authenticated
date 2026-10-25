@@ -423,3 +423,198 @@
  .mobility-page .destination-panel .start-journey-panel{display:flex;flex-direction:column;gap:9px;margin-top:12px;padding:13px;border:1px solid #e1e7dd;border-radius:13px;background:#f7f8f3}
  .mobility-page .destination-panel .start-journey-panel select{width:100%;box-sizing:border-box}
 }
+
+
+/* Hard override for the mobile header: the shared global header grid places
+   the tagline and actions in overlapping columns on narrow screens. */
+@media screen and (max-width: 720px) {
+  body.mobility-page > header.app-header,
+  .mobility-page header.app-header {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    gap: 10px !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    padding: 12px 14px !important;
+    box-sizing: border-box !important;
+    position: relative !important;
+  }
+  .mobility-page header.app-header > a.header-choice {
+    display: inline-flex !important;
+    align-self: flex-start !important;
+    flex: 0 1 auto !important;
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    grid-column: auto !important;
+    grid-row: auto !important;
+    white-space: normal !important;
+    box-sizing: border-box !important;
+  }
+  .mobility-page header.app-header .header-choice .privacy-note {
+    display: inline-flex !important;
+    max-width: 100% !important;
+    padding: 6px 10px !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    line-height: 1.35 !important;
+    box-sizing: border-box !important;
+  }
+  .mobility-page header.app-header > .header-actions {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    align-self: stretch !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    grid-column: auto !important;
+    grid-row: auto !important;
+    box-sizing: border-box !important;
+  }
+  .mobility-page header.app-header #mobilityConnection {
+    display: inline-flex !important;
+    flex: 0 1 auto !important;
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    padding: 7px 10px !important;
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    box-sizing: border-box !important;
+  }
+  .mobility-page header.app-header .mobility-header-link {
+    display: inline-flex !important;
+    flex: 0 1 auto !important;
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    padding: 8px 11px !important;
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    box-sizing: border-box !important;
+  }
+  .mobility-page header.app-header > .header-tagline {
+    display: block !important;
+    position: static !important;
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 14px !important;
+    line-height: 1.45 !important;
+    letter-spacing: 0 !important;
+    text-align: left !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    grid-column: auto !important;
+    grid-row: auto !important;
+    transform: none !important;
+    box-sizing: border-box !important;
+  }
+}
+
+
+/* Mobile-only landscape control; desktop header remains unchanged. */
+.landscape-mode-toggle { display: none; cursor: pointer; font: inherit; }
+@media screen and (max-width: 720px) {
+  .landscape-mode-toggle {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 8px 11px;
+    border: 1px solid var(--line, #d8ded6);
+    border-radius: 11px;
+    background: rgba(255,253,248,.92);
+    color: var(--ink, #263d3a);
+    font-size: 12px;
+    font-weight: 750;
+    line-height: 1.25;
+    white-space: normal;
+    text-align: center;
+  }
+  body.app-shell.mobility-page > header.app-header > .header-actions .landscape-mode-toggle {
+    flex: 0 1 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    position: static !important;
+  }
+}
+
+
+/* Portrait is intentionally gated on small screens: journey UI is landscape-first. */
+.landscape-required[hidden] { display: none !important; }
+.landscape-required {
+  display: none;
+  position: fixed;
+  z-index: 99999;
+  inset: 0;
+  width: 100vw;
+  min-height: 100dvh;
+  padding: 24px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  background: #f3f0e9;
+  color: #263d3a;
+  text-align: center;
+}
+@media screen and (max-width: 720px) and (orientation: portrait) {
+  .landscape-required:not([hidden]) { display: flex; }
+}
+.landscape-required-card { width: min(100%, 420px); margin: auto; }
+.landscape-phone-icon { position: relative; display: inline-grid; place-items: center; width: 100px; height: 72px; margin: 0 auto 18px; font-size: 70px; line-height: 1; color: #718e78; transform: rotate(90deg); }
+.landscape-phone-icon span { position: absolute; right: -20px; top: -10px; font-size: 26px; transform: rotate(-90deg); }
+.landscape-required .eyebrow { font-size: 11px; letter-spacing: .16em; font-weight: 800; color: #718e78; }
+.landscape-required h1 { margin: 8px 0 12px; font-size: clamp(27px, 7vw, 36px); line-height: 1.08; letter-spacing: -.04em; }
+.landscape-required p:not(.eyebrow) { max-width: 340px; margin: 0 auto 22px; color: #63736a; font-size: 14px; line-height: 1.6; }
+.landscape-required button { width: 100%; min-height: 48px; border: 0; border-radius: 13px; padding: 12px 16px; background: #344f43; color: white; font-weight: 800; font-size: 14px; }
+.landscape-required small { display: block; max-width: 340px; margin: 14px auto 0; color: #68766e; font-size: 11px; line-height: 1.55; }
+
+
+/* Shared landscape-first gate for the authenticated map and journey pages only. */
+.landscape-required[hidden] { display: none !important; }
+.landscape-required {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  padding: 24px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  background: #f3f0e9;
+  color: #263d3a;
+  text-align: center;
+}
+@media screen and (max-width: 720px) and (orientation: portrait) {
+  .landscape-required:not([hidden]) { display: flex !important; }
+}
+.landscape-required-card { width: min(100%, 420px); margin: auto; }
+.landscape-phone-icon { position: relative; display: inline-grid; place-items: center; width: 100px; height: 72px; margin: 0 auto 18px; font-size: 64px; line-height: 1; color: #718e78; transform: rotate(90deg); }
+.landscape-phone-icon span { position: absolute; right: -20px; top: -10px; font-size: 26px; transform: rotate(-90deg); }
+.landscape-required .eyebrow { font-size: 11px; letter-spacing: .16em; font-weight: 800; color: #718e78; }
+.landscape-required h1 { margin: 8px 0 12px; font-size: clamp(27px, 7vw, 36px); line-height: 1.08; letter-spacing: -.04em; }
+.landscape-required p:not(.eyebrow) { max-width: 340px; margin: 0 auto 22px; color: #63736a; font-size: 14px; line-height: 1.6; }
+.landscape-required button { width: 100%; min-height: 48px; border: 0; border-radius: 13px; padding: 12px 16px; background: #344f43; color: white; font-weight: 800; font-size: 14px; }
+.landscape-required small { display: block; max-width: 340px; margin: 14px auto 0; color: #68766e; font-size: 11px; line-height: 1.55; }
+body.landscape-required-active { overflow: hidden !important; }

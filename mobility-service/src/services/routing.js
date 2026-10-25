@@ -50,7 +50,9 @@ async function routeBetween(origin, destination, profile) {
   const cached = cacheRead(routeCache, cacheKey);
   if (cached) return cached;
   await reserveRequest("directions");
-  const response = await fetch("https://api.openrouteservice.org/v2/directions/" + routingProfile + "/geojson", {
+  let response;
+  try {
+    response = await fetch("https://api.openrouteservice.org/v2/directions/" + routingProfile + "/geojson", {
     method: "POST",
     headers: {
       Authorization: process.env.ORS_API_KEY,
@@ -65,8 +67,19 @@ async function routeBetween(origin, destination, profile) {
       instructions: false,
       elevation: false
     }),
-    signal: AbortSignal.timeout(12000)
-  });
+      signal: AbortSignal.timeout(12000)
+    });
+  } catch (cause) {
+    console.error("[MobilityRouting] ORS directions network failure", {
+      requestedMode,
+      routingProfile,
+      errorName: cause?.name || "Error",
+      errorMessage: String(cause?.message || cause || "unknown").slice(0, 240)
+    });
+    const error = new Error("Could not contact the road-routing provider. Please retry in a moment.");
+    error.status = 502;
+    throw error;
+  }
 
   if (response.status === 429) {
     const error = new Error("The free road-routing quota is temporarily exhausted. Please try again later.");
@@ -74,10 +87,25 @@ async function routeBetween(origin, destination, profile) {
     throw error;
   }
   if (!response.ok) {
+    // Keep provider details in server logs so profile-specific failures can be diagnosed
+    // without exposing the API key or raw provider response to the user.
+    let providerMessage = "";
+    try {
+      const providerError = await response.clone().json();
+      providerMessage = String(providerError?.error?.message || providerError?.error || providerError?.message || "").slice(0, 240);
+    } catch (_) {}
+    console.error("[MobilityRouting] ORS directions failed", {
+      requestedMode,
+      routingProfile,
+      status: response.status,
+      providerMessage
+    });
     const error = new Error(response.status === 401 || response.status === 403
-      ? "The routing API key is invalid or does not have access to this route."
-      : "The road route could not be calculated right now.");
-    error.status = response.status === 400 ? 400 : 502;
+      ? "OpenRouteService rejected the " + routingProfile + " profile for " + requestedMode + ". Check the mobility service API key and profile access."
+      : response.status === 400
+        ? "OpenRouteService could not route this trip for " + requestedMode + ". Try a nearby destination or check the selected mode."
+        : "The road route for " + requestedMode + " could not be calculated right now. Please retry.");
+    error.status = response.status === 400 ? 400 : response.status === 429 ? 429 : 502;
     throw error;
   }
 

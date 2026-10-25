@@ -9,7 +9,12 @@
     "rag:setup": "node scripts/setup-rag.js",
     "history:regeocode": "node scripts/regeocode-history.js",
     "test": "node --test",
-    "rag:start": "python rag_service/main.py"
+    "rag:start": "python rag_service/main.py",
+    "mobile:build": "esbuild src/public/js/reva-native-background.entry.ts --bundle --format=iife --target=es2020 --outfile=src/public/js/reva-native-background.js",
+    "mobile:sync": "npm run mobile:build && cap sync android",
+    "mobile:android": "cap open android",
+    "prestart": "npm run mobile:build",
+    "predev": "npm run mobile:build"
   },
   "keywords": [],
   "author": "",
@@ -27,9 +32,16 @@
     "morgan": "^1.11.0",
     "nodemailer": "^9.0.3",
     "resend": "^6.16.0",
-    "socket.io": "^4.8.3"
+    "socket.io": "^4.8.3",
+    "@capacitor/android": "^7.4.3",
+    "@capacitor/core": "^7.4.3",
+    "@capacitor-community/background-geolocation": "^1.2.25",
+    "@capacitor/local-notifications": "^7.0.3",
+    "@capacitor/screen-orientation": "^7.0.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "nodemon": "^3.1.14",
+    "@capacitor/cli": "^7.4.3",
+    "esbuild": "^0.25.0"
   }
 }

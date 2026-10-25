@@ -1440,3 +1440,56 @@ body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.3
     overscroll-behavior: contain;
   }
 }
+
+
+/* Shared landscape-first gate for the authenticated map and journey pages only. */
+.landscape-required[hidden] { display: none !important; }
+.landscape-required {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  padding: 24px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  background: #f3f0e9;
+  color: #263d3a;
+  text-align: center;
+}
+@media screen and (max-width: 720px) and (orientation: portrait) {
+  .landscape-required:not([hidden]) { display: flex !important; }
+}
+.landscape-required-card { width: min(100%, 420px); margin: auto; }
+.landscape-phone-icon { position: relative; display: inline-grid; place-items: center; width: 100px; height: 72px; margin: 0 auto 18px; font-size: 64px; line-height: 1; color: #718e78; transform: rotate(90deg); }
+.landscape-phone-icon span { position: absolute; right: -20px; top: -10px; font-size: 26px; transform: rotate(-90deg); }
+.landscape-required .eyebrow { font-size: 11px; letter-spacing: .16em; font-weight: 800; color: #718e78; }
+.landscape-required h1 { margin: 8px 0 12px; font-size: clamp(27px, 7vw, 36px); line-height: 1.08; letter-spacing: -.04em; }
+.landscape-required p:not(.eyebrow) { max-width: 340px; margin: 0 auto 22px; color: #63736a; font-size: 14px; line-height: 1.6; }
+.landscape-required button { width: 100%; min-height: 48px; border: 0; border-radius: 13px; padding: 12px 16px; background: #344f43; color: white; font-weight: 800; font-size: 14px; }
+.landscape-required small { display: block; max-width: 340px; margin: 14px auto 0; color: #68766e; font-size: 11px; line-height: 1.55; }
+body.landscape-required-active { overflow: hidden !important; }
+
+
+/* Landscape dashboard: make the map taller so Ask Reva sits directly beneath it. */
+@media (min-width: 781px) {
+  .dashboard-grid > .map-stage .map-frame {
+    aspect-ratio: 1.32 / 1;
+  }
+  .dashboard-grid > .map-stage #map {
+    height: 100%;
+    min-height: 0;
+  }
+  .dashboard-grid > .map-stack > .reva-card {
+    margin-top: 0;
+  }
+}
+@media (min-width: 781px) and (max-height: 800px) {
+  .dashboard-grid > .map-stage .map-frame {
+    aspect-ratio: 1.38 / 1;
+  }
+}

@@ -3,7 +3,81 @@
   if (!token) { window.location.replace("/login"); return; }
 
   const $ = id => document.getElementById(id);
+
+  // On phones, require a landscape viewport for the journey map and planner.
+  // Attempt a lock where supported; otherwise the overlay asks the user to rotate.
+  const landscapeGate = $("landscapeRequired");
+  const landscapeHint = $("landscapeRequiredHint");
+  const isSmallScreen = () => window.matchMedia("(max-width: 720px)").matches;
+  const isPortraitViewport = () => window.matchMedia("(orientation: portrait)").matches;
+  const syncLandscapeGate = () => {
+    if (!landscapeGate) return;
+    const blocked = isSmallScreen() && isPortraitViewport();
+    landscapeGate.hidden = !blocked;
+    document.body.classList.toggle("landscape-required-active", blocked);
+    if (!blocked && window.journeyMapInstance) window.journeyMapInstance.invalidateSize();
+  };
+  const requestLandscape = async () => {
+    try {
+      if (!screen.orientation?.lock) throw new Error("orientation-lock-unavailable");
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen();
+      }
+      await screen.orientation.lock("landscape");
+      if (landscapeHint) landscapeHint.textContent = "Landscape mode enabled.";
+    } catch (_) {
+      if (landscapeHint) landscapeHint.textContent = "Automatic rotation is blocked by this browser. Enable Auto-rotate in Quick Settings and turn your phone sideways. Landscape lock works best when Reva is installed on your home screen.";
+    }
+    syncLandscapeGate();
+  };
+  $("tryLandscapeLock")?.addEventListener("click", requestLandscape);
+  window.addEventListener("resize", syncLandscapeGate);
+  window.addEventListener("orientationchange", () => setTimeout(syncLandscapeGate, 120));
+  screen.orientation?.addEventListener?.("change", syncLandscapeGate);
+  syncLandscapeGate();
+
   const message = text => { $("mobilityMessage").textContent = text || ""; };
+
+  // Landscape is opt-in: browsers only permit orientation locking in supported
+  // mobile contexts, commonly after entering fullscreen or when installed as a PWA.
+  const landscapeToggle = $("landscapeModeToggle");
+  if (landscapeToggle) {
+    const updateLandscapeButton = () => {
+      const locked = screen.orientation && screen.orientation.type && screen.orientation.type.startsWith("landscape");
+      landscapeToggle.textContent = locked ? "↻ Return to portrait" : "↻ Landscape mode";
+      landscapeToggle.setAttribute("aria-pressed", locked ? "true" : "false");
+    };
+    landscapeToggle.addEventListener("click", async () => {
+      const orientation = screen.orientation;
+      const currentlyLandscape = orientation?.type?.startsWith("landscape") ||
+        (window.matchMedia && window.matchMedia("(orientation: landscape)").matches);
+      try {
+        if (currentlyLandscape && orientation?.unlock) {
+          orientation.unlock();
+          if (document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen().catch(() => {});
+          message("Landscape lock released. Rotate your phone to return to portrait.");
+          updateLandscapeButton();
+          return;
+        }
+        if (!orientation?.lock) throw new Error("orientation-lock-unavailable");
+        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+          await document.documentElement.requestFullscreen();
+        }
+        await orientation.lock("landscape");
+        message("Landscape mode enabled. Turn your phone sideways for the best journey view.");
+        updateLandscapeButton();
+      } catch (_) {
+        if (document.fullscreenElement && document.exitFullscreen) {
+          try { await document.exitFullscreen(); } catch (_) {}
+        }
+        message("Your browser does not allow automatic rotation here. Turn on Auto-rotate in your phone's quick settings, then rotate your phone sideways. For best support, open Reva from an installed home-screen app.");
+        updateLandscapeButton();
+      }
+    });
+    if (screen.orientation?.addEventListener) screen.orientation.addEventListener("change", updateLandscapeButton);
+    window.addEventListener("resize", updateLandscapeButton);
+    updateLandscapeButton();
+  }
   const api = async (path, options = {}) => {
     const response = await fetch("/api/mobility" + path, {
       ...options,
@@ -39,9 +113,34 @@
   const destinationIcon = L.divIcon({ className: "", html: '<div class="destination-marker"><span>●</span></div>', iconSize: [34,34], iconAnchor: [17,34] });
   let vehicleMarker = null, animationMarker = null, destinationMarker = null, routeLine = null, animationGuideLine = null, socket = null;
   let selectedDestination = null, activeTrip = null, latestPosition = null, watchId = null, vehiclePreviewEnabled = false, journeyAnimationRunning = false, pageRefreshScheduled = false, locationSharingEnabled = false;
-  let mapPickMode = false, pendingMapDestination = null, mapPickMarker = null;
+  let mapPickMode = false, pendingMapDestination = null, mapPickMarker = null, initialGpsCenterDone = false;
   let friendList = [], currentRouteCoordinates = [], pollHandle = null, lastGpsSentAt = 0, lastGpsSent = null, lastRenderedRouteAt = null;
   const sharedTripId = window.REVA_SHARED_TRIP_ID || null;
+  let nativeTrackingRequested = false;
+  let nativeTrackingToken = null;
+  async function syncNativeBackgroundTracking(trip) {
+    const bridge = window.RevaNativeBackground;
+    const shouldTrack = Boolean(!sharedTripId && bridge?.supported && locationSharingEnabled && trip && ["ACTIVE", "DELAYED"].includes(trip.status));
+    if (shouldTrack) {
+      if (nativeTrackingRequested && nativeTrackingToken === token) return;
+      nativeTrackingRequested = true;
+      nativeTrackingToken = token;
+      try {
+        await bridge.start({ token, endpoint: window.location.origin + "/api/tracker/location-native" });
+        message("Background journey tracking is active. Android will show a persistent notification while your journey is being tracked.");
+      } catch (error) {
+        nativeTrackingRequested = false;
+        nativeTrackingToken = null;
+        message("Could not start Android background tracking. Check location and notification permissions: " + (error?.message || "permission required"));
+      }
+      return;
+    }
+    if (nativeTrackingRequested) {
+      nativeTrackingRequested = false;
+      nativeTrackingToken = null;
+      try { await bridge?.stop?.(); } catch (error) { console.warn("Could not stop native journey tracking cleanly.", error); }
+    }
+  }
 
   const formatDistance = meters => meters >= 1000 ? (meters / 1000).toFixed(meters >= 10000 ? 0 : 1) + " km" : Math.round(meters) + " m";
   const formatDuration = seconds => {
@@ -69,6 +168,7 @@
       $("etaValue").textContent = "—"; $("distanceValue").textContent = "—"; $("durationValue").textContent = "—";
       $("lastLocationInfo").textContent = "Waiting for journey location.";
       $("arrivedButton").disabled = true; $("endJourney").disabled = true;
+      void syncNativeBackgroundTracking(null);
       return;
     }
     const isSharedView = Boolean(sharedTripId);
@@ -105,6 +205,7 @@
     if (vehicleMarker) vehicleMarker.setIcon(vehicleIcon);
     $("routeSource").textContent = (modeLabels[mode] || "Journey") + (["bus", "train"].includes(mode) ? " · road-network estimate" : " · " + (trip.route?.provider || "road route"));
     $("mapSubtitle").textContent = trip.destination?.label || "Your city, your route";
+    void syncNativeBackgroundTracking(trip);
   }
 
   function normalizeRouteCoordinates(rawCoordinates, origin, destination) {
@@ -128,7 +229,9 @@
   }
 
   function showRoute(trip) {
-    if (!trip?.route?.coordinates?.length) return;
+    if (!trip?.route?.coordinates?.length || !trip?.destination || !trip?.origin) return;
+    // Leaflet must know the final container size before computing route bounds.
+    map.invalidateSize({ pan: false });
     if (animationGuideLine) { map.removeLayer(animationGuideLine); animationGuideLine = null; }
     currentRouteCoordinates = normalizeRouteCoordinates(trip.route.coordinates, [Number(trip.origin?.latitude), Number(trip.origin?.longitude)], [Number(trip.destination?.latitude), Number(trip.destination?.longitude)]);
     if (currentRouteCoordinates.length < 2) return;
@@ -137,17 +240,20 @@
     routeLine = L.polyline(currentRouteCoordinates, { color: "#263746", weight: 7, opacity: 1, lineCap: "round", lineJoin: "round" }).addTo(map);
     if (destinationMarker) map.removeLayer(destinationMarker);
     destinationMarker = L.marker([trip.destination.latitude, trip.destination.longitude], { icon: destinationIcon, keyboard: false }).addTo(map).bindTooltip(trip.destination.label || "Destination");
-    if (trip.lastLocation && Number.isFinite(Number(trip.lastLocation.latitude))) setVehiclePosition(trip.lastLocation.latitude, trip.lastLocation.longitude, false);
-    const bounds = routeLine.getBounds().extend(destinationMarker.getLatLng());
-    const fitZoom = map.getBoundsZoom(bounds, false, L.point(36, 36));
-    if (fitZoom < 12) {
-      const focus = trip.lastLocation && Number.isFinite(Number(trip.lastLocation.latitude))
-        ? [trip.lastLocation.latitude, trip.lastLocation.longitude]
-        : [trip.origin.latitude, trip.origin.longitude];
-      map.setView(focus, 13, { animate: false });
-    } else {
-      map.fitBounds(bounds, { paddingTopLeft: [36, 36], paddingBottomRight: [36, 36], maxZoom: 15, animate: false });
+    const livePosition = latestPosition && Number.isFinite(Number(latestPosition.latitude))
+      ? latestPosition : trip.lastLocation;
+    if (livePosition && Number.isFinite(Number(livePosition.latitude)) && Number.isFinite(Number(livePosition.longitude))) {
+      setVehiclePosition(livePosition.latitude, livePosition.longitude, false);
     }
+    const bounds = routeLine.getBounds().extend(destinationMarker.getLatLng());
+    // Start Journey must show the whole route immediately, even for long trips.
+    // Recenter is the separate control for zooming back to the traveller.
+    map.fitBounds(bounds, {
+      paddingTopLeft: [44, 44],
+      paddingBottomRight: [44, 44],
+      maxZoom: 15,
+      animate: false
+    });
     $("mapSubtitle").textContent = trip.destination?.label || "Your route";
   }
 
@@ -313,29 +419,30 @@
       setMapPickMode(false);
       updateStatus(activeTrip);
 
-      // No cinematic animation: immediately draw the full solid road route and both markers.
+      // No animation: size the map first, then render the road route and both markers immediately.
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      map.invalidateSize({ pan: false });
       if (activeTrip?.route?.coordinates?.length) {
         showRoute(activeTrip);
         updateStatus(activeTrip);
-        map.invalidateSize();
+      } else {
+        throw new Error("The journey started, but the routing service returned no road geometry. Please retry the route.");
       }
       await refreshTrip();
       if (activeTrip?.route?.coordinates?.length) {
+        map.invalidateSize({ pan: false });
         showRoute(activeTrip);
         updateStatus(activeTrip);
-        map.invalidateSize();
       }
       message("Journey started. Your route, current location and destination are shown on the map.");
 
-      // Move straight to Live Journey so ETA, distance, travel time and journey actions are visible.
-      const progressPanel = document.querySelector(".journey-status-panel");
-      if (progressPanel) {
-        progressPanel.setAttribute("tabindex", "-1");
-        progressPanel.style.scrollMarginTop = "18px";
+      // Keep the actual route visible immediately after Start Journey; status and ETA remain above it.
+      const mapSection = document.querySelector(".journey-map-section");
+      if (mapSection) {
         await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        const top = progressPanel.getBoundingClientRect().top + window.scrollY - 18;
-        window.scrollTo({ top: Math.max(0, top), behavior: "auto" });
-        progressPanel.focus({ preventScroll: true });
+        mapSection.scrollIntoView({ behavior: "auto", block: "start" });
+        map.invalidateSize({ pan: false });
+        if (activeTrip?.route?.coordinates?.length) showRoute(activeTrip);
       }
     } catch (error) { message(error.message); $("startJourney").disabled = false; }
   }
@@ -421,6 +528,11 @@
   function sendGps(position) {
     latestPosition = { latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy, recordedAt: new Date() };
     setVehiclePosition(latestPosition.latitude, latestPosition.longitude, true);
+    // Center on the first usable fix automatically; Recenter remains a manual recovery control.
+    if (!initialGpsCenterDone && !activeTrip && !sharedTripId) {
+      initialGpsCenterDone = true;
+      map.setView([latestPosition.latitude, latestPosition.longitude], 15, { animate: false });
+    }
     $("mobilityConnection").textContent = "GPS ±" + Math.round(latestPosition.accuracy || 0) + " m";
     if (!socket?.connected) return;
     const moved = !lastGpsSent || distanceMeters(lastGpsSent, latestPosition) >= 30;
@@ -445,10 +557,16 @@
       socket.on("mobility-trip-update", event => { if (event && String(event.tripId) === String(sharedTripId)) refreshTrip(); });
       socket.on("receive-location", data => {
         if (!activeTrip || !data || String(data.userId) !== String(activeTrip.travellerId)) return;
-        setVehiclePosition(data.latitude, data.longitude, true);
+        activeTrip.lastLocation = {
+          latitude: Number(data.latitude),
+          longitude: Number(data.longitude),
+          lastSeen: data.lastSeen || new Date().toISOString()
+        };
+        setVehiclePosition(activeTrip.lastLocation.latitude, activeTrip.lastLocation.longitude, true);
         $("lastLocationInfo").textContent = "Live GPS update received" + (data.lastSeen ? " · " + new Date(data.lastSeen).toLocaleTimeString() : "") + (Number.isFinite(Number(data.accuracyMeters)) ? " · ±" + Math.round(Number(data.accuracyMeters)) + " m accuracy" : "");
       });
-      await refreshTrip(); pollHandle = setInterval(refreshTrip, 30000); return;
+      // Keep shared viewers fresh even if a Socket.IO update is missed or reconnects.
+      await refreshTrip(); pollHandle = setInterval(refreshTrip, 5000); return;
     }
     try {
       const data = await fetch("/api/tracker/friends", { headers: { Authorization: "Bearer " + token } }).then(r => r.json());
@@ -490,6 +608,8 @@
     }
   }
 
+  let hasAdvancedToDestination = false;
+
   function syncTransportModeCards() {
     const mode = $("transportMode").value;
     document.querySelectorAll(".transport-mode-card").forEach(card => {
@@ -514,11 +634,17 @@
       $("transportMode").value = card.dataset.mode;
       syncTransportModeCards();
       if (sharedTripId) return;
-      message((modeLabels[card.dataset.mode] || "Vehicle") + " selected. Continue to Plan a Journey below.");
-      const destinationPanel = document.querySelector(".destination-panel");
-      destinationPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
-      destinationPanel?.classList.add("plan-next-highlight");
-      window.setTimeout(() => destinationPanel?.classList.remove("plan-next-highlight"), 1400);
+      message((modeLabels[card.dataset.mode] || "Vehicle") + " selected.");
+      // Advance to destination planning only on the first selection. If the user
+      // comes back to change their mind, update the selected card/vehicle in place
+      // without pulling the page away from the vehicle choices again.
+      if (!hasAdvancedToDestination) {
+        hasAdvancedToDestination = true;
+        const destinationPanel = document.querySelector(".destination-panel");
+        destinationPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+        destinationPanel?.classList.add("plan-next-highlight");
+        window.setTimeout(() => destinationPanel?.classList.remove("plan-next-highlight"), 1400);
+      }
     });
   });
   $("transportMode").addEventListener("change", syncTransportModeCards);
@@ -538,8 +664,16 @@
   $("arrivedButton").addEventListener("click", () => finishTrip("arrive"));
   $("endJourney").addEventListener("click", () => { if (confirm("End this journey now?")) finishTrip("end"); });
   $("recenterMap").addEventListener("click", () => {
-    if (activeTrip?.route?.coordinates?.length) showRoute(activeTrip);
-    else if (latestPosition) map.setView([latestPosition.latitude, latestPosition.longitude], 15, { animate: true });
+    // Recenter means return to the traveller, not refit the entire route.
+    const position = latestPosition || (activeTrip?.lastLocation && {
+      latitude: Number(activeTrip.lastLocation.latitude), longitude: Number(activeTrip.lastLocation.longitude)
+    });
+    if (position && Number.isFinite(Number(position.latitude)) && Number.isFinite(Number(position.longitude))) {
+      map.setView([Number(position.latitude), Number(position.longitude)], Math.max(map.getZoom(), 16), { animate: true, duration: 0.35 });
+      if (activeTrip) setVehiclePosition(position.latitude, position.longitude, false);
+    } else {
+      message("Your current GPS position is not available yet. Wait for a fresh GPS fix and try Recenter again.");
+    }
   });
   $("logoutMobility")?.addEventListener("click", () => { localStorage.removeItem("token"); window.location.replace("/login"); });
   window.addEventListener("pagehide", () => {

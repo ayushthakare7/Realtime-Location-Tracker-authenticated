@@ -1,0 +1,125 @@
+name: Build Reva Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      reva_web_url:
+        description: "Full HTTPS URL of the deployed Reva app (the host serving /tracker and /mobility)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      REVA_WEB_URL: ${{ inputs.reva_web_url }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
+
+      - name: Install dependencies and native orientation plugin
+        run: npm install
+
+      - name: Build web bridge
+        run: npm run mobile:build
+
+      - name: Generate Android project
+        run: npx cap add android
+
+      - name: Enforce native orientation by page
+        shell: bash
+        run: |
+          mkdir -p android/app/src/main/java/com/reva/locationtracker
+          cat > android/app/src/main/java/com/reva/locationtracker/MainActivity.java <<'JAVA'
+          package com.reva.locationtracker;
+
+          import android.content.pm.ActivityInfo;
+          import android.os.Bundle;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.webkit.WebView;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+            private final Handler orientationHandler = new Handler(Looper.getMainLooper());
+            private int lastRequestedOrientation = -1;
+
+            @Override
+            public void onCreate(Bundle savedInstanceState) {
+              // Request landscape immediately instead of waiting for remote WebView navigation.
+              setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+              lastRequestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
+              super.onCreate(savedInstanceState);
+              orientationHandler.post(orientationCheck);
+            }
+
+            private final Runnable orientationCheck = new Runnable() {
+              @Override
+              public void run() {
+                try {
+                  com.getcapacitor.Bridge currentBridge = getBridge();
+                  WebView webView = currentBridge == null ? null : currentBridge.getWebView();
+                  String url = webView == null ? null : webView.getUrl();
+                  if (url != null) {
+                    String path = android.net.Uri.parse(url).getPath();
+                    if (path == null) path = "/";
+                    String normalizedPath = path.replaceAll("/+$", "");
+                    boolean portraitPage = normalizedPath.matches("(?i)(^|/)(login|register)$");
+                    int wanted = portraitPage
+                      ? ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                      : ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
+                    if (wanted != lastRequestedOrientation) {
+                      setRequestedOrientation(wanted);
+                      lastRequestedOrientation = wanted;
+                    }
+                  }
+                } catch (Exception ignored) {
+                  // Retry on the next tick while the Capacitor WebView is starting.
+                }
+                orientationHandler.postDelayed(this, 400);
+              }
+            };
+
+            @Override
+            public void onDestroy() {
+              orientationHandler.removeCallbacks(orientationCheck);
+              super.onDestroy();
+            }
+          }
+          JAVA
+
+      - name: Sync Capacitor plugins
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: android
+        run: chmod +x gradlew && ./gradlew assembleDebug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: reva-android-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14

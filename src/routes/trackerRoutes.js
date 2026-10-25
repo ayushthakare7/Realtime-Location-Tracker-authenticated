@@ -8,6 +8,7 @@ router.get('/friends', controller.listFriends);
 router.delete('/friends/:id', controller.removeFriend);
 router.post('/friends/request', controller.sendFriendRequest);
 router.post('/friends/requests/:id/respond', controller.respondToRequest);
+router.post('/location-native', controller.receiveNativeLocation);
 router.patch('/sharing', controller.setSharing);
 router.patch('/history', controller.setHistory);
 router.get('/history', controller.history);
