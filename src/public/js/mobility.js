@@ -3,6 +3,39 @@
   if (!token) { window.location.replace("/login"); return; }
 
   const $ = id => document.getElementById(id);
+
+  // On phones, require a landscape viewport for the journey map and planner.
+  // Attempt a lock where supported; otherwise the overlay asks the user to rotate.
+  const landscapeGate = $("landscapeRequired");
+  const landscapeHint = $("landscapeRequiredHint");
+  const isSmallScreen = () => window.matchMedia("(max-width: 720px)").matches;
+  const isPortraitViewport = () => window.matchMedia("(orientation: portrait)").matches;
+  const syncLandscapeGate = () => {
+    if (!landscapeGate) return;
+    const blocked = isSmallScreen() && isPortraitViewport();
+    landscapeGate.hidden = !blocked;
+    document.body.classList.toggle("landscape-required-active", blocked);
+    if (!blocked && window.journeyMapInstance) window.journeyMapInstance.invalidateSize();
+  };
+  const requestLandscape = async () => {
+    try {
+      if (!screen.orientation?.lock) throw new Error("orientation-lock-unavailable");
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen();
+      }
+      await screen.orientation.lock("landscape");
+      if (landscapeHint) landscapeHint.textContent = "Landscape mode enabled.";
+    } catch (_) {
+      if (landscapeHint) landscapeHint.textContent = "Automatic rotation is blocked by this browser. Enable Auto-rotate in Quick Settings and turn your phone sideways. Landscape lock works best when Reva is installed on your home screen.";
+    }
+    syncLandscapeGate();
+  };
+  $("tryLandscapeLock")?.addEventListener("click", requestLandscape);
+  window.addEventListener("resize", syncLandscapeGate);
+  window.addEventListener("orientationchange", () => setTimeout(syncLandscapeGate, 120));
+  screen.orientation?.addEventListener?.("change", syncLandscapeGate);
+  syncLandscapeGate();
+
   const message = text => { $("mobilityMessage").textContent = text || ""; };
 
   // Landscape is opt-in: browsers only permit orientation locking in supported
