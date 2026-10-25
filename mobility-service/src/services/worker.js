@@ -48,7 +48,7 @@ async function tick(now = new Date()) {
       const previousStatus = trip.status;
       const moved = distanceMeters(trip.lastRoutedFrom, point);
       const routeAge = now.getTime() - new Date(trip.lastRouteRefreshAt).getTime();
-      if (moved >= Math.max(100, Number(process.env.MOBILITY_RECALCULATE_AFTER_METERS) || 300) || routeAge >= 300000) {
+      if (moved >= Math.max(300, Number(process.env.MOBILITY_RECALCULATE_AFTER_METERS) || 1000) || (routeAge >= 600000 && moved >= 300)) {
         try {
           const route = await routeBetween(point, trip.destination, trip.transportMode);
           trip.route = route; trip.lastRoutedFrom = point; trip.lastRouteRefreshAt = now;
