@@ -130,21 +130,48 @@ router.get("/trips/shared", async (req, res) => {
       MobilityTrip.find({
         userId: { $in: friendIds },
         recipients: req.user.userId,
-        status: { $in: ["ACTIVE", "DELAYED"] }
+        dismissedBy: { $ne: req.user.userId },
+        status: { $in: ["ACTIVE", "DELAYED", "ARRIVED", "COMPLETED"] }
       }).sort({ updatedAt: -1 }).limit(30).lean(),
       User.find({ _id: { $in: friendIds }, sharingEnabled: true }).select("_id").lean()
     ]);
     const currentlySharing = new Set(sharingUsers.map(user => String(user._id)));
-    const visible = trips.filter(trip => currentlySharing.has(String(trip.userId))).map(trip => ({
+    const visible = trips.filter(trip =>
+      ["ARRIVED", "COMPLETED"].includes(trip.status) || currentlySharing.has(String(trip.userId))
+    ).map(trip => ({
       id: String(trip._id),
       travellerUsername: trip.username || "Your friend",
       status: trip.status,
       transportMode: trip.transportMode,
       destination: { label: trip.destination?.label || "Destination" },
       expectedArrivalAt: trip.expectedArrivalAt,
+      arrivedAt: trip.arrivedAt || null,
+      endedAt: trip.endedAt || null,
       updatedAt: trip.updatedAt
     }));
     res.json({ success: true, trips: visible });
+  } catch (error) { fail(res, error); }
+});
+
+router.post("/trips/shared/:id/dismiss", async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ success: false, message: "Invalid journey ID." });
+  try {
+    const trip = await MobilityTrip.findOne({
+      _id: req.params.id,
+      recipients: req.user.userId,
+      status: { $in: ["ARRIVED", "COMPLETED"] }
+    });
+    if (!trip) return res.status(404).json({ success: false, message: "Completed shared journey not found." });
+    const friendship = await Friendship.findOne({ status: "accepted", $or: [
+      { requester: trip.userId, recipient: req.user.userId },
+      { requester: req.user.userId, recipient: trip.userId }
+    ] }).lean();
+    if (!friendship) return res.status(403).json({ success: false, message: "You no longer have access to this friend's journey." });
+    await MobilityTrip.updateOne(
+      { _id: trip._id, recipients: req.user.userId },
+      { $addToSet: { dismissedBy: req.user.userId } }
+    );
+    res.json({ success: true });
   } catch (error) { fail(res, error); }
 });
 
