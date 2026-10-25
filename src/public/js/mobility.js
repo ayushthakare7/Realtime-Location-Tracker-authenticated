@@ -229,7 +229,7 @@
     if (!socket?.connected) return;
     const moved = !lastGpsSent || distanceMeters(lastGpsSent, latestPosition) >= 30;
     if (moved || Date.now() - lastGpsSentAt >= 15000) {
-      socket.emit("send-location", { latitude: latestPosition.latitude, longitude: latestPosition.longitude });
+      socket.emit("send-location", { latitude: latestPosition.latitude, longitude: latestPosition.longitude, accuracyMeters: latestPosition.accuracy });
       lastGpsSent = { latitude: latestPosition.latitude, longitude: latestPosition.longitude };
       lastGpsSentAt = Date.now();
     }
