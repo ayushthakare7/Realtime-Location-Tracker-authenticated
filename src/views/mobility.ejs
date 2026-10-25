@@ -7,7 +7,7 @@
   <title>My Journey · Reva</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
-  <link rel="stylesheet" href="/css/mobility.css?v=landscape-toggle-1">
+  <link rel="stylesheet" href="/css/mobility.css?v=landscape-required-2">
   <style>
     /* Portrait-phone header: replace the shared 3-column header with stacked rows. */
     @media screen and (max-width: 720px) {
@@ -151,6 +151,16 @@
   </section>
   <p id="mobilityMessage" class="mobility-message" aria-live="polite"></p>
 </main>
+<div id="landscapeRequired" class="landscape-required" role="dialog" aria-modal="true" aria-labelledby="landscapeRequiredTitle">
+  <div class="landscape-required-card">
+    <div class="landscape-phone-icon" aria-hidden="true">▱<span>↻</span></div>
+    <p class="eyebrow">BETTER IN LANDSCAPE</p>
+    <h1 id="landscapeRequiredTitle">Turn your phone sideways</h1>
+    <p>Reva Journey is designed for a wide map and a clearer route view. Rotate your phone to landscape to continue.</p>
+    <button id="tryLandscapeLock" type="button">Try landscape automatically ↗</button>
+    <small id="landscapeRequiredHint">If your browser cannot rotate automatically, enable Auto-rotate in Quick Settings and turn your phone sideways.</small>
+  </div>
+</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 <script>window.REVA_SHARED_TRIP_ID = <%- JSON.stringify(sharedTripId || null) %>;</script>
