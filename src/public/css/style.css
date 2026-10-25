@@ -1473,3 +1473,23 @@ body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.3
 .landscape-required button { width: 100%; min-height: 48px; border: 0; border-radius: 13px; padding: 12px 16px; background: #344f43; color: white; font-weight: 800; font-size: 14px; }
 .landscape-required small { display: block; max-width: 340px; margin: 14px auto 0; color: #68766e; font-size: 11px; line-height: 1.55; }
 body.landscape-required-active { overflow: hidden !important; }
+
+
+/* Landscape dashboard: make the map taller so Ask Reva sits directly beneath it. */
+@media (min-width: 781px) {
+  .dashboard-grid > .map-stage .map-frame {
+    aspect-ratio: 1.32 / 1;
+  }
+  .dashboard-grid > .map-stage #map {
+    height: 100%;
+    min-height: 0;
+  }
+  .dashboard-grid > .map-stack > .reva-card {
+    margin-top: 0;
+  }
+}
+@media (min-width: 781px) and (max-height: 800px) {
+  .dashboard-grid > .map-stage .map-frame {
+    aspect-ratio: 1.38 / 1;
+  }
+}
