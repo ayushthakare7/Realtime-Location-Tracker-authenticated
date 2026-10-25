@@ -22,7 +22,7 @@ Set `MOBILITY_SERVICE_URL` in the main app to the deployed service base URL (for
 
 Routes and durations come from OpenRouteService road-routing responses. Reva does not calculate ETA from straight-line distance. If the routing key is missing or quota is exhausted, the API returns an explicit error rather than fabricating an ETA. Shared MongoDB counters cap the defaults at 1,500 direction requests and 500 geocoding requests per UTC day; results are cached to avoid unnecessary calls. Review the current provider free-plan limits and lower these caps if required.
 
-Supported modes: driving, cycling, walking, bus and train. Driving, cycling and walking use their corresponding OpenRouteService profiles. Bus and train are currently represented with a clearly labelled road-network ETA approximation and mode-specific live marker; this is not a true transit itinerary, rail-track route, timetable, transfer plan or live-traffic ETA. A dedicated public-transit/rail routing provider and its data/credentials are required for accurate bus and train directions.
+Supported modes: car, bicycle, motorbike, walking, bus and train. Car, bicycle and walking use their corresponding OpenRouteService profiles. Motorbike uses the car road-routing profile with its own mode-specific live marker (the provider does not calculate a distinct motorcycle route). Bus and train are currently represented with a clearly labelled road-network ETA approximation and mode-specific live marker; this is not a true transit itinerary, rail-track route, timetable, transfer plan or live-traffic ETA. A dedicated public-transit/rail routing provider and its data/credentials are required for accurate bus and train directions.
 
 ## Safety and operational notes
 
