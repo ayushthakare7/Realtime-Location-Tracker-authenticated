@@ -47,7 +47,7 @@ async function routeBetween(origin, destination, profile) {
   const cached = cacheRead(routeCache, cacheKey);
   if (cached) return cached;
   await reserveRequest("directions");
-  const response = await fetch("https://api.openrouteservice.org/v2/directions/" + profile + "/geojson",
+  const response = await fetch("https://api.openrouteservice.org/v2/directions/" + profile + "/geojson", {
     method: "POST",
     headers: {
       Authorization: process.env.ORS_API_KEY,
