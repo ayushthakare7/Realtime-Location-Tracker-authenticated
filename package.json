@@ -12,7 +12,9 @@
     "rag:start": "python rag_service/main.py",
     "mobile:build": "esbuild src/public/js/reva-native-background.entry.js --bundle --format=iife --target=es2020 --outfile=src/public/js/reva-native-background.js",
     "mobile:sync": "npm run mobile:build && cap sync android",
-    "mobile:android": "cap open android"
+    "mobile:android": "cap open android",
+    "prestart": "npm run mobile:build",
+    "predev": "npm run mobile:build"
   },
   "keywords": [],
   "author": "",
