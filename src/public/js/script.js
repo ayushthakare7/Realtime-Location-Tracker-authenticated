@@ -416,6 +416,12 @@ async function setSharing(enabled) {
       removeMarker("me");
     }
     await loadFriends();
+    // If the user was sent here from Plan a Journey, return once sharing is enabled.
+    const returnTo = new URLSearchParams(window.location.search).get("returnTo");
+    if (sharing && returnTo === "/mobility") {
+      setStatus("Location sharing enabled. Returning to Plan a Journey…");
+      window.location.replace("/mobility?resumeJourney=1");
+    }
   } catch (e) { setStatus(e.message); }
 }
 
