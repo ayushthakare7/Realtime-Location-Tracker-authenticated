@@ -71,9 +71,17 @@ def answer_time_question(question, authorized_user_ids, context, database):
         if not mine:
             return f"I don't have your recorded GPS history for {day:%d %b %Y}, so I can't calculate when you were closest to a friend."
         best = None
-        for friend_id in ids:
-            if friend_id == current_id:
-                continue
+        named_friend = next((person for person in context.get("authorizedPeople", [])
+                             if person.get("username") not in ("", "you")
+                             and re.search(r"\\b" + re.escape(str(person.get("username"))) + r"\\b", question, re.I)), None)
+        if named_friend:
+            named_id = str(named_friend.get("id") or "")
+            if named_id not in ids or named_id == current_id:
+                return "I can't compare against that person's history because it isn't available to you."
+            candidate_ids = [named_id]
+        else:
+            candidate_ids = [friend_id for friend_id in ids if friend_id != current_id]
+        for friend_id in candidate_ids:
             friend_points = list(points.find({"userId": _oid(friend_id), "recordedAt": {"$gte": start, "$lt": end}},
                                              {"username": 1, "recordedAt": 1, "latitude": 1, "longitude": 1}).sort("recordedAt", 1).limit(2500))
             stamps = [_as_utc(p["recordedAt"]).timestamp() for p in friend_points]
