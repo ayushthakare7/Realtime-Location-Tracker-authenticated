@@ -64,8 +64,8 @@ jobs:
           root_text = root_gradle.read_text()
           if "com.google.gms:google-services" not in root_text:
               root_text, count = re.subn(
-                  r"(dependencies\\s*\\{)",
-                  r"\\1\\n        classpath 'com.google.gms:google-services:4.4.2'",
+                  r"(dependencies\s*\{)",
+                  r"\1\n        classpath 'com.google.gms:google-services:4.4.2'",
                   root_text,
                   count=1,
               )
@@ -76,11 +76,11 @@ jobs:
           app_gradle = Path("android/app/build.gradle")
           app_text = app_gradle.read_text()
           if "com.google.gms.google-services" not in app_text:
-              app_text += "\\napply plugin: 'com.google.gms.google-services'\\n"
+              app_text += "\napply plugin: 'com.google.gms.google-services'\n"
           if "firebase-bom" not in app_text:
               app_text, count = re.subn(
-                  r"(dependencies\\s*\\{)",
-                  r"\\1\\n    implementation platform('com.google.firebase:firebase-bom:33.16.0')\\n    implementation 'com.google.firebase:firebase-messaging'",
+                  r"(dependencies\s*\{)",
+                  r"\1\n    implementation platform('com.google.firebase:firebase-bom:33.16.0')\n    implementation 'com.google.firebase:firebase-messaging'",
                   app_text,
                   count=1,
               )
@@ -93,7 +93,7 @@ jobs:
           permission = '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />'
           if "android.permission.POST_NOTIFICATIONS" not in manifest_text:
               manifest_text = manifest_text.replace("<manifest ", "<manifest ", 1)
-              manifest_text = re.sub(r"(<manifest[^>]*>)", r"\\1\\n" + permission, manifest_text, count=1)
+              manifest_text = re.sub(r"(<manifest[^>]*>)", r"\1\n" + permission, manifest_text, count=1)
           manifest.write_text(manifest_text)
           PY
 
