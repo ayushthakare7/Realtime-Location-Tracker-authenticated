@@ -1018,3 +1018,16 @@ body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.3
 .safety-travel-link { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; margin-top: 14px; padding: 12px 15px; border-radius: 12px; background: var(--sage-dark); color: #fff; text-decoration: none; font-weight: 700; box-shadow: 0 6px 16px rgba(49,87,72,.13); transition: transform .18s ease, background .18s ease; }
 .safety-travel-link:hover { background: #264a3b; transform: translateY(-1px); }
 .safety-entry-note { margin: 10px 0 0; color: #8a958b; font-size: 11px; }
+
+/* Active friend journey inbox: a permanent discovery point for shared trips */
+.shared-journeys-panel .section-heading{margin-bottom:8px}
+.shared-journeys-panel>.muted{line-height:1.6;margin:0 0 10px}
+.shared-journeys-empty{padding:12px;border-radius:11px;background:#f7f8f3;line-height:1.6}
+.shared-journey-item{padding:12px 0;border-top:1px solid #eef0e9}
+.shared-journey-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.shared-journey-top strong{font-size:13px;overflow-wrap:anywhere}
+.shared-journey-status{padding:3px 8px;border-radius:999px;background:#e7f1e6;color:#41684b;font-size:10px;font-weight:700;white-space:nowrap}
+.shared-journey-item p{margin:5px 0 9px;font-size:11px;overflow-wrap:anywhere}
+.shared-journey-open{display:inline-flex;align-items:center;justify-content:center;padding:8px 11px;border-radius:10px;background:var(--sage-dark);color:#fff;text-decoration:none;font-size:11px;font-weight:700}
+.shared-journey-open:hover{background:#264a3b}
+@media(max-width:780px){.shared-journeys-panel{grid-column:1/-1}}
