@@ -212,6 +212,17 @@ function connectSocket() {
   socket.on("sharing-stopped", data => { if (data && data.userId) removeMarker(data.userId); });
   socket.on("friend-removed", data => { if (data && data.userId) { removeMarker(data.userId); loadFriends({ quiet: true }); } });
   socket.on("friend-request-received", data => { if (data && data.username) setStatus("New friend request from " + data.username + "."); loadFriends(); });
+  socket.on("mobility-notification", data => {
+    if (!data || !data.tripId) return;
+    const titles = { journey_started: "Journey started", journey_delayed: "Journey delayed", journey_arrived: "Arrival confirmed", journey_ended: "Journey ended" };
+    const card = document.createElement("div");
+    card.style.cssText = "position:fixed;z-index:3000;right:16px;bottom:16px;width:min(360px,calc(100vw - 32px));padding:16px;border:1px solid #dce6dc;border-radius:16px;background:#fffdf8;box-shadow:0 18px 50px #20382c30;color:#24332f";
+    const title = document.createElement("strong"); title.textContent = titles[data.type] || "Journey update"; title.style.cssText = "display:block;font:700 14px Manrope,sans-serif";
+    const detail = document.createElement("p"); detail.textContent = (data.travellerUsername || "Your friend") + (data.destination?.label ? " · " + data.destination.label : "") + (data.expectedArrivalAt ? " · ETA " + new Date(data.expectedArrivalAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : ""); detail.style.cssText = "margin:7px 0 12px;color:#78847d;font-size:12px";
+    const open = document.createElement("a"); open.href = "/mobility/shared/" + encodeURIComponent(data.tripId); open.textContent = "View shared journey →"; open.style.cssText = "display:inline-block;padding:8px 11px;border-radius:10px;background:#294d40;color:white;text-decoration:none;font-size:12px;font-weight:700";
+    const close = document.createElement("button"); close.type = "button"; close.textContent = "Dismiss"; close.style.cssText = "float:right;border:0;background:transparent;color:#78847d;padding:8px;font-size:12px"; close.addEventListener("click", () => card.remove());
+    card.append(title, detail, open, close); document.body.append(card); setTimeout(() => card.remove(), 20000);
+  });
 }
 connectSocket();
 
