@@ -1,24 +1,60 @@
+const crypto = require("crypto");
 const PushDevice = require("../models/PushDevice");
 
-let firebaseAdmin = null;
-let firebaseInitAttempted = false;
+let serviceAccount = null;
+let cachedAccessToken = null;
+let accessTokenExpiresAt = 0;
 
-function getMessaging() {
-  if (firebaseInitAttempted) return firebaseAdmin?.messaging?.() || null;
-  firebaseInitAttempted = true;
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (!raw) return null;
+function getServiceAccount() {
+  if (serviceAccount) return serviceAccount;
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) return null;
   try {
-    const admin = require("firebase-admin");
-    const serviceAccount = JSON.parse(raw);
-    firebaseAdmin = admin.apps.length ? admin : admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-    return firebaseAdmin.messaging();
+    const account = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+    if (!account.project_id || !account.client_email || !account.private_key) {
+      throw new Error("Service account needs project_id, client_email and private_key.");
+    }
+    serviceAccount = account;
+    return serviceAccount;
   } catch (error) {
-    console.error("[Push] Firebase Admin is not configured:", error.message);
+    console.error("[Push] Firebase service account configuration is invalid:", error.message);
     return null;
   }
+}
+
+function base64url(value) {
+  return Buffer.from(value).toString("base64url");
+}
+
+async function getAccessToken(account) {
+  if (cachedAccessToken && Date.now() < accessTokenExpiresAt - 60000) return cachedAccessToken;
+  const now = Math.floor(Date.now() / 1000);
+  const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const claim = base64url(JSON.stringify({
+    iss: account.client_email,
+    scope: "https://www.googleapis.com/auth/firebase.messaging",
+    aud: account.token_uri || "https://oauth2.googleapis.com/token",
+    iat: now,
+    exp: now + 3600
+  }));
+  const unsigned = header + "." + claim;
+  const signer = crypto.createSign("RSA-SHA256");
+  signer.update(unsigned);
+  signer.end();
+  const assertion = unsigned + "." + signer.sign(account.private_key, "base64url");
+  const response = await fetch(account.token_uri || "https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion
+    }),
+    signal: AbortSignal.timeout(10000)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.access_token) throw new Error("Google OAuth token request failed (" + response.status + ").");
+  cachedAccessToken = data.access_token;
+  accessTokenExpiresAt = Date.now() + Number(data.expires_in || 3600) * 1000;
+  return cachedAccessToken;
 }
 
 async function registerPushDevice({ userId, token, platform = "android" }) {
@@ -43,10 +79,17 @@ async function unregisterPushDevice({ userId, token }) {
 }
 
 async function sendPushToUser({ userId, title, body, data = {} }) {
-  const messaging = getMessaging();
-  if (!messaging || !userId) return { configured: Boolean(messaging), sent: 0 };
+  const account = getServiceAccount();
+  if (!account || !userId) return { configured: Boolean(account), sent: 0 };
   const devices = await PushDevice.find({ userId, enabled: true }).select("_id token").lean();
   if (!devices.length) return { configured: true, sent: 0 };
+  let accessToken;
+  try {
+    accessToken = await getAccessToken(account);
+  } catch (error) {
+    console.warn("[Push] Could not obtain Firebase access token:", error.message);
+    return { configured: true, sent: 0 };
+  }
   const stringData = {};
   for (const [key, value] of Object.entries(data || {})) {
     if (value !== undefined && value !== null) stringData[key] = typeof value === "string" ? value : JSON.stringify(value);
@@ -54,20 +97,29 @@ async function sendPushToUser({ userId, title, body, data = {} }) {
   let sent = 0;
   for (const device of devices) {
     try {
-      await messaging.send({
-        token: device.token,
-        notification: { title: String(title || "Reva"), body: String(body || "") },
-        data: stringData,
-        android: { priority: "high", notification: { channelId: "reva_journeys", sound: "default" } }
+      const response = await fetch("https://fcm.googleapis.com/v1/projects/" + encodeURIComponent(account.project_id) + "/messages:send", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + accessToken, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: {
+            token: device.token,
+            notification: { title: String(title || "Reva"), body: String(body || "") },
+            data: stringData,
+            android: { priority: "HIGH", notification: { channel_id: "reva_journeys", sound: "default" } }
+          }
+        }),
+        signal: AbortSignal.timeout(10000)
       });
-      sent += 1;
-    } catch (error) {
-      const code = error?.code || "";
-      if (code.includes("registration-token-not-registered") || code.includes("invalid-registration-token")) {
+      if (response.ok) { sent += 1; continue; }
+      const failure = await response.json().catch(() => ({}));
+      const detail = JSON.stringify(failure);
+      if (detail.includes("UNREGISTERED") || detail.includes("registration-token-not-registered") || detail.includes("INVALID_ARGUMENT")) {
         await PushDevice.updateOne({ _id: device._id }, { $set: { enabled: false } });
       } else {
-        console.warn("[Push] Delivery failed:", code || error.message);
+        console.warn("[Push] FCM delivery failed:", response.status);
       }
+    } catch (error) {
+      console.warn("[Push] FCM delivery failed:", error.message);
     }
   }
   return { configured: true, sent };
