@@ -172,15 +172,14 @@
       setVehiclePosition(livePosition.latitude, livePosition.longitude, false);
     }
     const bounds = routeLine.getBounds().extend(destinationMarker.getLatLng());
-    const fitZoom = map.getBoundsZoom(bounds, false, L.point(36, 36));
-    if (fitZoom < 12) {
-      const focus = trip.lastLocation && Number.isFinite(Number(trip.lastLocation.latitude))
-        ? [trip.lastLocation.latitude, trip.lastLocation.longitude]
-        : [trip.origin.latitude, trip.origin.longitude];
-      map.setView(focus, 13, { animate: false });
-    } else {
-      map.fitBounds(bounds, { paddingTopLeft: [36, 36], paddingBottomRight: [36, 36], maxZoom: 15, animate: false });
-    }
+    // Start Journey must show the whole route immediately, even for long trips.
+    // Recenter is the separate control for zooming back to the traveller.
+    map.fitBounds(bounds, {
+      paddingTopLeft: [44, 44],
+      paddingBottomRight: [44, 44],
+      maxZoom: 15,
+      animate: false
+    });
     $("mapSubtitle").textContent = trip.destination?.label || "Your route";
   }
 
