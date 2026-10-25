@@ -483,10 +483,16 @@
       socket.on("mobility-trip-update", event => { if (event && String(event.tripId) === String(sharedTripId)) refreshTrip(); });
       socket.on("receive-location", data => {
         if (!activeTrip || !data || String(data.userId) !== String(activeTrip.travellerId)) return;
-        setVehiclePosition(data.latitude, data.longitude, true);
+        activeTrip.lastLocation = {
+          latitude: Number(data.latitude),
+          longitude: Number(data.longitude),
+          lastSeen: data.lastSeen || new Date().toISOString()
+        };
+        setVehiclePosition(activeTrip.lastLocation.latitude, activeTrip.lastLocation.longitude, true);
         $("lastLocationInfo").textContent = "Live GPS update received" + (data.lastSeen ? " · " + new Date(data.lastSeen).toLocaleTimeString() : "") + (Number.isFinite(Number(data.accuracyMeters)) ? " · ±" + Math.round(Number(data.accuracyMeters)) + " m accuracy" : "");
       });
-      await refreshTrip(); pollHandle = setInterval(refreshTrip, 30000); return;
+      // Keep shared viewers fresh even if a Socket.IO update is missed or reconnects.
+      await refreshTrip(); pollHandle = setInterval(refreshTrip, 5000); return;
     }
     try {
       const data = await fetch("/api/tracker/friends", { headers: { Authorization: "Bearer " + token } }).then(r => r.json());
