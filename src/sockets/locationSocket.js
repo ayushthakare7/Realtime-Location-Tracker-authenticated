@@ -65,7 +65,7 @@ module.exports = (io) => {
         }
         const links = await Friendship.find({ status: "accepted", $or: [{ requester: userId }, { recipient: userId }] }).lean();
         const friendIds = links.map(f => String(f.requester) === String(userId) ? f.recipient : f.requester);
-        const recipients = await User.find({ _id: { $in: friendIds }, sharingEnabled: true }).select("_id").lean();
+        const recipients = await User.find({ _id: { $in: friendIds } }).select("_id").lean();
         const payload = { userId: String(userId), username: user.username || username, latitude, longitude, accuracyMeters, lastSeen: now };
         for (const recipient of recipients) io.to("user:" + recipient._id).emit("receive-location", payload);
       } catch (e) { console.error("Location update failed:", e.message); }
