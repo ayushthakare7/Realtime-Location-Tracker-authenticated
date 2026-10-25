@@ -1,5 +1,5 @@
-const PROFILES = new Set(["driving-car", "cycling-regular", "foot-walking", "bus", "train"]);
-const ROUTING_PROFILE = { bus: "driving-car", train: "driving-car" };
+const PROFILES = new Set(["driving-car", "cycling-regular", "motorbike", "foot-walking", "bus", "train"]);
+const ROUTING_PROFILE = { motorbike: "driving-car", bus: "driving-car", train: "driving-car" };
 const routeCache = new Map();
 const geocodeCache = new Map();
 const RoutingUsage = require("../models/RoutingUsage");
