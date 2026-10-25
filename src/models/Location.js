@@ -23,6 +23,13 @@ const locationSchema = new mongoose.Schema(
             required: true
         },
 
+        accuracyMeters: {
+            type: Number,
+            min: 0,
+            max: 10000,
+            default: null
+        },
+
         lastSeen: {
             type: Date,
             default: Date.now

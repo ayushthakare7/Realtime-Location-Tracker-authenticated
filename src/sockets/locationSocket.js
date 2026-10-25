@@ -52,19 +52,21 @@ module.exports = (io) => {
       try {
         const latitude = Number(data && data.latitude);
         const longitude = Number(data && data.longitude);
+        const rawAccuracy = Number(data && (data.accuracyMeters ?? data.accuracy));
+        const accuracyMeters = Number.isFinite(rawAccuracy) && rawAccuracy >= 0 && rawAccuracy <= 10000 ? rawAccuracy : null;
         if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) return;
         const user = await User.findById(userId).select("sharingEnabled historyEnabled username");
         if (!user || !user.sharingEnabled) return;
         const now = new Date();
-        await Location.findOneAndUpdate({ userId }, { userId, username: user.username || username, latitude, longitude, lastSeen: now }, { upsert: true, new: true });
+        await Location.findOneAndUpdate({ userId }, { userId, username: user.username || username, latitude, longitude, accuracyMeters, lastSeen: now }, { upsert: true, new: true });
         if (user.historyEnabled !== false) {
           await LocationPoint.create({ userId, username: user.username || username, latitude, longitude, recordedAt: now });
           await processLocationEvent({ userId, username: user.username || username, latitude, longitude, recordedAt: now });
         }
         const links = await Friendship.find({ status: "accepted", $or: [{ requester: userId }, { recipient: userId }] }).lean();
         const friendIds = links.map(f => String(f.requester) === String(userId) ? f.recipient : f.requester);
-        const recipients = await User.find({ _id: { $in: friendIds }, sharingEnabled: true }).select("_id").lean();
-        const payload = { userId: String(userId), username: user.username || username, latitude, longitude, lastSeen: now };
+        const recipients = await User.find({ _id: { $in: friendIds } }).select("_id").lean();
+        const payload = { userId: String(userId), username: user.username || username, latitude, longitude, accuracyMeters, lastSeen: now };
         for (const recipient of recipients) io.to("user:" + recipient._id).emit("receive-location", payload);
       } catch (e) { console.error("Location update failed:", e.message); }
     });

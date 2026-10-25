@@ -121,13 +121,8 @@ async function animateCrewReveal() {
   const wait = ms => new Promise(resolve => setTimeout(resolve, reducedMotion ? 0 : ms));
   const duration = seconds => reducedMotion ? 0 : seconds;
   try {
-    if (!radarFocusedOnMe) {
-      hint.textContent = "Finding your signal…";
-      flyToAtSteadyPace(ownMarker.getLatLng(), 15);
-      radarFocusedOnMe = true;
-      await waitForMapTiles();
-    }
-
+    // Reveal friends first, then finish by focusing on the user's own location.
+    // This avoids the old own → friends → own camera sequence.
     const crew = [...markers.entries()].filter(([id, marker]) =>
       id !== "me" && marker && marker.getLatLng()
     );
@@ -147,10 +142,10 @@ async function animateCrewReveal() {
       }
     }
 
-    // Always finish at the user's own location and city-level zoom.
-    // Never fit all friends into the viewport: that can zoom the map too far out.
+    // Finish on the user's own position at a useful close city/neighbourhood zoom.
+    // Never fit all friends into the viewport or zoom out to the whole country.
     hint.textContent = "Returning to your location…";
-    flyToAtSteadyPace(ownMarker.getLatLng(), 13);
+    flyToAtSteadyPace(ownMarker.getLatLng(), 15);
     await waitForMapTiles();
 
     hint.textContent = crew.length
@@ -174,7 +169,7 @@ function sendLatestPosition(force = false) {
   const moved = !lastSent || distanceMeters(lastSent.lat, lastSent.lon, latitude, longitude) >= 30;
   const enoughTime = Date.now() - lastSentAt >= 15000;
   if (!force && !moved && !enoughTime) return false;
-  socket.emit("send-location", { latitude, longitude });
+  socket.emit("send-location", { latitude, longitude, accuracyMeters: accuracy });
   lastSent = { lat: latitude, lon: longitude };
   lastSentAt = Date.now();
   upsertMarker({ userId: "me", username: "You", latitude, longitude }, accuracy);
@@ -200,6 +195,134 @@ function handleLocationError(error) {
   };
   setStatus(messages[error.code] || "Unable to read your current location.");
 }
+
+function markMobilityNotificationRead(id) {
+  if (!id) return Promise.resolve();
+  return fetch("/api/mobility-notifications/" + encodeURIComponent(id) + "/read", {
+    method: "PATCH", headers: { Authorization: "Bearer " + token }
+  }).catch(() => {});
+}
+function showMobilityNotice(data) {
+  if (!data || !data.tripId) return;
+  document.getElementById("mobilityNotice")?.remove();
+  const titles = { journey_started: "Journey started", journey_delayed: "Journey delayed", journey_arrived: "Arrival confirmed", journey_ended: "Journey ended" };
+  const card = document.createElement("div");
+  card.id = "mobilityNotice";
+  card.style.cssText = "position:fixed;z-index:3000;right:16px;bottom:16px;width:min(360px,calc(100vw - 32px));padding:16px;border:1px solid #dce6dc;border-radius:16px;background:#fffdf8;box-shadow:0 18px 50px #20382c30;color:#24332f";
+  const title = document.createElement("strong");
+  title.textContent = data.title || titles[data.type] || "Journey update";
+  title.style.cssText = "display:block;font:700 14px Manrope,sans-serif";
+  const detail = document.createElement("p");
+  detail.textContent = data.body || ((data.travellerUsername || "Your friend") + (data.destination?.label ? " · " + data.destination.label : "") + (data.expectedArrivalAt ? " · ETA " + new Date(data.expectedArrivalAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : ""));
+  detail.style.cssText = "margin:7px 0 12px;color:#78847d;font-size:12px";
+  const open = document.createElement("a");
+  open.href = data.viewPath || data.payload?.viewPath || ("/mobility/shared/" + encodeURIComponent(data.tripId));
+  open.textContent = "View shared journey →";
+  open.style.cssText = "display:inline-block;padding:8px 11px;border-radius:10px;background:#294d40;color:white;text-decoration:none;font-size:12px;font-weight:700";
+  open.addEventListener("click", async event => { event.preventDefault(); await markMobilityNotificationRead(data.notificationId || data.id); window.location.href = open.href; });
+  const close = document.createElement("button");
+  close.type = "button"; close.textContent = "Dismiss";
+  close.style.cssText = "float:right;border:0;background:transparent;color:#78847d;padding:8px;font-size:12px";
+  close.addEventListener("click", () => { void markMobilityNotificationRead(data.notificationId || data.id); card.remove(); });
+  card.append(title, detail, open, close); document.body.append(card);
+  setTimeout(() => card.remove(), 20000);
+}
+async function loadSharedJourneys() {
+  const root = document.getElementById("sharedJourneys");
+  if (!root) return;
+  try {
+    const response = await fetch("/api/mobility/trips/shared", { headers: { Authorization: "Bearer " + token } });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || "Could not load shared journeys.");
+    root.replaceChildren();
+    const trips = Array.isArray(data.trips) ? data.trips : [];
+    if (!trips.length) {
+      const empty = document.createElement("p");
+      empty.className = "muted shared-journeys-empty";
+      empty.textContent = "No active journeys have been shared with you yet.";
+      root.append(empty);
+      return;
+    }
+    trips.forEach(trip => {
+      const card = document.createElement("article");
+      card.className = "shared-journey-item";
+      const finished = ["ARRIVED", "COMPLETED"].includes(trip.status);
+      if (finished) card.classList.add("shared-journey-finished");
+      const top = document.createElement("div");
+      top.className = "shared-journey-top";
+      const traveller = document.createElement("strong");
+      traveller.textContent = trip.travellerUsername || "Your friend";
+      const status = document.createElement("span");
+      status.className = "shared-journey-status";
+      status.textContent = trip.status === "ARRIVED" ? "Arrived" : trip.status === "COMPLETED" ? "Journey ended" : trip.status === "DELAYED" ? "Delayed" : "Live";
+      top.append(traveller, status);
+      const destination = document.createElement("p");
+      destination.className = "muted";
+      if (trip.status === "ARRIVED") {
+        const when = trip.arrivedAt ? " at " + new Date(trip.arrivedAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : "";
+        destination.textContent = (trip.travellerUsername || "Your friend") + " has arrived at " + (trip.destination?.label || "their destination") + when + ".";
+      } else if (trip.status === "COMPLETED") {
+        destination.textContent = (trip.travellerUsername || "Your friend") + "'s journey has ended.";
+      } else {
+        destination.textContent = (trip.destination?.label || "Destination not labelled") + (trip.expectedArrivalAt ? " · ETA " + new Date(trip.expectedArrivalAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : "");
+      }
+      card.append(top, destination);
+      if (finished) {
+        const acknowledge = document.createElement("button");
+        acknowledge.type = "button";
+        acknowledge.className = "shared-journey-dismiss";
+        acknowledge.textContent = "OK · Remove";
+        acknowledge.addEventListener("click", async () => {
+          acknowledge.disabled = true;
+          acknowledge.textContent = "Removing…";
+          try {
+            const response = await fetch("/api/mobility/trips/shared/" + encodeURIComponent(trip.id) + "/dismiss", {
+              method: "POST",
+              headers: { Authorization: "Bearer " + token }
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.message || "Could not remove this journey.");
+            card.remove();
+            if (!root.querySelector(".shared-journey-item")) {
+              const empty = document.createElement("p");
+              empty.className = "muted shared-journeys-empty";
+              empty.textContent = "No active journeys have been shared with you yet.";
+              root.append(empty);
+            }
+          } catch (error) {
+            acknowledge.disabled = false;
+            acknowledge.textContent = "OK · Remove";
+            acknowledge.title = error.message;
+          }
+        });
+        card.append(acknowledge);
+      } else {
+        const link = document.createElement("a");
+        link.className = "shared-journey-open";
+        link.href = "/mobility/shared/" + encodeURIComponent(trip.id);
+        link.textContent = "View live journey →";
+        card.append(link);
+      }
+      root.append(card);
+    });
+  } catch (error) {
+    root.replaceChildren();
+    const note = document.createElement("p");
+    note.className = "muted shared-journeys-empty";
+    note.textContent = "Shared journeys are temporarily unavailable. " + error.message;
+    root.append(note);
+  }
+}
+
+async function loadMobilityNotifications() {
+  try {
+    const response = await fetch("/api/mobility-notifications", { headers: { Authorization: "Bearer " + token } });
+    if (!response.ok) return;
+    const data = await response.json();
+    if (data.notifications?.length) showMobilityNotice(data.notifications[0]);
+  } catch (_) {}
+}
+
 function connectSocket() {
   socket = io({ auth: { token } });
   socket.on("connect", () => {
@@ -212,8 +335,12 @@ function connectSocket() {
   socket.on("sharing-stopped", data => { if (data && data.userId) removeMarker(data.userId); });
   socket.on("friend-removed", data => { if (data && data.userId) { removeMarker(data.userId); loadFriends({ quiet: true }); } });
   socket.on("friend-request-received", data => { if (data && data.username) setStatus("New friend request from " + data.username + "."); loadFriends(); });
+  socket.on("mobility-notification", data => { showMobilityNotice(data); loadSharedJourneys(); });
 }
 connectSocket();
+loadMobilityNotifications();
+loadSharedJourneys();
+setInterval(loadSharedJourneys, 30000);
 
 async function loadFriends({ quiet = false } = {}) {
   try {
@@ -289,6 +416,12 @@ async function setSharing(enabled) {
       removeMarker("me");
     }
     await loadFriends();
+    // If the user was sent here from Plan a Journey, return once sharing is enabled.
+    const returnTo = new URLSearchParams(window.location.search).get("returnTo");
+    if (sharing && returnTo === "/mobility") {
+      setStatus("Location sharing enabled. Returning to Plan a Journey…");
+      window.location.replace("/mobility?resumeJourney=1");
+    }
   } catch (e) { setStatus(e.message); }
 }
 

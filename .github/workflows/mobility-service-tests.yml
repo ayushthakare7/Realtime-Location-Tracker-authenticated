@@ -1,0 +1,50 @@
+name: Mobility service checks
+
+on:
+  push:
+    branches: [feature/reva-mobility-context]
+    paths:
+      - "mobility-service/**"
+      - ".github/workflows/mobility-service-tests.yml"
+  pull_request:
+    paths:
+      - "mobility-service/**"
+      - ".github/workflows/mobility-service-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobility-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm test
+      - run: node --check server.js
+      - run: node --check src/routes/trips.js
+      - run: node --check src/services/worker.js
+      - run: node --check src/services/routing.js
+
+      - run: node --check src/app.js
+        working-directory: .
+      - run: node --check src/routes/mobilityProxyRoutes.js
+        working-directory: .
+      - run: node --check src/routes/mobilityEventsRoutes.js
+        working-directory: .
+      - run: node --check src/sockets/locationSocket.js
+        working-directory: .
+      - run: node --check src/public/js/script.js
+        working-directory: .
+      - run: node --check src/public/js/mobility.js
+        working-directory: .
+      - run: node --check src/models/RoutingUsage.js
+      - run: node --check src/services/notifications.js
+      - run: node --check src/models/index.js
+      - run: node --check src/models/MobilityNotification.js
+        working-directory: .
+      - run: node --check src/routes/mobilityNotificationRoutes.js
+        working-directory: .
