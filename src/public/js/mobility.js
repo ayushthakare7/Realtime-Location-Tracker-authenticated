@@ -71,9 +71,19 @@
       $("arrivedButton").disabled = true; $("endJourney").disabled = true;
       return;
     }
-    $("journeyHeading").textContent = trip.status === "ARRIVED" ? "You've arrived" : trip.status === "DELAYED" ? "Journey delayed" : "Journey in progress";
+    const isSharedView = Boolean(sharedTripId);
+    const travellerName = String(trip.travellerUsername || trip.username || "Your friend").trim() || "Your friend";
+    $("journeyHeading").textContent = isSharedView
+      ? trip.status === "ARRIVED" ? travellerName + " has arrived" : trip.status === "DELAYED" ? travellerName + "'s journey is delayed" : ["COMPLETED", "CANCELLED"].includes(trip.status) ? travellerName + "'s journey has ended" : travellerName + "'s journey in progress"
+      : trip.status === "ARRIVED" ? "You've arrived" : trip.status === "DELAYED" ? "Journey delayed" : "Journey in progress";
     $("journeyStatus").dataset.state = trip.status;
-    const copy = {
+    const copy = isSharedView ? {
+      ACTIVE: travellerName + " is on the way. Their ETA updates as their location changes.",
+      DELAYED: travellerName + "'s expected arrival has shifted or is delayed. Check their shared route for updates.",
+      ARRIVED: travellerName + " has arrived at their destination. Their journey is complete.",
+      CANCELLED: travellerName + "'s journey was cancelled.",
+      COMPLETED: travellerName + "'s journey has ended."
+    } : {
       ACTIVE: "You're on your way. ETA updates as your location changes.",
       DELAYED: "Your latest expected arrival has passed or shifted beyond the original estimate. Check your route and location signal.",
       ARRIVED: "Arrival confirmed. Your trip is complete.",
