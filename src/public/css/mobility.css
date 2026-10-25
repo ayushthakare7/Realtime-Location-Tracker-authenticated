@@ -61,3 +61,13 @@
 .vehicle-marker{display:grid;place-items:center;width:62px;height:58px;border:0;border-radius:0;background:transparent;box-shadow:none;transition:transform .18s ease}
 .vehicle-marker svg{display:block;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 4px 4px #263d3a22)}
 @media(max-width:380px){.transport-mode-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.transport-mode-card{min-height:106px}}
+
+/* Improve anime illustration visibility in picker cards and on Leaflet markers */
+.transport-mode-card{overflow:visible;min-height:126px;padding:8px 4px 9px;gap:3px}
+.mode-art{width:100%;height:78px;min-width:0;overflow:visible}
+.mode-art svg{width:100%;height:100%;max-width:88px;overflow:visible;filter:drop-shadow(0 2px 1px #263d3a14)}
+.vehicle-icon-shell{width:74px!important;height:64px!important;overflow:visible!important}
+.vehicle-marker{width:74px!important;height:64px!important;overflow:visible!important;background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;padding:0!important;color:inherit!important;font-size:initial!important}
+.vehicle-marker svg{width:100%;height:100%;max-width:none;overflow:visible;display:block;filter:drop-shadow(0 3px 3px #263d3a2b)}
+.leaflet-marker-icon.vehicle-icon-shell{background:transparent!important;border:0!important}
+@media(max-width:380px){.transport-mode-card{min-height:120px}.mode-art{height:76px}}
