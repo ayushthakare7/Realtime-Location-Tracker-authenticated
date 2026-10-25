@@ -346,3 +346,40 @@
  .mobility-page .transport-mode-select-wrap{display:none!important}
  .mobility-page .start-journey-panel{grid-column:2;grid-row:1;align-self:stretch;min-width:0;box-sizing:border-box}
 }
+
+/* Journey page sequence: status, vehicle choice, then destination + tall map */
+@media(min-width:721px){
+ .mobility-page .mobility-layout{display:flex;flex-direction:column;align-items:stretch;gap:14px}
+ .mobility-page .journey-status-panel{order:0;width:100%;box-sizing:border-box}
+ .mobility-page .journey-planner-form{order:1;width:100%;display:flex;flex-direction:column;gap:14px;min-width:0}
+ .mobility-page .travel-options-panel{order:0;width:100%;box-sizing:border-box}
+ .mobility-page .travel-options-heading{margin-bottom:12px}
+ .mobility-page .travel-options-content{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(260px,320px)!important;align-items:stretch;gap:18px;width:100%;min-width:0}
+ .mobility-page #transportModeCards{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-template-rows:1fr;gap:10px;width:100%;min-width:0}
+ .mobility-page #transportModeCards .transport-mode-card{width:100%;min-width:0;min-height:130px;height:100%;box-sizing:border-box}
+ .mobility-page .start-journey-panel{grid-column:2;grid-row:1;align-self:stretch;width:100%;min-width:0;box-sizing:border-box}
+ .mobility-page .journey-map-section{order:1;width:100%;min-width:0}
+ .mobility-page .journey-map-frame{height:clamp(500px,64vh,680px)!important;min-height:500px!important}
+ .mobility-page .destination-panel{order:0;width:100%;min-height:0;height:auto;box-sizing:border-box}
+ .mobility-page .journey-planner-form{display:grid;grid-template-columns:minmax(280px,.68fr) minmax(0,1.5fr);grid-template-areas:"destination map" "travel travel";align-items:stretch}
+ .mobility-page .destination-panel{grid-area:destination}
+ .mobility-page .journey-map-section{grid-area:map}
+ .mobility-page .travel-options-panel{grid-area:travel}
+}
+@media(min-width:721px) and (max-width:1050px){
+ .mobility-page #transportModeCards{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(2,minmax(100px,1fr))}
+ .mobility-page .travel-options-content{grid-template-columns:minmax(0,1fr) minmax(235px,280px)!important}
+ .mobility-page .journey-map-frame{height:clamp(440px,58vh,590px)!important;min-height:440px!important}
+}
+@media(max-width:720px){
+ .mobility-page .mobility-layout{display:flex;flex-direction:column;gap:11px}
+ .mobility-page .journey-status-panel{order:0;width:100%}
+ .mobility-page .journey-planner-form{order:1;display:flex;flex-direction:column;gap:11px;width:100%}
+ .mobility-page .travel-options-panel{order:0;width:100%;box-sizing:border-box}
+ .mobility-page .travel-options-content{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:12px}
+ .mobility-page #transportModeCards{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(2,minmax(96px,1fr))}
+ .mobility-page .start-journey-panel{grid-column:1;grid-row:auto}
+ .mobility-page .destination-panel{order:1;width:100%;box-sizing:border-box}
+ .mobility-page .journey-map-section{order:2;width:100%;min-width:0}
+ .mobility-page .journey-map-frame{height:clamp(390px,58vh,520px)!important;min-height:390px!important}
+}
