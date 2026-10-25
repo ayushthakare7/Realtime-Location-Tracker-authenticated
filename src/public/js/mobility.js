@@ -193,6 +193,9 @@
   }
 
   function setVehiclePosition(latitude, longitude, animate = true) {
+    // Do not render a vehicle/location pin while the user is only planning a journey.
+    // The vehicle marker appears only for an active trip or a friend's shared trip.
+    if (!activeTrip && !sharedTripId) return;
     const mode = activeTrip?.transportMode || $("transportMode")?.value || "driving-car";
     vehicleIcon = vehicleIconForMode(mode);
     const target = L.latLng(Number(latitude), Number(longitude));
@@ -448,8 +451,8 @@
       card.classList.toggle("is-selected", selected);
       card.setAttribute("aria-pressed", String(selected));
     });
-    if (vehicleMarker && !activeTrip) vehicleMarker.setIcon(vehicleIconForMode(mode));
-    if (latestPosition && !activeTrip) setVehiclePosition(latestPosition.latitude, latestPosition.longitude, false);
+    // Selecting a vehicle changes the selected mode only; it must not place a GPS pin.
+    if (vehicleMarker && activeTrip) vehicleMarker.setIcon(vehicleIconForMode(mode));
   }
   document.querySelectorAll(".transport-mode-card").forEach(card => {
     card.addEventListener("click", () => {
