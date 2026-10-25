@@ -31,6 +31,15 @@ async function tick(now = new Date()) {
         trip.status = "ARRIVED"; trip.arrivedAt = now; trip.endedAt = now;
         await trip.save(); await emitMobilityEvent(trip, "journey_arrived"); continue;
       }
+      if (!fresh) {
+        const previousStatus = trip.status;
+        if (now.getTime() > new Date(trip.expectedArrivalAt).getTime() + (Number(trip.gracePeriodMinutes) || 8) * 60000) trip.status = "DELAYED";
+        await trip.save();
+        if (previousStatus !== "DELAYED" && trip.status === "DELAYED" && !trip.delayNotifiedAt) {
+          trip.delayNotifiedAt = now; await trip.save(); await emitMobilityEvent(trip, "journey_delayed");
+        }
+        continue;
+      }
 
       const previousStatus = trip.status;
       const moved = distanceMeters(trip.lastRoutedFrom, point);
@@ -42,9 +51,12 @@ async function tick(now = new Date()) {
           trip.expectedArrivalAt = new Date(now.getTime() + route.durationSeconds * 1000); trip.lastRouteErrorAt = null;
         } catch (error) { trip.lastRouteErrorAt = now; console.warn("[MobilityWorker] Route refresh skipped:", error.message); }
       }
-      trip.status = now.getTime() > new Date(trip.expectedArrivalAt).getTime() + (Number(trip.gracePeriodMinutes) || 8) * 60000 ? "DELAYED" : "ACTIVE";
+      const graceMs = (Number(trip.gracePeriodMinutes) || 8) * 60000;
+      const pushedBeyondOriginal = new Date(trip.expectedArrivalAt).getTime() > new Date(trip.originalExpectedArrivalAt).getTime() + graceMs;
+      const latestEtaPassed = now.getTime() > new Date(trip.expectedArrivalAt).getTime() + graceMs;
+      trip.status = (trip.status === "DELAYED" || pushedBeyondOriginal || latestEtaPassed) ? "DELAYED" : "ACTIVE";
       await trip.save();
-      if (previousStatus !== "DELAYED" && trip.status === "DELAYED") {
+      if (previousStatus !== "DELAYED" && trip.status === "DELAYED" && !trip.delayNotifiedAt) {
         trip.delayNotifiedAt = now; await trip.save(); await emitMobilityEvent(trip, "journey_delayed");
       }
     } catch (error) { console.error("[MobilityWorker] Trip processing failed:", String(trip._id), error.message); }
