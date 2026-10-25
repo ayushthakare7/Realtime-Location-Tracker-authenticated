@@ -8,6 +8,61 @@ const SafetyJourney = require("../models/SafetyJourney");
 const { askRagService } = require("../services/ragClient.service");
 const { placeLabel, reverseGeocode } = require("../services/locationEvents.service");
 
+exports.receiveNativeLocation = async (req, res) => {
+  try {
+    const latitude = Number(req.body?.latitude);
+    const longitude = Number(req.body?.longitude);
+    const rawAccuracy = Number(req.body?.accuracyMeters ?? req.body?.accuracy);
+    const accuracyMeters = Number.isFinite(rawAccuracy) && rawAccuracy >= 0 && rawAccuracy <= 10000 ? rawAccuracy : null;
+
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
+        !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      return res.status(400).json({ success: false, message: "Valid latitude and longitude are required." });
+    }
+
+    const uid = req.user.userId;
+    const user = await User.findById(uid).select("sharingEnabled historyEnabled username");
+    if (!user || !user.sharingEnabled) {
+      return res.status(403).json({ success: false, message: "Enable Reva location sharing before sending background updates." });
+    }
+
+    const recordedAt = new Date(Number(req.body?.time) || Date.now());
+    // Reject implausibly old or future timestamps; native queues must not overwrite a newer fix.
+    const ageMs = Date.now() - recordedAt.getTime();
+    if (!Number.isFinite(recordedAt.getTime()) || ageMs > 24 * 60 * 60 * 1000 || ageMs < -5 * 60 * 1000) {
+      return res.status(400).json({ success: false, message: "Location timestamp is invalid or too old." });
+    }
+
+    const current = await Location.findOne({ userId: uid }).lean();
+    if (current?.lastSeen && new Date(current.lastSeen).getTime() > recordedAt.getTime()) {
+      return res.json({ success: true, ignored: true, reason: "stale_location" });
+    }
+
+    await Location.findOneAndUpdate(
+      { userId: uid },
+      { userId: uid, username: user.username || req.user.username, latitude, longitude, accuracyMeters, lastSeen: recordedAt },
+      { upsert: true, new: true }
+    );
+
+    if (user.historyEnabled !== false) {
+      await LocationPoint.create({ userId: uid, username: user.username || req.user.username, latitude, longitude, recordedAt });
+      await processLocationEvent({ userId: uid, username: user.username || req.user.username, latitude, longitude, recordedAt });
+    }
+
+    const links = await Friendship.find({ status: "accepted", $or: [{ requester: uid }, { recipient: uid }] }).lean();
+    const friendIds = links.map(link => String(link.requester) === String(uid) ? link.recipient : link.requester);
+    const recipients = await User.find({ _id: { $in: friendIds }, sharingEnabled: true }).select("_id").lean();
+    const payload = { userId: String(uid), username: user.username || req.user.username, latitude, longitude, accuracyMeters, lastSeen: recordedAt, source: "native-background" };
+    const io = req.app.get("io");
+    for (const recipient of recipients) io?.to("user:" + recipient._id).emit("receive-location", payload);
+
+    res.json({ success: true, recordedAt });
+  } catch (error) {
+    console.error("Native background location update failed:", error.message);
+    res.status(500).json({ success: false, message: "Could not save the background location update." });
+  }
+};
+
 exports.setSharing = async (req, res) => {
   try {
     const enabled = req.body.enabled === true;
