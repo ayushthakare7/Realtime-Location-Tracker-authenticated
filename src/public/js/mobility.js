@@ -113,7 +113,7 @@
     currentRouteCoordinates = trip.route.coordinates.map(point => [Number(point[1]), Number(point[0])]);
     if (routeLine) map.removeLayer(routeLine);
     lastRenderedRouteAt = trip.route.calculatedAt || null;
-    routeLine = L.polyline(currentRouteCoordinates, { color: "#4d83c6", weight: 6, opacity: .88, lineCap: "round", lineJoin: "round" }).addTo(map);
+    routeLine = L.polyline(currentRouteCoordinates, { color: "#263746", weight: 7, opacity: 1, lineCap: "round", lineJoin: "round" }).addTo(map);
     if (destinationMarker) map.removeLayer(destinationMarker);
     destinationMarker = L.marker([trip.destination.latitude, trip.destination.longitude], { icon: destinationIcon, keyboard: false }).addTo(map).bindTooltip(trip.destination.label || "Destination");
     if (trip.lastLocation && Number.isFinite(Number(trip.lastLocation.latitude))) setVehiclePosition(trip.lastLocation.latitude, trip.lastLocation.longitude, false);
@@ -158,15 +158,11 @@
       if (destinationMarker) { map.removeLayer(destinationMarker); destinationMarker = null; }
       if (animationMarker) { map.removeLayer(animationMarker); animationMarker = null; }
 
-      // Keep a subtle full-route guide visible while the main route is drawn.
+      // Draw one solid dark route progressively, matching the original map styling.
       if (coordinates.length >= 2) {
         currentRouteCoordinates = coordinates;
-        animationGuideLine = L.polyline(coordinates, {
-          color: "#8ab7e8", weight: 5, opacity: 0.48, dashArray: "7 9",
-          lineCap: "round", lineJoin: "round"
-        }).addTo(map);
         routeLine = L.polyline([], {
-          color: "#2868bd", weight: 7, opacity: 1,
+          color: "#263746", weight: 7, opacity: 1,
           lineCap: "round", lineJoin: "round"
         }).addTo(map);
         lastRenderedRouteAt = trip.route?.calculatedAt || null;
@@ -270,7 +266,10 @@
         : Number.isFinite(origin?.[0]) && Number.isFinite(origin?.[1]) ? origin : null;
       if (livePosition && vehicleMarker) vehicleMarker.setLatLng(livePosition);
       vehicleMarker?.setOpacity(1);
-      statusPanel?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+      if (statusPanel) {
+        statusPanel.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+        document.getElementById("journeyHeading")?.focus({ preventScroll: true });
+      }
       message(coordinates.length >= 2
         ? "Route preview complete. Your live journey is in progress."
         : "Journey started. A road route could not be animated, but your destination and live journey status are available.");
@@ -437,6 +436,13 @@
       message("Journey started. Watch the route animation from your location to your destination.");
       await animateJourneyStart(activeTrip);
       await refreshTrip();
+      // Hand off to Journey in Progress only after map and status updates have settled.
+      const progressPanel = document.querySelector(".journey-status-panel");
+      const heading = document.getElementById("journeyHeading");
+      window.setTimeout(() => {
+        progressPanel?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+        heading?.focus({ preventScroll: true });
+      }, 120);
     } catch (error) { message(error.message); $("startJourney").disabled = false; }
   }
 
