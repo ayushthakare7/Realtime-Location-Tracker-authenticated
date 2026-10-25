@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const User = require("../models/User");
 const Friendship = require("../models/Friendship");
 const MobilityNotification = require("../models/MobilityNotification");
+const { sendPushToUser } = require("../services/pushNotification.service");
 const router = express.Router();
 
 function secretMatches(provided, expected) {
@@ -24,8 +25,8 @@ router.post("/mobility-events", async (req, res) => {
   }
   const event = req.body || {};
   if (!["journey_started", "journey_delayed", "journey_arrived", "journey_ended"].includes(event.type)
-      || !/^[a-f\d]{24}$/i.test(String(event.travellerId || ""))
-      || !/^[a-f\d]{24}$/i.test(String(event.tripId || ""))) {
+      || !/^[a-f\\d]{24}$/i.test(String(event.travellerId || ""))
+      || !/^[a-f\\d]{24}$/i.test(String(event.tripId || ""))) {
     return res.status(400).json({ success: false, message: "Invalid mobility event." });
   }
   const io = req.app.get("io");
@@ -40,7 +41,7 @@ router.post("/mobility-events", async (req, res) => {
   io.to("user:" + payload.travellerId).emit("mobility-trip-update", payload);
 
   let recipients = [...new Set((Array.isArray(event.recipientIds) ? event.recipientIds : []).map(String))]
-    .filter(id => /^[a-f\d]{24}$/i.test(id) && id !== payload.travellerId);
+    .filter(id => /^[a-f\\d]{24}$/i.test(id) && id !== payload.travellerId);
   const traveller = await User.findById(payload.travellerId).select("sharingEnabled").lean();
   if (!traveller || !traveller.sharingEnabled) recipients = [];
   if (recipients.length) {
@@ -70,6 +71,10 @@ router.post("/mobility-events", async (req, res) => {
       } },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     ).lean();
+    await sendPushToUser({
+      userId: recipientId, title: notification.title, body: notification.body,
+      data: { ...(notification.payload || {}), viewPath: "/mobility/shared/" + String(event.tripId) }
+    });
     io.to("user:" + recipientId).emit("mobility-notification", {
       ...payload, notificationId: String(notification._id), title: notification.title, body: notification.body, viewPath: "/mobility/shared/" + String(event.tripId)
     });
@@ -85,6 +90,7 @@ router.post("/mobility-events", async (req, res) => {
       { $setOnInsert: { notificationKey, recipientId: payload.travellerId, tripId: event.tripId, type: event.type, title: travellerCopy[0], body: travellerCopy[1], payload: { tripId: String(event.tripId), travellerId: payload.travellerId, destination: event.destination || null, expectedArrivalAt: event.expectedArrivalAt || null, status: payload.status, viewPath: "/mobility" } } },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     ).lean();
+    await sendPushToUser({ userId: payload.travellerId, title: notification.title, body: notification.body, data: notification.payload });
     io.to("user:" + payload.travellerId).emit("mobility-notification", { ...payload, notificationId: String(notification._id), title: notification.title, body: notification.body, viewPath: "/mobility" });
   }
   res.json({ success: true, deliveredTo: recipients.length });
