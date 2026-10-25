@@ -1031,3 +1031,11 @@ body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.3
 .shared-journey-open{display:inline-flex;align-items:center;justify-content:center;padding:8px 11px;border-radius:10px;background:var(--sage-dark);color:#fff;text-decoration:none;font-size:11px;font-weight:700}
 .shared-journey-open:hover{background:#264a3b}
 @media(max-width:780px){.shared-journeys-panel{grid-column:1/-1}}
+
+
+/* Completed shared journeys stay visible until this friend acknowledges them. */
+.shared-journey-finished{padding:13px;margin:8px 0;border:1px solid #dce8dc;border-radius:13px;background:linear-gradient(135deg,#f5faf2,#fffdf8)}
+.shared-journey-finished .shared-journey-status{background:#dcefe0;color:#2e6744}
+.shared-journey-dismiss{display:inline-flex;align-items:center;justify-content:center;margin-top:2px;padding:8px 12px;border:1px solid #d2e0d2;border-radius:10px;background:#fff;color:#315e43;font:700 11px Manrope,sans-serif;cursor:pointer}
+.shared-journey-dismiss:hover{background:#e8f2e7}
+.shared-journey-dismiss:disabled{opacity:.6;cursor:wait}
