@@ -17,7 +17,7 @@ async function tick(now = new Date()) {
       if (!Number.isFinite(point.latitude) || !Number.isFinite(point.longitude)) continue;
       trip.lastLocation = { ...point, lastSeen: location.lastSeen };
       const remainingMeters = distanceMeters(point, trip.destination);
-      const radius = Math.max(30, Number(process.env.MOBILITY_ARRIVAL_RADIUS_METERS) || 120);
+      const radius = Math.max(30, Number(process.env.MOBILITY_ARRIVAL_RADIUS_METERS) || 150);
       const confirmations = Math.max(2, Number(process.env.MOBILITY_ARRIVAL_CONFIRMATIONS) || 2);
       const gpsAge = now.getTime() - new Date(location.lastSeen).getTime();
       const fresh = gpsAge >= 0 && gpsAge <= 120000;
@@ -68,7 +68,7 @@ async function tick(now = new Date()) {
 }
 function startMobilityWorker() {
   let running = false;
-  const interval = Math.max(30000, Number(process.env.MOBILITY_WORKER_INTERVAL_MS) || 60000);
+  const interval = Math.max(30000, Number(process.env.MOBILITY_WORKER_INTERVAL_MS) || 30000);
   const run = async () => { if (running) return; running = true; try { await tick(); } catch (error) { console.error("[MobilityWorker] Tick failed:", error.message); } finally { running = false; } };
   void run(); const timer = setInterval(run, interval); timer.unref?.();
   console.log("[MobilityWorker] Polling every " + interval + "ms"); return () => clearInterval(timer);
