@@ -107,14 +107,13 @@ def answer_time_question(question, authorized_user_ids, context, database):
     subject_id = current_id
     is_self = bool(re.search(r"\b(?:i|me|my)\b", question, re.I)) and not re.search(r"\bmy friend\b", question, re.I)
     if not is_self:
-        names = [str(x.get("username", "")) for x in context.get("authorizedPeople", context.get("currentLocations", [])) if x.get("username") not in ("", "you")]
-        name = next((n for n in names if re.search(r"\b" + re.escape(n) + r"\b", question, re.I)), None)
-        if not name:
+        people = context.get("authorizedPeople", context.get("currentLocations", []))
+        person = next((x for x in people
+                       if x.get("username") not in ("", "you")
+                       and re.search(r"\b" + re.escape(str(x.get("username"))) + r"\b", question, re.I)), None)
+        if not person:
             return None
-        row = database["locationevents"].find_one({"userId": {"$in": [_oid(i) for i in ids]}, "username": {"$regex": "^" + re.escape(name) + "$", "$options": "i"}}, {"userId": 1})
-        if not row:
-            return "I couldn't identify an authorized friend with saved location history for that question."
-        subject_id = str(row["userId"])
+        subject_id = str(person.get("id") or "")
         if subject_id not in ids:
             return "I can't access that person's location history."
     target = _as_utc(clock)
