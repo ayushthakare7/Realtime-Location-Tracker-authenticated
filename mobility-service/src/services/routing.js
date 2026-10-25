@@ -74,10 +74,25 @@ async function routeBetween(origin, destination, profile) {
     throw error;
   }
   if (!response.ok) {
+    // Keep provider details in server logs so profile-specific failures can be diagnosed
+    // without exposing the API key or raw provider response to the user.
+    let providerMessage = "";
+    try {
+      const providerError = await response.clone().json();
+      providerMessage = String(providerError?.error?.message || providerError?.error || providerError?.message || "").slice(0, 240);
+    } catch (_) {}
+    console.error("[MobilityRouting] ORS directions failed", {
+      requestedMode,
+      routingProfile,
+      status: response.status,
+      providerMessage
+    });
     const error = new Error(response.status === 401 || response.status === 403
-      ? "The routing API key is invalid or does not have access to this route."
-      : "The road route could not be calculated right now.");
-    error.status = response.status === 400 ? 400 : 502;
+      ? "OpenRouteService rejected the " + routingProfile + " profile for " + requestedMode + ". Check the mobility service API key and profile access."
+      : response.status === 400
+        ? "OpenRouteService could not route this trip for " + requestedMode + ". Try a nearby destination or check the selected mode."
+        : "The road route for " + requestedMode + " could not be calculated right now. Please retry.");
+    error.status = response.status === 400 ? 400 : response.status === 429 ? 429 : 502;
     throw error;
   }
 
