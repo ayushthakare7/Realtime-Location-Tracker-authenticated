@@ -48,7 +48,18 @@ async function acceptedFriendIds(userId) {
   return links.map(link => String(link.requester) === String(userId) ? String(link.recipient) : String(link.requester));
 }
 function fail(res, error) {
-  return res.status(error.status || 500).json({ success: false, message: error.status ? error.message : "Mobility request failed." });
+  console.error("[MobilityTrip] Request failed", {
+    status: error.status || 500,
+    errorName: error.name || "Error",
+    errorMessage: String(error.message || "unknown").slice(0, 300),
+    stack: String(error.stack || "").split("\\n").slice(0, 4).join("\\n")
+  });
+  return res.status(error.status || 500).json({
+    success: false,
+    message: error.status && error.status < 500
+      ? error.message
+      : (error.status === 502 ? error.message : "Could not start the journey because a server operation failed. Please retry; if it continues, check Mobility logs.")
+  });
 }
 
 router.get("/health", (_req, res) => res.json({ success: true, service: "reva-mobility-context" }));
