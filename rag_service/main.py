@@ -193,8 +193,14 @@ def extract_question_intent(question: str) -> dict[str, Any]:
 
 
 def classify_node(state: GraphState) -> GraphState:
-    # Classification is advisory only. Do not let a transient Groq/model issue
-    # prevent retrieval of location history.
+    # Prefer the validated LLM-extracted intent, then fall back to keyword rules.
+    extracted_intent = state.get("intent")
+    allowed_intents = {
+        "location_at_time", "closest_people", "visit_duration", "movement_between_places",
+        "location_timeline", "history_summary", "current_presence", "other"
+    }
+    if extracted_intent in allowed_intents:
+        return {"intent": extracted_intent}
     question = state["question"].lower()
     if any(term in question for term in ("summarize", "summary", "most visited", "usual", "frequently")):
         return {"intent": "summary"}
