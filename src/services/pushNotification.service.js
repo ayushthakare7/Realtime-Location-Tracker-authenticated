@@ -113,7 +113,7 @@ async function sendPushToUser({ userId, title, body, data = {} }) {
       if (response.ok) { sent += 1; continue; }
       const failure = await response.json().catch(() => ({}));
       const detail = JSON.stringify(failure);
-      if (detail.includes("UNREGISTERED") || detail.includes("registration-token-not-registered") || detail.includes("INVALID_ARGUMENT")) {
+      if (detail.includes("UNREGISTERED") || detail.includes("registration-token-not-registered")) {
         await PushDevice.updateOne({ _id: device._id }, { $set: { enabled: false } });
       } else {
         console.warn("[Push] FCM delivery failed:", response.status);
