@@ -67,6 +67,9 @@ jobs:
 
             @Override
             public void onCreate(Bundle savedInstanceState) {
+              // Request landscape immediately instead of waiting for remote WebView navigation.
+              setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+              lastRequestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
               super.onCreate(savedInstanceState);
               orientationHandler.post(orientationCheck);
             }
@@ -81,7 +84,8 @@ jobs:
                   if (url != null) {
                     String path = android.net.Uri.parse(url).getPath();
                     if (path == null) path = "/";
-                    boolean portraitPage = path.matches("(?i)^/(login|register)/?$");
+                    String normalizedPath = path.replaceAll("/+$", "");
+                    boolean portraitPage = normalizedPath.matches("(?i)(^|/)(login|register)$");
                     int wanted = portraitPage
                       ? ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                       : ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
