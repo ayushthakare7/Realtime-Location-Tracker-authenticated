@@ -1,12 +1,14 @@
 const express = require("express");
 const crypto = require("crypto");
+const User = require("../models/User");
+const Friendship = require("../models/Friendship");
 const router = express.Router();
 function secretMatches(provided, expected) {
   if (!provided || !expected) return false;
   const left = Buffer.from(String(provided)), right = Buffer.from(String(expected));
   return left.length === right.length && crypto.timingSafeEqual(left, right);
 }
-router.post("/mobility-events", (req, res) => {
+router.post("/mobility-events", async (req, res) => {
   if (!secretMatches(req.get("x-mobility-secret"), process.env.MOBILITY_CALLBACK_SECRET)) return res.status(401).json({ success: false, message: "Invalid service credential." });
   const event = req.body || {};
   if (!["journey_started", "journey_delayed", "journey_arrived", "journey_ended"].includes(event.type) || !/^[a-f\d]{24}$/i.test(String(event.travellerId || ""))) return res.status(400).json({ success: false, message: "Invalid mobility event." });
