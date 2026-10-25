@@ -35,7 +35,7 @@ function cleanTrip(trip) {
   if (!trip) return null;
   const data = trip.toObject ? trip.toObject() : trip;
   return {
-    id: String(data._id), status: data.status, transportMode: data.transportMode,
+    id: String(data._id), travellerId: String(data.userId), travellerUsername: data.username, status: data.status, transportMode: data.transportMode,
     origin: data.origin, destination: data.destination, route: data.route,
     expectedArrivalAt: data.expectedArrivalAt, originalExpectedArrivalAt: data.originalExpectedArrivalAt,
     lastLocation: data.lastLocation, recipientMode: data.recipientMode,
