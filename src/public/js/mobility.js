@@ -19,7 +19,7 @@
     attribution: "© OpenStreetMap contributors", maxZoom: 19
   }).addTo(map);
 
-  const vehicleIcon = L.divIcon({ className: "", html: '<div class="vehicle-marker" aria-label="Your live position">➤</div>', iconSize: [38,38], iconAnchor: [19,19] });
+  const vehicleIcon = L.divIcon({ className: "", html: '<div class="vehicle-marker" aria-label="Your live position">🚗</div>', iconSize: [38,38], iconAnchor: [19,19] });
   const destinationIcon = L.divIcon({ className: "", html: '<div class="destination-marker"><span>●</span></div>', iconSize: [34,34], iconAnchor: [17,34] });
   let vehicleMarker = null, destinationMarker = null, routeLine = null, socket = null;
   let selectedDestination = null, activeTrip = null, latestPosition = null, watchId = null;
@@ -254,6 +254,11 @@
       socket.on("connect", () => $("mobilityConnection").textContent = "Live connection");
       socket.on("disconnect", () => $("mobilityConnection").textContent = "Reconnecting…");
       socket.on("mobility-trip-update", event => { if (event && String(event.tripId) === String(sharedTripId)) refreshTrip(); });
+      socket.on("receive-location", data => {
+        if (!activeTrip || !data || String(data.userId) !== String(activeTrip.travellerId)) return;
+        setVehiclePosition(data.latitude, data.longitude, true);
+        $("lastLocationInfo").textContent = "Live GPS update received" + (data.lastSeen ? " · " + new Date(data.lastSeen).toLocaleTimeString() : "") + (Number.isFinite(Number(data.accuracyMeters)) ? " · ±" + Math.round(Number(data.accuracyMeters)) + " m accuracy" : "");
+      });
       await refreshTrip(); pollHandle = setInterval(refreshTrip, 30000); return;
     }
     try {
