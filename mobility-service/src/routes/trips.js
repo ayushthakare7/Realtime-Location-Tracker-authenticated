@@ -191,7 +191,20 @@ router.get("/trips/shared/:id", async (req, res) => {
     ] }).lean();
     const traveller = await User.findById(trip.userId).select("sharingEnabled").lean();
     if (!friendship || !traveller?.sharingEnabled) return res.status(403).json({ success: false, message: "The journey is no longer shared with you." });
-    res.json({ success: true, trip: cleanTrip(trip) });
+
+    // Read the main app's canonical GPS record on every shared-view request.
+    // The worker refreshes MobilityTrip.lastLocation on a slower interval, which can
+    // leave a friend looking at the journey origin instead of the traveller's current position.
+    const liveLocation = await Location.findOne({ userId: trip.userId }).lean();
+    const sharedTrip = cleanTrip(trip);
+    if (liveLocation && validCoordinate({ latitude: liveLocation.latitude, longitude: liveLocation.longitude }) && liveLocation.lastSeen) {
+      sharedTrip.lastLocation = {
+        latitude: Number(liveLocation.latitude),
+        longitude: Number(liveLocation.longitude),
+        lastSeen: liveLocation.lastSeen
+      };
+    }
+    res.json({ success: true, trip: sharedTrip });
   } catch (error) { fail(res, error); }
 });
 
