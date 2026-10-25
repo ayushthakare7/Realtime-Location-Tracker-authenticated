@@ -1135,3 +1135,153 @@ body.app-shell{background:radial-gradient(ellipse at 92% 10%,rgba(226,218,239,.3
   .shared-journeys-panel .shared-journey-top { grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
   .shared-journeys-panel .shared-journey-status { font-size: 9px; padding: 3px 6px; }
 }
+
+
+/* Balanced dashboard panel heights and safer content spacing. */
+.dashboard-grid {
+  align-items: stretch;
+}
+.dashboard-grid > aside {
+  align-self: stretch;
+  gap: 16px;
+  min-width: 0;
+}
+.dashboard-grid > aside > .sharing-panel,
+.dashboard-grid > aside > .friends-panel,
+.dashboard-grid > aside > .privacy-panel,
+.dashboard-grid > aside > .shared-journeys-panel,
+.dashboard-grid > .reva-card,
+.dashboard-grid .reva-card {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+.dashboard-grid > aside > .sharing-panel {
+  min-height: 320px;
+  padding: 22px;
+}
+.dashboard-grid > aside > .sharing-panel .section-heading {
+  margin-bottom: 17px;
+}
+.dashboard-grid > aside > .sharing-panel > p {
+  line-height: 1.7;
+  margin-bottom: 16px;
+}
+.dashboard-grid > aside > .sharing-panel #status {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  margin-top: 2px;
+}
+.dashboard-grid > aside > .sharing-panel .mobility-entry-button {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
+.dashboard-grid > aside > .friends-panel {
+  min-height: 350px;
+  padding: 22px;
+}
+.dashboard-grid > aside > .friends-panel #requests,
+.dashboard-grid > aside > .friends-panel #friends {
+  min-height: 40px;
+}
+.dashboard-grid > .reva-card,
+.dashboard-grid .reva-card {
+  min-height: 410px;
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 12px;
+  overflow: visible;
+}
+.dashboard-grid .reva-card .reva-brand {
+  margin-bottom: 2px;
+}
+.dashboard-grid .reva-card > .muted {
+  max-width: 900px;
+  line-height: 1.8;
+  margin: 0;
+}
+.dashboard-grid .reva-card .reva-prompts {
+  margin: 10px 0 12px;
+}
+.dashboard-grid .reva-card #askForm {
+  width: 100%;
+  min-width: 0;
+  gap: 14px;
+}
+.dashboard-grid .reva-card #askForm textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 124px;
+  padding: 15px 16px;
+  line-height: 1.65;
+}
+.dashboard-grid .reva-card #askForm label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.dashboard-grid .reva-card #askForm button[type="submit"] {
+  min-height: 42px;
+  max-width: 100%;
+  white-space: normal;
+}
+.dashboard-grid .reva-card #answer {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+@media (min-width: 781px) {
+  .dashboard-grid > aside > .sharing-panel,
+  .dashboard-grid > aside > .friends-panel {
+    padding: 22px;
+  }
+}
+@media (max-width: 780px) {
+  .dashboard-grid > aside > .sharing-panel {
+    min-height: 0;
+    padding: 20px;
+  }
+  .dashboard-grid > aside > .friends-panel {
+    min-height: 0;
+    padding: 20px;
+  }
+  .dashboard-grid > .reva-card,
+  .dashboard-grid .reva-card {
+    min-height: 0;
+    padding: 24px;
+    gap: 10px;
+  }
+  .dashboard-grid .reva-card #askForm textarea {
+    min-height: 135px;
+  }
+}
+@media (max-width: 520px) {
+  .dashboard-grid > aside > .sharing-panel,
+  .dashboard-grid > aside > .friends-panel {
+    padding: 18px;
+  }
+  .dashboard-grid > .reva-card,
+  .dashboard-grid .reva-card {
+    padding: 19px;
+  }
+  .dashboard-grid .reva-card #askForm {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dashboard-grid .reva-card #askForm label,
+  .dashboard-grid .reva-card #askForm button[type="submit"] {
+    width: 100%;
+    max-width: 100%;
+    align-self: stretch;
+  }
+}
