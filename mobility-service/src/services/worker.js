@@ -22,7 +22,7 @@ async function tick(now = new Date()) {
       const gpsAge = now.getTime() - new Date(location.lastSeen).getTime();
       const fresh = gpsAge >= 0 && gpsAge <= 120000;
       const maxArrivalAccuracy = Math.max(20, Number(process.env.MOBILITY_MAX_ARRIVAL_ACCURACY_METERS) || 80);
-      const accurateEnough = Number.isFinite(Number(location.accuracyMeters)) && Number(location.accuracyMeters) <= maxArrivalAccuracy;
+      const accurateEnough = location.accuracyMeters !== null && location.accuracyMeters !== undefined && Number.isFinite(Number(location.accuracyMeters)) && Number(location.accuracyMeters) <= maxArrivalAccuracy;
       const newSample = !trip.lastArrivalSampleAt || new Date(location.lastSeen).getTime() > new Date(trip.lastArrivalSampleAt).getTime();
       if (fresh && accurateEnough && newSample) {
         trip.nearDestinationCount = remainingMeters <= radius ? trip.nearDestinationCount + 1 : 0;
