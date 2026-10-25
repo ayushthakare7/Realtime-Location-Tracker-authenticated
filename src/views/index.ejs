@@ -98,6 +98,11 @@
     sync();
   };
   document.getElementById("tryLandscapeLock")?.addEventListener("click", requestLock);
+  // Best-effort on page load. Installed Android PWAs can honor the manifest
+  // orientation; regular browser tabs may reject this until a user gesture.
+  if (isMobile() && screen.orientation?.lock) {
+    screen.orientation.lock("landscape").catch(() => {});
+  }
   window.addEventListener("resize", sync);
   window.addEventListener("orientationchange", () => setTimeout(sync, 150));
   screen.orientation?.addEventListener?.("change", sync);
