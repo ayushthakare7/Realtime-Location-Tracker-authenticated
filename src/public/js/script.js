@@ -251,22 +251,63 @@ async function loadSharedJourneys() {
     trips.forEach(trip => {
       const card = document.createElement("article");
       card.className = "shared-journey-item";
+      const finished = ["ARRIVED", "COMPLETED"].includes(trip.status);
+      if (finished) card.classList.add("shared-journey-finished");
       const top = document.createElement("div");
       top.className = "shared-journey-top";
       const traveller = document.createElement("strong");
       traveller.textContent = trip.travellerUsername || "Your friend";
       const status = document.createElement("span");
       status.className = "shared-journey-status";
-      status.textContent = trip.status === "DELAYED" ? "Delayed" : "Live";
+      status.textContent = trip.status === "ARRIVED" ? "Arrived" : trip.status === "COMPLETED" ? "Journey ended" : trip.status === "DELAYED" ? "Delayed" : "Live";
       top.append(traveller, status);
       const destination = document.createElement("p");
       destination.className = "muted";
-      destination.textContent = (trip.destination?.label || "Destination not labelled") + (trip.expectedArrivalAt ? " · ETA " + new Date(trip.expectedArrivalAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : "");
-      const link = document.createElement("a");
-      link.className = "shared-journey-open";
-      link.href = "/mobility/shared/" + encodeURIComponent(trip.id);
-      link.textContent = "View live journey →";
-      card.append(top, destination, link);
+      if (trip.status === "ARRIVED") {
+        const when = trip.arrivedAt ? " at " + new Date(trip.arrivedAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : "";
+        destination.textContent = (trip.travellerUsername || "Your friend") + " has arrived at " + (trip.destination?.label || "their destination") + when + ".";
+      } else if (trip.status === "COMPLETED") {
+        destination.textContent = (trip.travellerUsername || "Your friend") + "'s journey has ended.";
+      } else {
+        destination.textContent = (trip.destination?.label || "Destination not labelled") + (trip.expectedArrivalAt ? " · ETA " + new Date(trip.expectedArrivalAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : "");
+      }
+      card.append(top, destination);
+      if (finished) {
+        const acknowledge = document.createElement("button");
+        acknowledge.type = "button";
+        acknowledge.className = "shared-journey-dismiss";
+        acknowledge.textContent = "OK · Remove";
+        acknowledge.addEventListener("click", async () => {
+          acknowledge.disabled = true;
+          acknowledge.textContent = "Removing…";
+          try {
+            const response = await fetch("/api/mobility/trips/shared/" + encodeURIComponent(trip.id) + "/dismiss", {
+              method: "POST",
+              headers: { Authorization: "Bearer " + token }
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.message || "Could not remove this journey.");
+            card.remove();
+            if (!root.querySelector(".shared-journey-item")) {
+              const empty = document.createElement("p");
+              empty.className = "muted shared-journeys-empty";
+              empty.textContent = "No active journeys have been shared with you yet.";
+              root.append(empty);
+            }
+          } catch (error) {
+            acknowledge.disabled = false;
+            acknowledge.textContent = "OK · Remove";
+            acknowledge.title = error.message;
+          }
+        });
+        card.append(acknowledge);
+      } else {
+        const link = document.createElement("a");
+        link.className = "shared-journey-open";
+        link.href = "/mobility/shared/" + encodeURIComponent(trip.id);
+        link.textContent = "View live journey →";
+        card.append(link);
+      }
       root.append(card);
     });
   } catch (error) {
