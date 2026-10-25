@@ -102,6 +102,22 @@ router.get("/trips/active", async (req, res) => {
   } catch (error) { fail(res, error); }
 });
 
+
+router.get("/trips/shared/:id", async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ success: false, message: "Invalid journey ID." });
+  try {
+    const trip = await MobilityTrip.findOne({ _id: req.params.id, recipients: req.user.userId });
+    if (!trip) return res.status(404).json({ success: false, message: "Shared journey not found or you do not have permission to view it." });
+    const friendship = await Friendship.findOne({ status: "accepted", $or: [
+      { requester: trip.userId, recipient: req.user.userId },
+      { requester: req.user.userId, recipient: trip.userId }
+    ] }).lean();
+    const traveller = await User.findById(trip.userId).select("sharingEnabled").lean();
+    if (!friendship || !traveller?.sharingEnabled) return res.status(403).json({ success: false, message: "The journey is no longer shared with you." });
+    res.json({ success: true, trip: cleanTrip(trip) });
+  } catch (error) { fail(res, error); }
+});
+
 router.get("/trips/:id", async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ success: false, message: "Invalid journey ID." });
   try {
