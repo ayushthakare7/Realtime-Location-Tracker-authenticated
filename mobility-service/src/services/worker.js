@@ -7,7 +7,12 @@ async function tick(now = new Date()) {
   for (const trip of trips) {
     try {
       const [user, location] = await Promise.all([User.findById(trip.userId).lean(), Location.findOne({ userId: trip.userId }).lean()]);
-      if (!user || !user.sharingEnabled || !location || !location.lastSeen) continue;
+      if (!user || !user.sharingEnabled) {
+        trip.status = "CANCELLED"; trip.endedAt = now;
+        await trip.save(); await emitMobilityEvent(trip, "journey_ended");
+        continue;
+      }
+      if (!location || !location.lastSeen) continue;
       const point = { latitude: Number(location.latitude), longitude: Number(location.longitude) };
       if (!Number.isFinite(point.latitude) || !Number.isFinite(point.longitude)) continue;
       trip.lastLocation = { ...point, lastSeen: location.lastSeen };
