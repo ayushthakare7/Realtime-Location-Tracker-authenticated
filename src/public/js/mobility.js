@@ -262,8 +262,9 @@
         await waitForAnimation(reducedMotion ? 0 : 1450);
       }
 
-      // Remove the preview pointer and reveal the actual live GPS marker.
+      // Remove cinematic-only layers so the final map shows one clean, solid route.
       if (animationMarker) { map.removeLayer(animationMarker); animationMarker = null; }
+      if (animationGuideLine) { map.removeLayer(animationGuideLine); animationGuideLine = null; }
       const livePosition = latestPosition
         ? [latestPosition.latitude, latestPosition.longitude]
         : Number.isFinite(origin?.[0]) && Number.isFinite(origin?.[1]) ? origin : null;
