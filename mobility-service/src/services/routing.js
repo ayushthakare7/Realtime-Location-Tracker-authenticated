@@ -1,4 +1,5 @@
-const PROFILES = new Set(["driving-car", "cycling-regular", "foot-walking"]);
+const PROFILES = new Set(["driving-car", "cycling-regular", "foot-walking", "bus", "train"]);
+const ROUTING_PROFILE = { bus: "driving-car", train: "driving-car" };
 const routeCache = new Map();
 const geocodeCache = new Map();
 const RoutingUsage = require("../models/RoutingUsage");
@@ -43,11 +44,13 @@ async function routeBetween(origin, destination, profile) {
     throw error;
   }
 
-  const cacheKey = [profile, origin.latitude.toFixed(5), origin.longitude.toFixed(5), destination.latitude.toFixed(5), destination.longitude.toFixed(5)].join(":");
+  const requestedMode = profile;
+  const routingProfile = ROUTING_PROFILE[requestedMode] || requestedMode;
+  const cacheKey = [routingProfile, origin.latitude.toFixed(5), origin.longitude.toFixed(5), destination.latitude.toFixed(5), destination.longitude.toFixed(5)].join(":");
   const cached = cacheRead(routeCache, cacheKey);
   if (cached) return cached;
   await reserveRequest("directions");
-  const response = await fetch("https://api.openrouteservice.org/v2/directions/" + profile + "/geojson", {
+  const response = await fetch("https://api.openrouteservice.org/v2/directions/" + routingProfile + "/geojson", {
     method: "POST",
     headers: {
       Authorization: process.env.ORS_API_KEY,
@@ -90,7 +93,9 @@ async function routeBetween(origin, destination, profile) {
 
   const result = {
     provider: "openrouteservice",
-    profile,
+    profile: routingProfile,
+    transportMode: requestedMode,
+    estimateType: ROUTING_PROFILE[requestedMode] ? "road-network-approximation" : "profile-route",
     distanceMeters: Math.round(summary.distance),
     durationSeconds: Math.round(summary.duration),
     coordinates,
@@ -111,8 +116,12 @@ async function geocode(query) {
   if (cached) return cached;
   await reserveRequest("geocode");
   const url = new URL("https://api.openrouteservice.org/geocode/search");
-  url.searchParams.set("text", query);
-  url.searchParams.set("size", "5");
+  const airportQuery = /\braipur\b/i.test(query) && /airport|air port|swami vivekananda/i.test(query)
+    ? "Swami Vivekananda Airport, Raipur, Chhattisgarh, India"
+    : query;
+  url.searchParams.set("text", airportQuery);
+  url.searchParams.set("size", "10");
+  url.searchParams.set("layers", "venue,address,street,locality,county,region");
   const response = await fetch(url, {
     headers: { Authorization: process.env.ORS_API_KEY },
     signal: AbortSignal.timeout(10000)
