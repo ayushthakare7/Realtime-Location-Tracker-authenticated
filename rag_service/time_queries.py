@@ -73,7 +73,7 @@ def answer_time_question(question, authorized_user_ids, context, database):
         best = None
         named_friend = next((person for person in context.get("authorizedPeople", [])
                              if person.get("username") not in ("", "you")
-                             and re.search(r"\\b" + re.escape(str(person.get("username"))) + r"\\b", question, re.I)), None)
+                             and re.search(r"\b" + re.escape(str(person.get("username"))) + r"\b", question, re.I)), None)
         if named_friend:
             named_id = str(named_friend.get("id") or "")
             if named_id not in ids or named_id == current_id:
