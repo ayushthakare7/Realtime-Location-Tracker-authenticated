@@ -39,7 +39,7 @@
   const destinationIcon = L.divIcon({ className: "", html: '<div class="destination-marker"><span>●</span></div>', iconSize: [34,34], iconAnchor: [17,34] });
   let vehicleMarker = null, animationMarker = null, destinationMarker = null, routeLine = null, animationGuideLine = null, socket = null;
   let selectedDestination = null, activeTrip = null, latestPosition = null, watchId = null, vehiclePreviewEnabled = false, journeyAnimationRunning = false, pageRefreshScheduled = false, locationSharingEnabled = false;
-  let mapPickMode = false, pendingMapDestination = null, mapPickMarker = null;
+  let mapPickMode = false, pendingMapDestination = null, mapPickMarker = null, initialGpsCenterDone = false;
   let friendList = [], currentRouteCoordinates = [], pollHandle = null, lastGpsSentAt = 0, lastGpsSent = null, lastRenderedRouteAt = null;
   const sharedTripId = window.REVA_SHARED_TRIP_ID || null;
   let nativeTrackingRequested = false;
@@ -155,7 +155,9 @@
   }
 
   function showRoute(trip) {
-    if (!trip?.route?.coordinates?.length) return;
+    if (!trip?.route?.coordinates?.length || !trip?.destination || !trip?.origin) return;
+    // Leaflet must know the final container size before computing route bounds.
+    map.invalidateSize({ pan: false });
     if (animationGuideLine) { map.removeLayer(animationGuideLine); animationGuideLine = null; }
     currentRouteCoordinates = normalizeRouteCoordinates(trip.route.coordinates, [Number(trip.origin?.latitude), Number(trip.origin?.longitude)], [Number(trip.destination?.latitude), Number(trip.destination?.longitude)]);
     if (currentRouteCoordinates.length < 2) return;
@@ -164,7 +166,11 @@
     routeLine = L.polyline(currentRouteCoordinates, { color: "#263746", weight: 7, opacity: 1, lineCap: "round", lineJoin: "round" }).addTo(map);
     if (destinationMarker) map.removeLayer(destinationMarker);
     destinationMarker = L.marker([trip.destination.latitude, trip.destination.longitude], { icon: destinationIcon, keyboard: false }).addTo(map).bindTooltip(trip.destination.label || "Destination");
-    if (trip.lastLocation && Number.isFinite(Number(trip.lastLocation.latitude))) setVehiclePosition(trip.lastLocation.latitude, trip.lastLocation.longitude, false);
+    const livePosition = latestPosition && Number.isFinite(Number(latestPosition.latitude))
+      ? latestPosition : trip.lastLocation;
+    if (livePosition && Number.isFinite(Number(livePosition.latitude)) && Number.isFinite(Number(livePosition.longitude))) {
+      setVehiclePosition(livePosition.latitude, livePosition.longitude, false);
+    }
     const bounds = routeLine.getBounds().extend(destinationMarker.getLatLng());
     const fitZoom = map.getBoundsZoom(bounds, false, L.point(36, 36));
     if (fitZoom < 12) {
@@ -340,29 +346,30 @@
       setMapPickMode(false);
       updateStatus(activeTrip);
 
-      // No cinematic animation: immediately draw the full solid road route and both markers.
+      // No animation: size the map first, then render the road route and both markers immediately.
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      map.invalidateSize({ pan: false });
       if (activeTrip?.route?.coordinates?.length) {
         showRoute(activeTrip);
         updateStatus(activeTrip);
-        map.invalidateSize();
+      } else {
+        throw new Error("The journey started, but the routing service returned no road geometry. Please retry the route.");
       }
       await refreshTrip();
       if (activeTrip?.route?.coordinates?.length) {
+        map.invalidateSize({ pan: false });
         showRoute(activeTrip);
         updateStatus(activeTrip);
-        map.invalidateSize();
       }
       message("Journey started. Your route, current location and destination are shown on the map.");
 
-      // Move straight to Live Journey so ETA, distance, travel time and journey actions are visible.
-      const progressPanel = document.querySelector(".journey-status-panel");
-      if (progressPanel) {
-        progressPanel.setAttribute("tabindex", "-1");
-        progressPanel.style.scrollMarginTop = "18px";
+      // Keep the actual route visible immediately after Start Journey; status and ETA remain above it.
+      const mapSection = document.querySelector(".journey-map-section");
+      if (mapSection) {
         await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        const top = progressPanel.getBoundingClientRect().top + window.scrollY - 18;
-        window.scrollTo({ top: Math.max(0, top), behavior: "auto" });
-        progressPanel.focus({ preventScroll: true });
+        mapSection.scrollIntoView({ behavior: "auto", block: "start" });
+        map.invalidateSize({ pan: false });
+        if (activeTrip?.route?.coordinates?.length) showRoute(activeTrip);
       }
     } catch (error) { message(error.message); $("startJourney").disabled = false; }
   }
@@ -448,6 +455,11 @@
   function sendGps(position) {
     latestPosition = { latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy, recordedAt: new Date() };
     setVehiclePosition(latestPosition.latitude, latestPosition.longitude, true);
+    // Center on the first usable fix automatically; Recenter remains a manual recovery control.
+    if (!initialGpsCenterDone && !activeTrip && !sharedTripId) {
+      initialGpsCenterDone = true;
+      map.setView([latestPosition.latitude, latestPosition.longitude], 15, { animate: false });
+    }
     $("mobilityConnection").textContent = "GPS ±" + Math.round(latestPosition.accuracy || 0) + " m";
     if (!socket?.connected) return;
     const moved = !lastGpsSent || distanceMeters(lastGpsSent, latestPosition) >= 30;
@@ -565,8 +577,16 @@
   $("arrivedButton").addEventListener("click", () => finishTrip("arrive"));
   $("endJourney").addEventListener("click", () => { if (confirm("End this journey now?")) finishTrip("end"); });
   $("recenterMap").addEventListener("click", () => {
-    if (activeTrip?.route?.coordinates?.length) showRoute(activeTrip);
-    else if (latestPosition) map.setView([latestPosition.latitude, latestPosition.longitude], 15, { animate: true });
+    // Recenter means return to the traveller, not refit the entire route.
+    const position = latestPosition || (activeTrip?.lastLocation && {
+      latitude: Number(activeTrip.lastLocation.latitude), longitude: Number(activeTrip.lastLocation.longitude)
+    });
+    if (position && Number.isFinite(Number(position.latitude)) && Number.isFinite(Number(position.longitude))) {
+      map.setView([Number(position.latitude), Number(position.longitude)], Math.max(map.getZoom(), 16), { animate: true, duration: 0.35 });
+      if (activeTrip) setVehiclePosition(position.latitude, position.longitude, false);
+    } else {
+      message("Your current GPS position is not available yet. Wait for a fresh GPS fix and try Recenter again.");
+    }
   });
   $("logoutMobility")?.addEventListener("click", () => { localStorage.removeItem("token"); window.location.replace("/login"); });
   window.addEventListener("pagehide", () => {
