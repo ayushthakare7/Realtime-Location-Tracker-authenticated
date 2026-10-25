@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3f0e9">
+  <title>My Journey · Reva</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+  <link rel="stylesheet" href="/css/mobility.css">
+</head>
+<body class="app-shell mobility-page">
+<header class="app-header">
+  <a class="wordmark" href="/tracker"><span class="wordmark-mark">R</span><span><strong>Reva</strong><small>My Journey</small></span></a>
+  <div class="header-actions"><span id="mobilityConnection" class="gps-pill"><span class="status-dot"></span> Connecting…</span><a class="secondary logout-button" href="/tracker">Back to Reva</a></div>
+</header>
+<main class="mobility-shell">
+  <section class="mobility-intro">
+    <div><p class="eyebrow">YOUR ROUTE, YOUR CHOICES</p><h1>Every journey,<br><em>closer to there.</em></h1><p>Road-based routes, live progress, and a clearer arrival estimate. You decide who gets updates.</p></div>
+    <div class="mobility-privacy"><span>◈</span><div><strong>Shared by choice</strong><small>Journey sharing uses your accepted Reva friends.</small></div></div>
+  </section>
+
+  <section class="mobility-layout">
+    <aside class="mobility-controls">
+      <section class="panel journey-form-panel">
+        <div class="section-heading"><span class="section-icon">↗</span><div><p class="eyebrow">PLAN A JOURNEY</p><h2>Where to?</h2></div></div>
+        <p class="muted">Reva uses a real road route for distance and ETA. Start location comes from your latest shared GPS position.</p>
+        <form id="journeyForm">
+          <label for="destinationQuery">Destination</label>
+          <div class="destination-search"><input id="destinationQuery" maxlength="160" placeholder="Search place or address" autocomplete="off" required><button id="searchDestination" type="button" aria-label="Search destination">Search</button></div>
+          <div id="destinationResults" class="destination-results" role="listbox"></div>
+          <p id="selectedDestination" class="selected-destination">Choose a destination from search results.</p>
+          <label for="transportMode">Travel mode</label>
+          <select id="transportMode"><option value="driving-car">Car / road vehicle</option><option value="cycling-regular">Bicycle</option><option value="foot-walking">Walking</option></select>
+          <label for="recipientMode">Who should receive journey updates?</label>
+          <select id="recipientMode"><option value="ALL_FRIENDS">All eligible friends</option><option value="SELECTED_FRIENDS">Selected friends</option><option value="ONE_FRIEND">One friend</option></select>
+          <div id="friendChoices" class="friend-choices" hidden></div>
+          <button id="startJourney" class="mobility-primary" type="submit">Start journey ↗</button>
+          <p class="form-note">Location sharing must be enabled on the main Reva page. Public transit and live-traffic ETA are not enabled in this first version.</p>
+        </form>
+      </section>
+      <section class="panel journey-status-panel">
+        <div class="section-heading"><span class="section-icon">◷</span><div><p class="eyebrow">LIVE JOURNEY</p><h2 id="journeyHeading">Ready when you are</h2></div></div>
+        <div id="journeyStatus" class="journey-status" role="status">Choose a destination to get started.</div>
+        <div class="eta-grid">
+          <div><small>EXPECTED ARRIVAL</small><strong id="etaValue">—</strong></div>
+          <div><small>ROAD DISTANCE</small><strong id="distanceValue">—</strong></div>
+          <div><small>TRAVEL TIME</small><strong id="durationValue">—</strong></div>
+        </div>
+        <p id="lastLocationInfo" class="last-location-info">Waiting for journey location.</p>
+        <div class="journey-actions"><button id="arrivedButton" type="button" class="secondary" disabled>I've arrived</button><button id="endJourney" type="button" class="secondary" disabled>End journey</button></div>
+      </section>
+    </aside>
+
+    <section class="journey-map-section">
+      <div class="map-heading"><div><p class="eyebrow">ROAD ROUTE</p><h2>Follow your journey</h2></div><span id="routeSource" class="map-caption">Waiting for route</span></div>
+      <div class="journey-map-frame"><div id="journeyMap" aria-label="Live journey road map"></div><div class="journey-map-overlay"><span class="journey-map-pulse"></span><span><strong>MY JOURNEY</strong><small id="mapSubtitle">Your city, your route</small></span></div><button id="recenterMap" type="button" class="recenter-button">◎ Recenter</button></div>
+      <div class="route-legend"><span><i class="legend-dot legend-you"></i> Your live position</span><span><i class="legend-line"></i> Road route</span><span><i class="legend-dot legend-destination"></i> Destination</span></div>
+      <div class="panel mobility-explainer"><strong>How ETA works</strong><p>ETA comes from road-network routing, not straight-line distance. Reva refreshes the estimate as your location changes. Traffic-aware timing is only available if a future routing provider supports it on a free plan.</p></div>
+    </section>
+  </section>
+  <p id="mobilityMessage" class="mobility-message" aria-live="polite"></p>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/mobility.js"></script>
+</body>
+</html>
