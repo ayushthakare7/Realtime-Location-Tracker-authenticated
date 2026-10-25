@@ -98,7 +98,7 @@ jobs:
             };
 
             @Override
-            protected void onDestroy() {
+            public void onDestroy() {
               orientationHandler.removeCallbacks(orientationCheck);
               super.onDestroy();
             }
