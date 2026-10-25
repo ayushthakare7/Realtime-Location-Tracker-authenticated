@@ -198,6 +198,8 @@ exports.askMap = async (req, res) => {
       });
     }
     const context = {
+      currentUserId: String(uid),
+      currentUsername: req.user.username || "you",
       currentLocations: [
         ...(mine ? [{ username: "you", placeName: visitByUser.get(String(uid))?.placeName || null, lastSeen: mine.lastSeen }] : []),
         ...others.map(p => ({
