@@ -232,6 +232,52 @@ function showMobilityNotice(data) {
   card.append(title, detail, open, close); document.body.append(card);
   setTimeout(() => card.remove(), 20000);
 }
+async function loadSharedJourneys() {
+  const root = document.getElementById("sharedJourneys");
+  if (!root) return;
+  try {
+    const response = await fetch("/api/mobility/trips/shared", { headers: { Authorization: "Bearer " + token } });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || "Could not load shared journeys.");
+    root.replaceChildren();
+    const trips = Array.isArray(data.trips) ? data.trips : [];
+    if (!trips.length) {
+      const empty = document.createElement("p");
+      empty.className = "muted shared-journeys-empty";
+      empty.textContent = "No active journeys have been shared with you yet.";
+      root.append(empty);
+      return;
+    }
+    trips.forEach(trip => {
+      const card = document.createElement("article");
+      card.className = "shared-journey-item";
+      const top = document.createElement("div");
+      top.className = "shared-journey-top";
+      const traveller = document.createElement("strong");
+      traveller.textContent = trip.travellerUsername || "Your friend";
+      const status = document.createElement("span");
+      status.className = "shared-journey-status";
+      status.textContent = trip.status === "DELAYED" ? "Delayed" : "Live";
+      top.append(traveller, status);
+      const destination = document.createElement("p");
+      destination.className = "muted";
+      destination.textContent = (trip.destination?.label || "Destination not labelled") + (trip.expectedArrivalAt ? " · ETA " + new Date(trip.expectedArrivalAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : "");
+      const link = document.createElement("a");
+      link.className = "shared-journey-open";
+      link.href = "/mobility/shared/" + encodeURIComponent(trip.id);
+      link.textContent = "View live journey →";
+      card.append(top, destination, link);
+      root.append(card);
+    });
+  } catch (error) {
+    root.replaceChildren();
+    const note = document.createElement("p");
+    note.className = "muted shared-journeys-empty";
+    note.textContent = "Shared journeys are temporarily unavailable. " + error.message;
+    root.append(note);
+  }
+}
+
 async function loadMobilityNotifications() {
   try {
     const response = await fetch("/api/mobility-notifications", { headers: { Authorization: "Bearer " + token } });
@@ -253,10 +299,12 @@ function connectSocket() {
   socket.on("sharing-stopped", data => { if (data && data.userId) removeMarker(data.userId); });
   socket.on("friend-removed", data => { if (data && data.userId) { removeMarker(data.userId); loadFriends({ quiet: true }); } });
   socket.on("friend-request-received", data => { if (data && data.username) setStatus("New friend request from " + data.username + "."); loadFriends(); });
-  socket.on("mobility-notification", showMobilityNotice);
+  socket.on("mobility-notification", data => { showMobilityNotice(data); loadSharedJourneys(); });
 }
 connectSocket();
 loadMobilityNotifications();
+loadSharedJourneys();
+setInterval(loadSharedJourneys, 30000);
 
 async function loadFriends({ quiet = false } = {}) {
   try {
