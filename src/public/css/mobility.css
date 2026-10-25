@@ -45,3 +45,19 @@
 #journeyMap.map-pick-active{cursor:crosshair}
 #journeyMap.map-pick-active .leaflet-interactive{cursor:crosshair}
 @media(max-width:720px){.map-pick-actions>div button{flex:1}}
+
+/* Anime-inspired travel character picker */
+.transport-mode-source{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+.transport-mode-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.transport-mode-card{display:flex;min-width:0;min-height:112px;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:9px 5px 8px;border:1px solid #e0e5dc;border-radius:14px;background:linear-gradient(155deg,#fffefa,#f7f6ef);color:var(--ink);text-align:center;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;cursor:pointer}
+.transport-mode-card:hover{transform:translateY(-2px);border-color:#b5c9b8;box-shadow:0 6px 15px #263d3a12}
+.transport-mode-card.is-selected{border:2px solid #71927c;background:linear-gradient(155deg,#f1f7ef,#e7f0e6);box-shadow:0 5px 16px #31574816}
+.transport-mode-card:focus-visible{outline:3px solid #8db7df;outline-offset:2px}
+.mode-art{display:grid;place-items:center;width:74px;height:62px;flex:0 0 auto}
+.mode-art svg{display:block;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 3px 2px #263d3a0d)}
+.transport-mode-card strong{font-size:11px;line-height:1.2}
+.transport-mode-card small{font-size:9px;line-height:1.25;color:var(--muted)}
+.vehicle-icon-shell{background:transparent!important;border:0!important}
+.vehicle-marker{display:grid;place-items:center;width:62px;height:58px;border:0;border-radius:0;background:transparent;box-shadow:none;transition:transform .18s ease}
+.vehicle-marker svg{display:block;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 4px 4px #263d3a22)}
+@media(max-width:380px){.transport-mode-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.transport-mode-card{min-height:106px}}
