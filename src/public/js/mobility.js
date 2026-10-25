@@ -130,7 +130,8 @@
   function showRoute(trip) {
     if (!trip?.route?.coordinates?.length) return;
     if (animationGuideLine) { map.removeLayer(animationGuideLine); animationGuideLine = null; }
-    currentRouteCoordinates = normalizeRouteCoordinates(trip.route.coordinates, [Number(trip.origin?.latitude), Number(trip.origin?.longitude)], [Number(trip.destination?.latitude), Number(trip.destination?.longitude)]);\n    if (currentRouteCoordinates.length < 2) return;
+    currentRouteCoordinates = normalizeRouteCoordinates(trip.route.coordinates, [Number(trip.origin?.latitude), Number(trip.origin?.longitude)], [Number(trip.destination?.latitude), Number(trip.destination?.longitude)]);
+    if (currentRouteCoordinates.length < 2) return;
     if (routeLine) map.removeLayer(routeLine);
     lastRenderedRouteAt = trip.route.calculatedAt || null;
     routeLine = L.polyline(currentRouteCoordinates, { color: "#263746", weight: 7, opacity: 1, lineCap: "round", lineJoin: "round" }).addTo(map);
@@ -280,7 +281,8 @@
         await waitForAnimation(reducedMotion ? 0 : 1450);
       }
 
-      // Remove cinematic-only layers so the final map shows one clean, solid route.
+      // Ensure the complete dark road line remains on the map after the preview finishes.
+      if (coordinates.length >= 2 && routeLine) routeLine.setLatLngs(coordinates);
       if (animationMarker) { map.removeLayer(animationMarker); animationMarker = null; }
       if (animationGuideLine) { map.removeLayer(animationGuideLine); animationGuideLine = null; }
       const livePosition = latestPosition
