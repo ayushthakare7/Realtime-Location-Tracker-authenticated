@@ -13,9 +13,7 @@
     "mobile:build": "esbuild src/public/js/reva-native-background.entry.ts --bundle --format=iife --target=es2020 --outfile=src/public/js/reva-native-background.js",
     "mobile:push-build": "esbuild src/public/js/reva-push-notifications.entry.ts --bundle --format=iife --target=es2020 --outfile=src/public/js/reva-push-notifications.js",
     "mobile:sync": "npm run mobile:build && npm run mobile:push-build && cap sync android",
-    "mobile:android": "cap open android",
-    "prestart": "npm run mobile:build && npm run mobile:push-build",
-    "predev": "npm run mobile:build && npm run mobile:push-build"
+    "mobile:android": "cap open android"
   },
   "keywords": [],
   "author": "",
