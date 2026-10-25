@@ -38,14 +38,64 @@ jobs:
         with:
           packages: "platform-tools platforms;android-35 build-tools;35.0.0"
 
-      - name: Install dependencies and native orientation plugin
+      - name: Install dependencies
         run: npm install
 
-      - name: Build web bridge
-        run: npm run mobile:build
+      - name: Build native web bridges
+        run: |
+          npm run mobile:build
+          npm run mobile:push-build
 
       - name: Generate Android project
         run: npx cap add android
+
+      - name: Configure Firebase Messaging in generated Android project
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp firebase/google-services.json android/app/google-services.json
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          root_gradle = Path("android/build.gradle")
+          if not root_gradle.exists():
+              raise SystemExit("Expected generated android/build.gradle (Groovy) was not found.")
+          root_text = root_gradle.read_text()
+          if "com.google.gms:google-services" not in root_text:
+              root_text, count = re.subn(
+                  r"(dependencies\s*\{)",
+                  r"\1\n        classpath 'com.google.gms:google-services:4.4.2'",
+                  root_text,
+                  count=1,
+              )
+              if count != 1:
+                  raise SystemExit("Could not add Google Services Gradle plugin to android/build.gradle.")
+              root_gradle.write_text(root_text)
+
+          app_gradle = Path("android/app/build.gradle")
+          app_text = app_gradle.read_text()
+          if "com.google.gms.google-services" not in app_text:
+              app_text += "\napply plugin: 'com.google.gms.google-services'\n"
+          if "firebase-bom" not in app_text:
+              app_text, count = re.subn(
+                  r"(dependencies\s*\{)",
+                  r"\1\n    implementation platform('com.google.firebase:firebase-bom:33.16.0')\n    implementation 'com.google.firebase:firebase-messaging'",
+                  app_text,
+                  count=1,
+              )
+              if count != 1:
+                  raise SystemExit("Could not add Firebase Messaging dependency to android/app/build.gradle.")
+          app_gradle.write_text(app_text)
+
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          manifest_text = manifest.read_text()
+          permission = '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />'
+          if "android.permission.POST_NOTIFICATIONS" not in manifest_text:
+              manifest_text = manifest_text.replace("<manifest ", "<manifest ", 1)
+              manifest_text = re.sub(r"(<manifest[^>]*>)", r"\1\n" + permission, manifest_text, count=1)
+          manifest.write_text(manifest_text)
+          PY
 
       - name: Enforce native orientation by page
         shell: bash
@@ -67,7 +117,6 @@ jobs:
 
             @Override
             public void onCreate(Bundle savedInstanceState) {
-              // Request landscape immediately instead of waiting for remote WebView navigation.
               setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
               lastRequestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
               super.onCreate(savedInstanceState);

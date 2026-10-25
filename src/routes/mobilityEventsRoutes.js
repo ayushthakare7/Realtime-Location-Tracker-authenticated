@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const User = require("../models/User");
 const Friendship = require("../models/Friendship");
 const MobilityNotification = require("../models/MobilityNotification");
+const { sendPushToUser } = require("../services/pushNotification.service");
 const router = express.Router();
 
 function secretMatches(provided, expected) {
@@ -62,6 +63,7 @@ router.post("/mobility-events", async (req, res) => {
     const destinationLabel = String(event.destination?.label || "").slice(0, 180);
     const body = destinationLabel ? baseBody + " Destination: " + destinationLabel : baseBody;
     const notificationKey = String(event.tripId) + ":" + event.type + ":" + recipientId;
+    const wasAlreadyCreated = await MobilityNotification.exists({ notificationKey });
     const notification = await MobilityNotification.findOneAndUpdate(
       { notificationKey },
       { $setOnInsert: {
@@ -70,6 +72,12 @@ router.post("/mobility-events", async (req, res) => {
       } },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     ).lean();
+    if (!wasAlreadyCreated) {
+      await sendPushToUser({
+        userId: recipientId, title: notification.title, body: notification.body,
+        data: { ...(notification.payload || {}), viewPath: "/mobility/shared/" + String(event.tripId) }
+      });
+    }
     io.to("user:" + recipientId).emit("mobility-notification", {
       ...payload, notificationId: String(notification._id), title: notification.title, body: notification.body, viewPath: "/mobility/shared/" + String(event.tripId)
     });
@@ -80,11 +88,15 @@ router.post("/mobility-events", async (req, res) => {
       ? ["Your journey is delayed", "Your expected arrival time has shifted or passed. Check the latest route and GPS update."]
       : ["Arrival confirmed", "Your arrival has been confirmed. Your journey is complete."];
     const notificationKey = String(event.tripId) + ":" + event.type + ":" + payload.travellerId;
+    const wasAlreadyCreated = await MobilityNotification.exists({ notificationKey });
     const notification = await MobilityNotification.findOneAndUpdate(
       { notificationKey },
       { $setOnInsert: { notificationKey, recipientId: payload.travellerId, tripId: event.tripId, type: event.type, title: travellerCopy[0], body: travellerCopy[1], payload: { tripId: String(event.tripId), travellerId: payload.travellerId, destination: event.destination || null, expectedArrivalAt: event.expectedArrivalAt || null, status: payload.status, viewPath: "/mobility" } } },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     ).lean();
+    if (!wasAlreadyCreated) {
+      await sendPushToUser({ userId: payload.travellerId, title: notification.title, body: notification.body, data: notification.payload });
+    }
     io.to("user:" + payload.travellerId).emit("mobility-notification", { ...payload, notificationId: String(notification._id), title: notification.title, body: notification.body, viewPath: "/mobility" });
   }
   res.json({ success: true, deliveredTo: recipients.length });
