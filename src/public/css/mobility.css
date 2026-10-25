@@ -526,3 +526,32 @@
     box-sizing: border-box !important;
   }
 }
+
+
+/* Mobile-only landscape control; desktop header remains unchanged. */
+.landscape-mode-toggle { display: none; cursor: pointer; font: inherit; }
+@media screen and (max-width: 720px) {
+  .landscape-mode-toggle {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 8px 11px;
+    border: 1px solid var(--line, #d8ded6);
+    border-radius: 11px;
+    background: rgba(255,253,248,.92);
+    color: var(--ink, #263d3a);
+    font-size: 12px;
+    font-weight: 750;
+    line-height: 1.25;
+    white-space: normal;
+    text-align: center;
+  }
+  body.app-shell.mobility-page > header.app-header > .header-actions .landscape-mode-toggle {
+    flex: 0 1 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    position: static !important;
+  }
+}
