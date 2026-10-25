@@ -215,7 +215,7 @@
   async function finishTrip(action) {
     if (!activeTrip) return;
     const endpoint = action === "arrive" ? "/trips/" + activeTrip.id + "/arrive" : "/trips/" + activeTrip.id + "/end";
-    const body = action === "end" ? { cancel: true } : {};
+    const body = action === "end" ? { cancel: false } : {};
     try {
       const data = await api(endpoint, { method: "POST", body: JSON.stringify(body) });
       activeTrip = data.trip; updateStatus(activeTrip); message(action === "arrive" ? "Arrival confirmed." : "Journey ended.");
