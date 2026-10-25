@@ -27,9 +27,11 @@
         <p class="muted">Reva uses a real road route for distance and ETA. Start location comes from your latest shared GPS position.</p>
         <form id="journeyForm">
           <label for="destinationQuery">Destination</label>
-          <div class="destination-search"><input id="destinationQuery" maxlength="160" placeholder="Search place or address" autocomplete="off" required><button id="searchDestination" type="button" aria-label="Search destination">Search</button></div>
+          <div class="destination-search"><input id="destinationQuery" maxlength="160" placeholder="Search place or address" autocomplete="off"><button id="searchDestination" type="button" aria-label="Search destination">Search</button></div>
+          <button id="pickDestinationOnMap" type="button" class="map-pick-button">⌖ Pick on Map</button>
+          <div id="mapPickActions" class="map-pick-actions" hidden><p>Tap anywhere on the map to place your destination pin. You can zoom and pan first.</p><div><button id="confirmMapDestination" type="button" disabled>Use This Destination</button><button id="cancelMapPick" type="button" class="secondary">Cancel</button></div></div>
           <div id="destinationResults" class="destination-results" role="listbox"></div>
-          <p id="selectedDestination" class="selected-destination">Choose a destination from search results.</p>
+          <p id="selectedDestination" class="selected-destination">Search for a place or pick a point directly on the map.</p>
           <label for="transportMode">Travel mode</label>
           <select id="transportMode"><option value="driving-car">🚗 Car / road vehicle</option><option value="cycling-regular">🚲 Bicycle</option><option value="foot-walking">🚶 Walking</option><option value="bus">🚌 Bus (road estimate)</option><option value="train">🚆 Train (route estimate)</option></select>
           <label for="recipientMode">Who should receive journey updates?</label>
