@@ -221,7 +221,7 @@ function showMobilityNotice(data) {
   detail.textContent = data.body || ((data.travellerUsername || "Your friend") + (data.destination?.label ? " · " + data.destination.label : "") + (data.expectedArrivalAt ? " · ETA " + new Date(data.expectedArrivalAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : ""));
   detail.style.cssText = "margin:7px 0 12px;color:#78847d;font-size:12px";
   const open = document.createElement("a");
-  open.href = "/mobility/shared/" + encodeURIComponent(data.tripId);
+  open.href = data.viewPath || data.payload?.viewPath || ("/mobility/shared/" + encodeURIComponent(data.tripId));
   open.textContent = "View shared journey →";
   open.style.cssText = "display:inline-block;padding:8px 11px;border-radius:10px;background:#294d40;color:white;text-decoration:none;font-size:12px;font-weight:700";
   open.addEventListener("click", async event => { event.preventDefault(); await markMobilityNotificationRead(data.notificationId || data.id); window.location.href = open.href; });
