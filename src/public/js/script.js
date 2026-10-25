@@ -174,7 +174,7 @@ function sendLatestPosition(force = false) {
   const moved = !lastSent || distanceMeters(lastSent.lat, lastSent.lon, latitude, longitude) >= 30;
   const enoughTime = Date.now() - lastSentAt >= 15000;
   if (!force && !moved && !enoughTime) return false;
-  socket.emit("send-location", { latitude, longitude });
+  socket.emit("send-location", { latitude, longitude, accuracyMeters: accuracy });
   lastSent = { lat: latitude, lon: longitude };
   lastSentAt = Date.now();
   upsertMarker({ userId: "me", username: "You", latitude, longitude }, accuracy);
