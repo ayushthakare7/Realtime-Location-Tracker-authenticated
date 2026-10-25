@@ -137,6 +137,7 @@ async function geocode(query) {
     throw error;
   }
   const data = await response.json();
+  const wantsRaipurAirport = /\braipur\b/i.test(query) && /airport|air port|swami vivekananda|mana/i.test(query);
   const results = (data.features || []).map(feature => {
     const p = feature.properties || {};
     const c = feature.geometry && feature.geometry.coordinates || [];
@@ -146,6 +147,14 @@ async function geocode(query) {
       longitude: Number(c[0])
     };
   }).filter(item => Number.isFinite(item.latitude) && Number.isFinite(item.longitude));
+  if (wantsRaipurAirport) {
+    results.sort((a, b) => {
+      const score = label => /swami vivekananda|raipur airport|mana airport/i.test(label) ? 0
+        : /airport|air port/i.test(label) ? 1
+        : /raipur/i.test(label) ? 2 : 3;
+      return score(a.label) - score(b.label);
+    });
+  }
   cacheWrite(geocodeCache, cacheKey, results, 10 * 60 * 1000);
   return results;
 }
