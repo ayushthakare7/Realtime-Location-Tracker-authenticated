@@ -3,11 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="/manifest-landscape.webmanifest">
   <meta name="theme-color" content="#f3f0e9">
   <title>My Journey · Reva</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
-  <link rel="stylesheet" href="/css/mobility.css?v=landscape-required-2">
+  <link rel="stylesheet" href="/css/mobility.css?v=landscape-app-3">
   <style>
     /* Portrait-phone header: replace the shared 3-column header with stacked rows. */
     @media screen and (max-width: 720px) {
@@ -151,14 +152,14 @@
   </section>
   <p id="mobilityMessage" class="mobility-message" aria-live="polite"></p>
 </main>
-<div id="landscapeRequired" class="landscape-required" role="dialog" aria-modal="true" aria-labelledby="landscapeRequiredTitle">
+<div id="landscapeRequired" class="landscape-required" role="dialog" aria-modal="true" aria-labelledby="landscapeRequiredTitle" hidden>
   <div class="landscape-required-card">
-    <div class="landscape-phone-icon" aria-hidden="true">▱<span>↻</span></div>
-    <p class="eyebrow">BETTER IN LANDSCAPE</p>
+    <div class="landscape-phone-icon" aria-hidden="true">▱ <span>↻</span></div>
+    <p class="eyebrow">REVA JOURNEY</p>
     <h1 id="landscapeRequiredTitle">Turn your phone sideways</h1>
-    <p>Reva Journey is designed for a wide map and a clearer route view. Rotate your phone to landscape to continue.</p>
+    <p>The journey map and route planner are designed for landscape. Rotate your phone to continue.</p>
     <button id="tryLandscapeLock" type="button">Try landscape automatically ↗</button>
-    <small id="landscapeRequiredHint">If your browser cannot rotate automatically, enable Auto-rotate in Quick Settings and turn your phone sideways.</small>
+    <small id="landscapeRequiredHint">For automatic landscape at launch, install Reva from your browser menu as an app. Otherwise enable Auto-rotate and turn your phone sideways.</small>
   </div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -166,5 +167,40 @@
 <script>window.REVA_SHARED_TRIP_ID = <%- JSON.stringify(sharedTripId || null) %>;</script>
 <script src="/js/reva-native-background.js"></script>
 <script src="/js/mobility.js"></script>
+
+<script>
+(() => {
+  const gate = document.getElementById("landscapeRequired");
+  const hint = document.getElementById("landscapeRequiredHint");
+  const isMobile = () => window.matchMedia("(max-width: 720px)").matches;
+  const isPortrait = () => window.matchMedia("(orientation: portrait)").matches;
+  const sync = () => {
+    if (!gate) return;
+    const blocked = isMobile() && isPortrait();
+    gate.hidden = !blocked;
+    document.body.classList.toggle("landscape-required-active", blocked);
+    if (!blocked) window.dispatchEvent(new Event("resize"));
+  };
+  const requestLock = async () => {
+    try {
+      if (!screen.orientation || typeof screen.orientation.lock !== "function") throw new Error("unsupported");
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen();
+      }
+      await screen.orientation.lock("landscape");
+      if (hint) hint.textContent = "Landscape mode requested.";
+    } catch (_) {
+      if (hint) hint.textContent = "This browser blocks forced rotation in a normal tab. Install Reva from the browser menu as an app for landscape-on-launch, or enable Auto-rotate and turn your phone sideways.";
+    }
+    sync();
+  };
+  document.getElementById("tryLandscapeLock")?.addEventListener("click", requestLock);
+  window.addEventListener("resize", sync);
+  window.addEventListener("orientationchange", () => setTimeout(sync, 150));
+  screen.orientation?.addEventListener?.("change", sync);
+  sync();
+})();
+</script>
+
 </body>
 </html>
