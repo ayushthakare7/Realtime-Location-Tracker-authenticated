@@ -20,7 +20,7 @@ Set `MOBILITY_SERVICE_URL` in the main app to the deployed service base URL (for
 
 ## Routing behavior
 
-Routes and durations come from OpenRouteService road-routing responses. Reva does not calculate ETA from straight-line distance. If the routing key is missing or quota is exhausted, the API returns an explicit error rather than fabricating an ETA.
+Routes and durations come from OpenRouteService road-routing responses. Reva does not calculate ETA from straight-line distance. If the routing key is missing or quota is exhausted, the API returns an explicit error rather than fabricating an ETA. Shared MongoDB counters cap the defaults at 1,500 direction requests and 500 geocoding requests per UTC day; results are cached to avoid unnecessary calls. Review the current provider free-plan limits and lower these caps if required.
 
 Supported profiles in this initial version: driving, cycling, and walking. Public transit and traffic-aware ETA are not enabled because they require a provider/data source with verified coverage and free allowance.
 
