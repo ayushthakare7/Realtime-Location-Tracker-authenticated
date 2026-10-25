@@ -36,11 +36,12 @@ def _requested_clock(question, now, extracted_intent=None):
         return None
     hour = hour % 12 + (12 if meridiem == "pm" else 0)
     day = now.date()
-    if re.search(r"\bday before yesterday\b", question, re.I):
+    date_text = str(extracted_intent.get("date_text") or question)
+    if re.search(r"\bday before yesterday\b", date_text, re.I):
         day -= timedelta(days=2)
-    elif re.search(r"\byesterday\b", question, re.I):
+    elif re.search(r"\byesterday\b|\blast night\b", date_text, re.I):
         day -= timedelta(days=1)
-    elif not re.search(r"\btoday\b", question, re.I):
+    elif not re.search(r"\btoday\b", date_text, re.I):
         candidate = datetime.combine(day, datetime_time(hour, minute), tzinfo=LOCAL_TZ)
         if candidate > now:
             day -= timedelta(days=1)
