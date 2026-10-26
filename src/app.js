@@ -3,6 +3,7 @@ const path = require("path");
 const cors = require("cors");
 const morgan = require("morgan");
 const authRoutes = require("./routes/authRoutes");
+const profileRoutes = require("./routes/profileRoutes");
 const trackerRoutes = require("./routes/trackerRoutes");
 const mobilityProxyRoutes = require("./routes/mobilityProxyRoutes");
 const mobilityEventsRoutes = require("./routes/mobilityEventsRoutes");
@@ -19,6 +20,7 @@ app.set("views", path.join(__dirname, "views"));
 app.use(express.static(path.join(__dirname, "public")));
 
 app.use("/api/auth", authRoutes);
+app.use("/api/profile", profileRoutes);
 app.use("/api/tracker", trackerRoutes);
 app.use("/api/mobility", mobilityProxyRoutes);
 app.use("/api/internal", mobilityEventsRoutes);
