@@ -9,6 +9,7 @@ const mobilityProxyRoutes = require("./routes/mobilityProxyRoutes");
 const mobilityEventsRoutes = require("./routes/mobilityEventsRoutes");
 const mobilityNotificationRoutes = require("./routes/mobilityNotificationRoutes");
 const pushRoutes = require("./routes/pushRoutes");
+const locationDeviceRoutes = require("./routes/locationDeviceRoutes");
 
 const app = express();
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || `http://localhost:${process.env.PORT || 3000}` }));
@@ -22,6 +23,7 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/tracker", trackerRoutes);
+app.use("/api/location-devices", locationDeviceRoutes);
 app.use("/api/mobility", mobilityProxyRoutes);
 app.use("/api/internal", mobilityEventsRoutes);
 app.use("/api/mobility-notifications", mobilityNotificationRoutes);
