@@ -39,6 +39,21 @@
     </section>
   </main>
 <script>
+(() => {
+  const params = new URLSearchParams(window.location.search);
+  const requestedPath = params.get("returnTo") || "/tracker";
+  const safeReturnPath = requestedPath.startsWith("/") && !requestedPath.startsWith("//") && !requestedPath.includes("\\\\") ? requestedPath : "/tracker";
+  const existingToken = localStorage.getItem("token");
+  if (existingToken) {
+    fetch("/api/profile", { headers: { Authorization: "Bearer " + existingToken } })
+      .then(response => {
+        if (response.ok) window.location.replace(safeReturnPath);
+        else { localStorage.removeItem("token"); }
+      })
+      .catch(() => { /* Keep the login form available when the network is offline. */ });
+  }
+  window.REVA_AUTH_RETURN_PATH = safeReturnPath;
+})();
 document.getElementById("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const button = e.currentTarget.querySelector("button[type=submit]");
@@ -56,7 +71,7 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
     const data = await response.json();
     if (data.success) {
       localStorage.setItem("token", data.token);
-      window.location.href = "/tracker";
+      window.location.replace(window.REVA_AUTH_RETURN_PATH || "/tracker");
     } else {
       message.textContent = data.message || "We couldn't sign you in. Please check your details.";
     }
