@@ -15,6 +15,7 @@ from fastembed import TextEmbedding
 from langchain_groq import ChatGroq
 from langgraph.graph import END, START, StateGraph
 from time_queries import answer_time_question
+from location_tools import resolve_location_tools
 
 load_dotenv()
 
@@ -62,6 +63,7 @@ class GraphState(TypedDict, total=False):
     events: list[dict[str, Any]]
     evidence: str
     answer: str
+    location_tools: dict[str, Any]
 
 def collection():
     if mongo is None:
@@ -241,6 +243,27 @@ def classify_node(state: GraphState) -> GraphState:
         return {"intent": "history_summary"}
     return {"intent": "other"}
 
+def location_tools_node(state: GraphState) -> GraphState:
+    """Route relevant questions to free public geocoding tools.
+
+    Inputs are supplied by the Node API after authorization. Public providers
+    label coordinates or resolve public place names; they never establish a
+    person's live location or replace MongoDB GPS/history.
+    """
+    try:
+        result = resolve_location_tools(
+            state.get("question", ""),
+            state.get("context", {}),
+            mongo[DB_NAME]["geocodingcache"] if mongo is not None else None,
+        )
+        if result.get("route") != "none":
+            print(f"[Reva RAG] location tool route={result.get('route')} results={len(result.get('results', []))}", flush=True)
+        return {"location_tools": result}
+    except Exception as exc:
+        print(f"[Reva RAG] location tools unavailable ({type(exc).__name__}); continuing with authorized context", flush=True)
+        return {"location_tools": {"route": "error", "results": []}}
+
+
 def retrieve_node(state: GraphState) -> GraphState:
     """Retrieve authorized history semantically first, with a MongoDB fallback.
 
@@ -354,6 +377,7 @@ def generate_node(state: GraphState) -> GraphState:
     safe_context = {
         "currentLocations": context.get("currentLocations", []),
         "calculatedDistances": context.get("calculatedDistances", []),
+        "locationTools": state.get("location_tools", {"route": "none", "results": []}),
     }
     print("[Reva RAG] generate: Groq invocation starting", flush=True)
     response = llm().invoke([
@@ -364,6 +388,11 @@ def generate_node(state: GraphState) -> GraphState:
             "the authorized current context, retrieved records, and backend-calculated values. Never invent a person's "
             "location, history, consent, timestamp, distance, route, or event. If the needed record is missing or stale, "
             "say exactly what is missing and do not treat a pinned journey destination as the person's live location. "
+            "Geocoding tool results are public map labels only; use them only when the result is marked ok and "
+            "keep the source/uncertainty clear. Do not claim a precise address or exact building from a city-level "
+            "result. For personal current-location answers, match the result person to the question and never "
+            "infer missing coordinates. If tool results are empty or unsuccessful, say that a reliable label could "
+            "not be resolved rather than inventing one. "
             "For general knowledge, explanations, definitions, study questions, and ordinary conversation that do not "
             "require private tracker data, answer helpfully from your general knowledge instead of refusing merely "
             "because the location-history context is empty. Be clear when a claim needs live external verification; "
@@ -379,11 +408,13 @@ def generate_node(state: GraphState) -> GraphState:
 def build_graph():
     graph = StateGraph(GraphState)
     graph.add_node("classify_intent", classify_node)
+    graph.add_node("resolve_location_tools", location_tools_node)
     graph.add_node("retrieve_authorized_events", retrieve_node)
     graph.add_node("prepare_evidence", evidence_node)
     graph.add_node("generate_answer", generate_node)
     graph.add_edge(START, "classify_intent")
-    graph.add_edge("classify_intent", "retrieve_authorized_events")
+    graph.add_edge("classify_intent", "resolve_location_tools")
+    graph.add_edge("resolve_location_tools", "retrieve_authorized_events")
     graph.add_edge("retrieve_authorized_events", "prepare_evidence")
     graph.add_edge("prepare_evidence", "generate_answer")
     graph.add_edge("generate_answer", END)
@@ -551,6 +582,7 @@ class RevaRAGHandler(BaseHTTPRequestHandler):
                         "intent": result.get("intent", extracted_intent.get("intent", "other")),
                         "extractedIntent": extracted_intent,
                         "retrievedEvents": len(result.get("events", [])),
+                        "locationTools": result.get("location_tools", {"route": "none", "results": []}),
                     }
                 except Exception as exc:
                     print(f"[Reva RAG] request failed: {type(exc).__name__}: {exc}", flush=True)
