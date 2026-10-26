@@ -152,7 +152,9 @@ def answer_time_question(question, authorized_user_ids, context, database, extra
         local_time = best["time"].astimezone(LOCAL_TZ).strftime("%I:%M:%S %p").lstrip("0")
         local_date = best["time"].astimezone(LOCAL_TZ).strftime("%d %b %Y")
         name = best["friend"].get("username", "your friend")
-        return f"You were closest to {name} at about {local_time} on {local_date}{period_label}. The nearest contemporaneous GPS samples were {best['distance'] / 1000:.2f} km apart in a straight line; the samples were no more than 5 minutes apart."
+        if day is not None:
+            return f"You were closest to {name} at about {local_time} on {local_date}. The nearest contemporaneous GPS samples were {best['distance'] / 1000:.2f} km apart in a straight line; the samples were no more than 5 minutes apart."
+        return f"Across all available recorded history, you were closest to {name} at about {local_time} on {local_date}. The nearest contemporaneous GPS samples were {best['distance'] / 1000:.2f} km apart in a straight line; the samples were no more than 5 minutes apart."
 
     # "Where was I at 1 AM?" and similar explicit clock-time questions.
     location_intent = intent == "location_at_time"
