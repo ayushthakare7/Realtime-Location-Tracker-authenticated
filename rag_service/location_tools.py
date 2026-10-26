@@ -253,11 +253,15 @@ def location_tool_route(question: str, context: dict[str, Any]) -> str:
             return "reverse_geocode"
         # A friend with no supplied GPS must not be looked up as a public place.
         return "none"
+    personal_reference = any(term in text for term in (
+        "my friend", "my friends", "a friend", "the friend", "my location",
+        "user one", "user two", "my family", "my brother", "my sister",
+    ))
     public_place_language = any(term in text for term in (
         "where is ", "where's ", "locate ", "which state is ", "what state is ",
         "what country is ", "what city is ",
     ))
-    if public_place_language and not named_people:
+    if public_place_language and not named_people and not personal_reference:
         return "forward_geocode"
     return "none"
 
