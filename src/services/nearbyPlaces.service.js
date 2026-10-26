@@ -1,3 +1,4 @@
+const NearbyPlaceCache = require("../models/NearbyPlaceCache");
 const cache = new Map();
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 let lastRequestAt = 0;
@@ -45,7 +46,34 @@ async function findNearbyPlaces(latitude, longitude, radiusMeters = 500) {
   const radius = Math.max(100, Math.min(1500, Number(radiusMeters) || 500));
   const key = lat.toFixed(3) + "," + lon.toFixed(3) + ":" + radius;
   const cached = cacheGet(key);
-  if (cached) return cached;
+  if (cached) return cached.map(place => ({
+    ...place,
+    distanceKm: Number(distanceKm(lat, lon, place.latitude, place.longitude).toFixed(3))
+  }));
+
+  // Persist geographic discovery across restarts. Cache only public place metadata,
+  // never the user's identity or their location-sharing history.
+  try {
+    const stored = await NearbyPlaceCache.findOne({
+      cacheKey: key,
+      fetchedAt: { $gt: new Date(Date.now() - CACHE_TTL_MS) }
+    }).lean();
+    if (stored && Array.isArray(stored.places)) {
+      const places = stored.places.map(place => ({
+        name: place.name,
+        category: place.category || "landmark",
+        latitude: Number(place.latitude),
+        longitude: Number(place.longitude),
+        distanceKm: Number(distanceKm(lat, lon, Number(place.latitude), Number(place.longitude)).toFixed(3)),
+        source: place.source || "OpenStreetMap"
+      })).filter(place => Number.isFinite(place.latitude) && Number.isFinite(place.longitude))
+        .sort((a, b) => a.distanceKm - b.distanceKm);
+      cache.set(key, { savedAt: Date.now(), places });
+      return places;
+    }
+  } catch (error) {
+    console.warn("[Nearby places] Persistent cache read failed:", error.message);
+  }
 
   // Public OSM Overpass is a fallback, not a high-volume map-tile service.
   // Cache results and throttle calls; do not request the whole map.
@@ -112,6 +140,33 @@ async function findNearbyPlaces(latitude, longitude, radiusMeters = 500) {
   }).filter(Boolean).sort((a, b) => a.distanceKm - b.distanceKm).slice(0, 8);
 
   cache.set(key, { savedAt: Date.now(), places });
+  try {
+    const expiresAt = new Date(Date.now() + CACHE_TTL_MS);
+    await NearbyPlaceCache.updateOne(
+      { cacheKey: key },
+      {
+        $set: {
+          cacheKey: key,
+          latitude: lat,
+          longitude: lon,
+          radiusMeters: radius,
+          places: places.map(place => ({
+            name: place.name,
+            normalizedName: place.name.toLocaleLowerCase("en-IN").replace(/\\s+/g, " ").trim(),
+            category: place.category,
+            latitude: place.latitude,
+            longitude: place.longitude,
+            source: place.source
+          })),
+          fetchedAt: new Date(),
+          expiresAt
+        }
+      },
+      { upsert: true, runValidators: true }
+    );
+  } catch (error) {
+    console.warn("[Nearby places] Persistent cache write failed:", error.message);
+  }
   if (cache.size > 500) {
     const oldestKey = cache.keys().next().value;
     cache.delete(oldestKey);
