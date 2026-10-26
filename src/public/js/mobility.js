@@ -1,6 +1,6 @@
 (() => {
   const token = localStorage.getItem("token");
-  if (!token) { window.location.replace("/login"); return; }
+  if (!token) { window.location.replace("/login?returnTo=" + encodeURIComponent(window.location.pathname + window.location.search)); return; }
 
   const $ = id => document.getElementById(id);
   const message = text => { $("mobilityMessage").textContent = text || ""; };
