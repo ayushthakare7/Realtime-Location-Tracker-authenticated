@@ -1,4 +1,20 @@
 const token = localStorage.getItem("token");
+const deviceIdKey = "revaLocationDeviceId";
+let locationDeviceId = localStorage.getItem(deviceIdKey);
+if (!locationDeviceId || !/^[A-Za-z0-9_-]{16,80}$/.test(locationDeviceId)) {
+  locationDeviceId = (window.crypto?.randomUUID ? window.crypto.randomUUID() : "reva_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)).replace(/[^A-Za-z0-9_-]/g, "_");
+  localStorage.setItem(deviceIdKey, locationDeviceId);
+}
+const locationDeviceLabel = (() => {
+  const ua = navigator.userAgent || "";
+  if (/Android/i.test(ua)) return /Mobile/i.test(ua) ? "Android phone" : "Android tablet";
+  if (/iPhone/i.test(ua)) return "iPhone";
+  if (/iPad/i.test(ua)) return "iPad";
+  if (/Windows/i.test(ua)) return "Windows computer";
+  if (/Macintosh|Mac OS/i.test(ua)) return "Mac computer";
+  return "This device";
+})();
+let activeLocationDeviceId = "";
 if (!token) window.location.replace("/login");
 
 const api = async (path, options = {}) => {
@@ -362,13 +378,27 @@ async function loadOwnProfileMarker() {
 }
 
 function connectSocket() {
-  socket = io({ auth: { token } });
+  socket = io({ auth: { token, deviceId: locationDeviceId, deviceLabel: locationDeviceLabel } });
   socket.on("connect", () => {
     setStatus("Connected. Location sharing is " + (sharing ? "on." : "off."));
     if (sharing && latestPosition) sendLatestPosition(true);
   });
   socket.on("connect_error", error => setStatus("Socket connection: " + error.message));
-  socket.on("sharing-status", data => { if (data) historyEnabled = data.historyEnabled !== false; if (!sharing) setStatus(data.enabled ? "Your sharing is enabled on this account." : "Sharing is off until you opt in."); });
+  socket.on("sharing-status", data => {
+    if (data) { historyEnabled = data.historyEnabled !== false; activeLocationDeviceId = data.activeDeviceId || ""; }
+    refreshLocationDevices();
+    if (!sharing) setStatus(data?.enabled ? (activeLocationDeviceId === locationDeviceId ? "Your sharing is enabled on this device." : "Sharing is enabled on another device.") : "Sharing is off until you opt in.");
+  });
+  socket.on("location-source-changed", data => {
+    activeLocationDeviceId = data?.activeDeviceId || "";
+    if (activeLocationDeviceId !== locationDeviceId && watchId !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(watchId); watchId = null; latestPosition = null; lastSent = null;
+      setStatus("Location source switched to another device. This device has stopped sharing GPS.");
+    } else if (activeLocationDeviceId === locationDeviceId && data?.sharingEnabled) {
+      setStatus("This device is now the active location source. Press Start sharing here to resume GPS updates.");
+    }
+    refreshLocationDevices();
+  });
   socket.on("receive-location", data => {
     if (!data) return;
     const id = String(data.userId || data.username || "");
@@ -445,6 +475,11 @@ async function loadFriends({ quiet = false } = {}) {
 async function setSharing(enabled) {
   try {
     if (enabled) {
+      const source = await fetch("/api/location-devices/active", { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ deviceId: locationDeviceId }) });
+      const sourceData = await source.json().catch(() => ({}));
+      if (!source.ok) throw new Error(sourceData.message || "Could not select this device for location sharing.");
+      activeLocationDeviceId = sourceData.activeDeviceId || locationDeviceId;
+      refreshLocationDevices();
       radarAnimationDone = false;
       radarFocusedOnMe = false;
     }
@@ -490,6 +525,44 @@ document.getElementById("stop").addEventListener("click", () => setSharing(false
 document.getElementById("historyToggle").addEventListener("change", event => setHistory(event.target.checked));
 document.getElementById("deleteHistory").addEventListener("click", deleteHistory);
 document.getElementById("logout").addEventListener("click", () => { if (watchId !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchId); localStorage.removeItem("token"); if (socket) socket.disconnect(); window.location.replace("/login"); });
+
+async function refreshLocationDevices() {
+  const root = document.getElementById("locationDevices");
+  if (!root || !token) return;
+  try {
+    const response = await fetch("/api/location-devices", { headers: { Authorization: "Bearer " + token } });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || "Could not load devices.");
+    activeLocationDeviceId = data.activeDeviceId || activeLocationDeviceId;
+    root.replaceChildren();
+    const devices = Array.isArray(data.devices) ? data.devices : [];
+    if (!devices.length) { root.textContent = "This device will appear here after it connects."; return; }
+    devices.forEach(device => {
+      const row = document.createElement("div"); row.className = "location-device-row";
+      const details = document.createElement("div"); details.className = "location-device-details";
+      const title = document.createElement("strong"); title.textContent = device.label + (device.deviceId === locationDeviceId ? " · This device" : "");
+      const meta = document.createElement("small");
+      const seen = device.lastSeen ? new Date(device.lastSeen).toLocaleString() : "Not yet seen";
+      meta.textContent = (device.isActive ? "Active location source" : "Standby device") + " · Last connected " + seen;
+      details.append(title, meta); row.append(details);
+      if (device.isActive) { const badge = document.createElement("span"); badge.className = "location-device-active"; badge.textContent = "ACTIVE"; row.append(badge); }
+      else {
+        const button = document.createElement("button"); button.type = "button"; button.className = "secondary location-device-switch"; button.textContent = "Make active";
+        button.addEventListener("click", async () => {
+          button.disabled = true; button.textContent = "Switching…";
+          try {
+            const result = await fetch("/api/location-devices/active", { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ deviceId: device.deviceId }) });
+            const payload = await result.json().catch(() => ({})); if (!result.ok) throw new Error(payload.message || "Could not switch devices.");
+            activeLocationDeviceId = payload.activeDeviceId; await refreshLocationDevices();
+            setStatus(device.deviceId === locationDeviceId ? "This device is active. Press Start sharing to publish its GPS location." : "Location source switched. The selected device will provide the shared location.");
+          } catch (error) { button.disabled = false; button.textContent = "Make active"; alert(error.message); }
+        }); row.append(button);
+      }
+      root.append(row);
+    });
+  } catch (error) { root.textContent = error.message || "Devices are temporarily unavailable."; }
+}
+
 document.getElementById("friendForm").addEventListener("submit", async event => { event.preventDefault(); try { await api("/friends/request", { method: "POST", body: JSON.stringify({ username: document.getElementById("friendUsername").value.trim() }) }); document.getElementById("friendUsername").value = ""; alert("Friend request sent."); await loadFriends(); } catch (e) { alert(e.message); } });
 document.getElementById("askForm").addEventListener("submit", async event => { event.preventDefault(); const answer = document.getElementById("answer"); answer.textContent = "Reva is connecting the dots in your shared location story…"; try { const data = await api("/ask", { method: "POST", body: JSON.stringify({ question: document.getElementById("question").value, aiConsent: document.getElementById("aiConsent").checked }) }); answer.textContent = data.answer; } catch (e) { answer.textContent = e.message; } });
 
