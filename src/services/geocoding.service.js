@@ -58,6 +58,22 @@ function removeCountry(query, countryMatch) {
   return String(query || "").replace(new RegExp(pattern, "i"), " ").replace(/[,;\s]+/g, " ").trim();
 }
 
+function expandPlaceAliases(query) {
+  const value = String(query || "").trim();
+  const patterns = [
+    { regex: /^iit\\s+(.+)$/i, expand: match => "Indian Institute of Technology " + match[1] },
+    { regex: /^nit\\s+(.+)$/i, expand: match => "National Institute of Technology " + match[1] },
+    { regex: /^aiims\\s+(.+)$/i, expand: match => "All India Institute of Medical Sciences " + match[1] },
+    { regex: /^iim\\s+(.+)$/i, expand: match => "Indian Institute of Management " + match[1] }
+  ];
+  const aliases = [value];
+  for (const pattern of patterns) {
+    const match = value.match(pattern.regex);
+    if (match) aliases.push(pattern.expand(match));
+  }
+  return [...new Set(aliases)];
+}
+
 function placeMatches(item, placeQuery, countryMatch) {
   const address = item.address || {};
   const settlement = normalizeQuery(
@@ -67,7 +83,7 @@ function placeMatches(item, placeQuery, countryMatch) {
   const searchable = normalizeQuery([
     settlement, item.name, item.display_name, address.state, address.country
   ].filter(Boolean).join(" "));
-  const tokens = normalizeQuery(placeQuery).split(/\s+/).filter(Boolean);
+  const tokens = normalizeQuery(placeQuery).split(/\\s+/).filter(Boolean);
   if (!tokens.length || !tokens.every(token => searchable.includes(token))) return false;
   if (countryMatch && normalizeQuery(address.country) !== countryMatch.country) return false;
   return true;
@@ -100,29 +116,41 @@ async function geocodePlace(input) {
     if (nameMatches && countryMatches) return asPlace(cached);
   }
 
-  const url = new URL("https://nominatim.openstreetmap.org/search");
-  url.searchParams.set("format", "jsonv2");
-  url.searchParams.set("q", placeQuery);
-  if (countryMatch) url.searchParams.set("countrycodes", countryMatch.code);
-  url.searchParams.set("addressdetails", "1");
-  url.searchParams.set("limit", "10");
+  let result = null;
+  let lastProviderError = null;
+  for (const searchQuery of expandPlaceAliases(placeQuery)) {
+    const url = new URL("https://nominatim.openstreetmap.org/search");
+    url.searchParams.set("format", "jsonv2");
+    url.searchParams.set("q", searchQuery);
+    if (countryMatch) url.searchParams.set("countrycodes", countryMatch.code);
+    url.searchParams.set("addressdetails", "1");
+    url.searchParams.set("limit", "10");
 
-  const response = await fetch(url, {
-    headers: { "User-Agent": "PrivacyAwareLocationTracker/1.0 (place geocoding)" },
-    signal: AbortSignal.timeout(10000)
-  });
-  if (!response.ok) throw new Error("Geocoding provider returned HTTP " + response.status);
-
-  const results = await response.json();
-  if (!Array.isArray(results) || results.length === 0) return null;
-
-  const matching = results.filter(item => placeMatches(item, placeQuery, countryMatch));
-  const result = matching.find(item => {
-    const address = item.address || {};
-    const settlement = address.city || address.town || address.village ||
-      address.municipality || address.hamlet || item.name;
-    return normalizeQuery(settlement) === normalizeQuery(placeQuery);
-  }) || matching[0];
+    try {
+      const response = await fetch(url, {
+        headers: { "User-Agent": "PrivacyAwareLocationTracker/1.0 (place geocoding)" },
+        signal: AbortSignal.timeout(10000)
+      });
+      if (!response.ok) {
+        lastProviderError = new Error("Geocoding provider returned HTTP " + response.status);
+        continue;
+      }
+      const results = await response.json();
+      if (!Array.isArray(results) || results.length === 0) continue;
+      const matching = results.filter(item => placeMatches(item, searchQuery, countryMatch));
+      result = matching.find(item => {
+        const address = item.address || {};
+        const settlement = address.city || address.town || address.village ||
+          address.municipality || address.hamlet || item.name;
+        return normalizeQuery(settlement) === normalizeQuery(searchQuery);
+      }) || matching[0] || null;
+      if (result) break;
+    } catch (error) {
+      lastProviderError = error;
+      console.warn("[Geocoding] Provider lookup failed for alias:", searchQuery, error.message);
+    }
+  }
+  if (!result && lastProviderError) throw lastProviderError;
 
   if (!result) {
     console.warn("[Geocoding] No relevant result for place query:", query);
