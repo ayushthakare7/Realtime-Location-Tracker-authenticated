@@ -11,7 +11,7 @@ const pushRoutes = require("./routes/pushRoutes");
 
 const app = express();
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || `http://localhost:${process.env.PORT || 3000}` }));
-app.use(express.json({ limit: "20kb" }));
+app.use(express.json({ limit: "160kb" }));
 app.use(morgan("dev"));
 app.use(express.urlencoded({ extended: true }));
 app.set("view engine", "ejs");
