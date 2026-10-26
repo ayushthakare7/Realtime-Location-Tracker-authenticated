@@ -9,6 +9,7 @@ const { askRagService } = require("../services/ragClient.service");
 const ragTasks = require("../services/ragTask.service");
 const { placeLabel, reverseGeocode } = require("../services/locationEvents.service");
 const { geocodePlace } = require("../services/geocoding.service");
+const { findNearbyPlaces } = require("../services/nearbyPlaces.service");
 
 exports.setSharing = async (req, res) => {
   try {
@@ -223,9 +224,24 @@ exports.askMap = async (req, res) => {
         }
         const ageMinutes = Math.max(0, Math.round((Date.now() - new Date(mine.lastSeen).getTime()) / 60000));
         const region = [geo.city, geo.state, geo.country].filter(Boolean).join(", ");
-        const resolved = place && !isFallbackPlace(place) ? place : region;
+        let resolved = place && !isFallbackPlace(place) ? place : region;
+        let nearbyNote = "";
+        if (!place || isFallbackPlace(place) || !geo.city) {
+          try {
+            const nearby = await findNearbyPlaces(mine.latitude, mine.longitude, 1000);
+            const educational = nearby.find(item => ["university", "college", "school"].includes(item.category) && item.distanceKm <= 1.5);
+            const closest = nearby.find(item => item.distanceKm <= 0.75);
+            const landmark = educational || closest;
+            if (landmark) {
+              resolved = landmark.name;
+              nearbyNote = " (nearest mapped " + landmark.category + ", about " + landmark.distanceKm.toFixed(2) + " km from the GPS point)";
+            }
+          } catch (error) {
+            console.warn("[Reva] Nearby landmark lookup failed:", error.message);
+          }
+        }
         const coordinates = Number.isFinite(Number(mine.latitude)) && Number.isFinite(Number(mine.longitude)) ? " (GPS " + Number(mine.latitude).toFixed(5) + ", " + Number(mine.longitude).toFixed(5) + ")" : "";
-        return res.json({ success: true, answer: resolved ? `Your latest shared location appears to be near ${resolved}${coordinates}. Updated ${ageMinutes} minute(s) ago.` : `I have your latest GPS coordinates${coordinates}, but the map provider could not identify a named nearby place. Updated ${ageMinutes} minute(s) ago.` });
+        return res.json({ success: true, answer: resolved ? `Your latest shared location appears to be near ${resolved}${nearbyNote}${coordinates}. Updated ${ageMinutes} minute(s) ago.` : `I have your latest GPS coordinates${coordinates}, but no named nearby place could be resolved. Updated ${ageMinutes} minute(s) ago.` });
       }
       const target = targetUser && String(targetUser._id) !== String(uid) ? others.find(p => String(p.userId) === String(targetUser._id)) : null;
       if (!target) return res.json({ success: true, answer: "I can't access a current location for that person. They may not be sharing right now, or their latest location is unavailable." });
@@ -238,14 +254,31 @@ exports.askMap = async (req, res) => {
       }
       const ageMinutes = Math.max(0, Math.round((Date.now() - new Date(target.lastSeen).getTime()) / 60000));
       const region = [geo.city, geo.state, geo.country].filter(Boolean).join(", ");
-      const resolved = place && !isFallbackPlace(place) ? place : region;
+      let resolved = place && !isFallbackPlace(place) ? place : region;
+      let nearbyNote = "";
+      // If reverse geocoding gives only coordinates or a broad region, look for
+      // actual named landmarks around the GPS point (campuses, hospitals, stations, etc.).
+      if (!place || isFallbackPlace(place) || !geo.city) {
+        try {
+          const nearby = await findNearbyPlaces(target.latitude, target.longitude, 1000);
+          const educational = nearby.find(item => ["university", "college", "school"].includes(item.category) && item.distanceKm <= 1.5);
+          const closest = nearby.find(item => item.distanceKm <= 0.75);
+          const landmark = educational || closest;
+          if (landmark) {
+            resolved = landmark.name;
+            nearbyNote = " (nearest mapped " + landmark.category + ", about " + landmark.distanceKm.toFixed(2) + " km from the GPS point)";
+          }
+        } catch (error) {
+          console.warn("[Reva] Nearby landmark lookup failed:", error.message);
+        }
+      }
       const coordinates = Number.isFinite(Number(target.latitude)) && Number.isFinite(Number(target.longitude)) ? " (GPS " + Number(target.latitude).toFixed(5) + ", " + Number(target.longitude).toFixed(5) + ")" : "";
       const staleAfterMinutes = Math.max(1, Number(process.env.LOCATION_STALE_MINUTES) || 15);
       if (ageMinutes > staleAfterMinutes) {
-        return res.json({ success: true, answer: `${target.username}'s last shared GPS point is ${ageMinutes} minute(s) old. The recorded location was near ${resolved || "an unnamed map location"}${coordinates}; I cannot confirm that this is where they are right now.` });
+        return res.json({ success: true, answer: `${target.username}'s last shared GPS point is ${ageMinutes} minute(s) old. The recorded location was near ${resolved || "an unnamed map location"}${nearbyNote}${coordinates}; I cannot confirm that this is where they are right now.` });
       }
-      if (resolved) return res.json({ success: true, answer: `${target.username}'s latest shared location appears to be near ${resolved}${coordinates}. Updated ${ageMinutes} minute(s) ago.` });
-      return res.json({ success: true, answer: `${target.username} is sharing a current location, but the map provider could not identify a named nearby place. Their GPS coordinates are ${Number(target.latitude).toFixed(5)}, ${Number(target.longitude).toFixed(5)}; updated ${ageMinutes} minute(s) ago.` });
+      if (resolved) return res.json({ success: true, answer: `${target.username}'s latest shared location appears to be near ${resolved}${nearbyNote}${coordinates}. Updated ${ageMinutes} minute(s) ago.` });
+      return res.json({ success: true, answer: `${target.username} is sharing a current location, but no named nearby place could be resolved. Their GPS coordinates are ${Number(target.latitude).toFixed(5)}, ${Number(target.longitude).toFixed(5)}; updated ${ageMinutes} minute(s) ago.` });
     }
 
     const distances = [];
