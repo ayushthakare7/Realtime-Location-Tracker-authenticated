@@ -37,7 +37,10 @@ async function startPushRegistration() {
       });
       await PushNotifications.addListener("pushNotificationActionPerformed", action => {
         const path = action.notification.data?.viewPath;
-        if (typeof path === "string" && path.startsWith("/")) window.location.assign(path);
+        if (typeof path === "string" && path.startsWith("/") && !path.startsWith("//") && !path.includes("\\\\")) {
+          // Preserve the intended destination through authentication; page code redirects to login with returnTo when needed.
+          window.location.assign(path);
+        }
       });
       await PushNotifications.addListener("pushNotificationReceived", notification => {
         // Android displays FCM notification payloads while backgrounded. In the
