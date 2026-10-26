@@ -15,7 +15,7 @@ const locationDeviceLabel = (() => {
   return "This device";
 })();
 let activeLocationDeviceId = "";
-if (!token) window.location.replace("/login");
+if (!token) window.location.replace("/login?returnTo=" + encodeURIComponent(window.location.pathname + window.location.search));
 
 const api = async (path, options = {}) => {
   const response = await fetch("/api/tracker" + path, {
@@ -29,6 +29,29 @@ const api = async (path, options = {}) => {
 
 const map = L.map("map").setView([20.5937, 78.9629], 5);
 const baseTiles = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap contributors" }).addTo(map);
+
+function recenterMainMap() {
+  const button = document.getElementById("mainRecenterMap");
+  const ownMarker = markers.get("me");
+  const target = latestPosition ? [latestPosition.latitude, latestPosition.longitude] : ownMarker?.getLatLng();
+  if (target) {
+    map.flyTo(target, Math.max(map.getZoom(), 15), { duration: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 0 : 1.1 });
+    return;
+  }
+  if (!navigator.geolocation) {
+    setStatus("This device does not support location access yet.");
+    return;
+  }
+  if (button) { button.disabled = true; button.textContent = "Finding you…"; }
+  navigator.geolocation.getCurrentPosition(position => {
+    const point = [position.coords.latitude, position.coords.longitude];
+    map.flyTo(point, Math.max(map.getZoom(), 15), { duration: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 0 : 1.1 });
+    if (button) { button.disabled = false; button.textContent = "◎ Recenter"; }
+  }, error => {
+    handleLocationError(error);
+    if (button) { button.disabled = false; button.textContent = "◎ Recenter"; }
+  }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 12000 });
+}
 
 // Keep camera movement at a consistent visual pace even when locations are far apart.
 function flyToAtSteadyPace(target, zoom) {
@@ -520,6 +543,7 @@ async function deleteHistory() {
   try { await api("/history", { method: "DELETE" }); setStatus("Your location history was deleted."); } catch (e) { alert(e.message); }
 }
 
+document.getElementById("mainRecenterMap")?.addEventListener("click", recenterMainMap);
 document.getElementById("start").addEventListener("click", () => setSharing(true));
 document.getElementById("stop").addEventListener("click", () => setSharing(false));
 document.getElementById("historyToggle").addEventListener("change", event => setHistory(event.target.checked));
