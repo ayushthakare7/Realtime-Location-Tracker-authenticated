@@ -61,6 +61,8 @@ function waitForMapTiles(maxWait = 4200) {
 
 const markers = new Map();
 const accuracyCircles = new Map();
+const profileByUser = new Map();
+const avatarEmoji = { "child-boy":"🧒", "child-girl":"👧", "college-boy":"🧑‍🎓", "college-girl":"👩‍🎓", "adult-man":"👨", "adult-woman":"👩" };
 let sharing = false;
 let historyEnabled = true;
 let watchId = null;
@@ -83,23 +85,26 @@ function distanceMeters(aLat, aLon, bLat, bLon) {
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(aLat)) * Math.cos(rad(bLat)) * Math.sin(dLon / 2) ** 2;
   return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
-function createRadarIcon(isMe) {
-  const kind = isMe ? "reva-pin-me" : "reva-pin-friend";
-  return L.divIcon({
-    className: "reva-marker-shell",
-    html: '<span class="reva-pin ' + kind + '"><i></i></span>',
-    iconSize: [28, 28],
-    iconAnchor: [14, 14]
-  });
+function createRadarIcon(isMe, data = {}) {
+  const profile = { ...(profileByUser.get(String(data.userId || data.username)) || {}), ...data };
+  const image = typeof profile.profileImage === "string" && profile.profileImage.startsWith("data:image/jpeg;base64,") ? profile.profileImage : "";
+  const emoji = avatarEmoji[profile.avatarId] || (isMe ? "🧑‍🎓" : "🧑");
+  const html = image
+    ? '<span class="reva-avatar-marker"><img alt="" src="' + image + '"></span>'
+    : '<span class="reva-avatar-marker"><span>' + emoji + '</span></span>';
+  return L.divIcon({ className: "reva-marker-shell", html, iconSize: [42, 42], iconAnchor: [21, 21] });
 }
 
 function upsertMarker(data, accuracy) {
   if (!data || !Number.isFinite(Number(data.latitude)) || !Number.isFinite(Number(data.longitude))) return;
   const id = String(data.userId || data.username);
+  if (data.avatarId || data.profileImage !== undefined) profileByUser.set(id, { ...(profileByUser.get(id) || {}), avatarId: data.avatarId, profileImage: data.profileImage || "" });
   const point = [Number(data.latitude), Number(data.longitude)];
-  if (markers.has(id)) markers.get(id).setLatLng(point);
-  else {
-    const marker = L.marker(point, { icon: createRadarIcon(id === "me") }).addTo(map).bindTooltip(data.username || "Friend", { permanent: true, direction: "top" });
+  if (markers.has(id)) {
+    const marker = markers.get(id); marker.setLatLng(point);
+    if (data.avatarId || data.profileImage !== undefined) marker.setIcon(createRadarIcon(id === "me", { ...profileByUser.get(id), userId: id }));
+  } else {
+    const marker = L.marker(point, { icon: createRadarIcon(id === "me", { ...profileByUser.get(id), ...data }) }).addTo(map).bindTooltip(data.username || "Friend", { permanent: true, direction: "top" });
     markers.set(id, marker);
   }
   if (accuracy && Number.isFinite(Number(accuracy))) {
@@ -372,7 +377,8 @@ async function loadFriends({ quiet = false } = {}) {
         }
       };
       item.append(title, detail, remove); friendRoot.append(item);
-      if (friend.location) upsertMarker({ ...friend.location, userId: friend.id, username: friend.username }); else removeMarker(friend.id);
+      profileByUser.set(String(friend.id), { avatarId: friend.avatarId || "college-boy", profileImage: friend.profileImage || "" });
+      if (friend.location) upsertMarker({ ...friend.location, userId: friend.id, username: friend.username, avatarId: friend.avatarId || "college-boy", profileImage: friend.profileImage || "" }); else removeMarker(friend.id);
     });
     const requestRoot = document.getElementById("requests"); requestRoot.replaceChildren();
     if (data.requests.length) {
@@ -459,3 +465,18 @@ document.getElementById("currentLocationPrompt").addEventListener("click", () =>
 });
 
 loadFriends();
+
+/* Free, client-side profile photo compression and avatar editor. */
+(() => {
+  const modal=document.getElementById("profileModal");
+  if(!modal) return;
+  let avatarId="college-boy", profileImage="", pendingImage=null;
+  const preview=document.getElementById("profilePreview"), options=document.getElementById("profileAvatarOptions"), message=document.getElementById("profileMessage");
+  const render=()=>{ preview.src=profileImage||"data:image/svg+xml;charset=utf-8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect width="80" height="80" rx="40" fill="#e9efe7"/><text x="40" y="56" font-size="44" text-anchor="middle">'+(avatarEmoji[avatarId]||"🧑‍🎓")+'</text></svg>'); options.replaceChildren(); Object.entries(avatarEmoji).forEach(([id,emoji])=>{const b=document.createElement("button");b.type="button";b.className="profile-avatar-choice"+(id===avatarId?" selected":"");const face=document.createElement("span");face.textContent=emoji;const label=document.createElement("small");label.textContent=({"child-boy":"Child boy","child-girl":"Child girl","college-boy":"College boy","college-girl":"College girl","adult-man":"Adult man","adult-woman":"Adult woman"})[id];b.append(face,label);b.onclick=()=>{avatarId=id;render();};options.append(b);});};
+  const compress=async file=>new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=reject;reader.onload=()=>{const img=new Image();img.onerror=reject;img.onload=()=>{const c=document.createElement("canvas"),s=Math.min(1,320/Math.max(img.width,img.height));c.width=Math.max(1,Math.round(img.width*s));c.height=Math.max(1,Math.round(img.height*s));c.getContext("2d").drawImage(img,0,0,c.width,c.height);let q=.78,d=c.toDataURL("image/jpeg",q);while(d.length>112000&&q>.35){q-=.1;d=c.toDataURL("image/jpeg",q);}d.length<=112000?resolve(d):reject(new Error("Photo is too large after compression. Choose another."));};img.src=reader.result;};reader.readAsDataURL(file);});
+  document.getElementById("profileOpen").addEventListener("click",async()=>{modal.hidden=false;message.textContent="Loading profile…";try{const r=await fetch("/api/profile",{headers:{Authorization:"Bearer "+token}}),d=await r.json();if(!r.ok)throw new Error(d.message);avatarId=d.profile.avatarId||"college-boy";profileImage=d.profile.profileImage||"";pendingImage=null;render();message.textContent="";}catch(e){message.textContent=e.message||"Could not load profile.";}});
+  document.getElementById("profileClose").onclick=()=>{modal.hidden=true;};
+  modal.addEventListener("click",e=>{if(e.target===modal)modal.hidden=true;});
+  document.getElementById("profilePhotoEdit").addEventListener("change",async e=>{const f=e.target.files?.[0];if(!f)return;try{if(!f.type.startsWith("image/"))throw new Error("Choose an image file.");pendingImage=await compress(f);profileImage=pendingImage;render();message.textContent="Photo ready. Save your marker to apply it.";}catch(err){message.textContent=err.message||"Could not process photo.";e.target.value="";}});
+  document.getElementById("profileSave").addEventListener("click",async()=>{const b=document.getElementById("profileSave");b.disabled=true;b.textContent="Saving…";try{const payload={avatarId};if(pendingImage!==null)payload.profileImage=pendingImage;const r=await fetch("/api/profile",{method:"PATCH",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify(payload)}),d=await r.json();if(!r.ok)throw new Error(d.message);profileImage=d.profile.profileImage||"";pendingImage=null;profileByUser.set("me",{avatarId:d.profile.avatarId,profileImage});if(latestPosition)upsertMarker({userId:"me",username:"You",latitude:latestPosition.latitude,longitude:latestPosition.longitude,avatarId,profileImage});markers.forEach((marker,id)=>{if(id==="me")marker.setIcon(createRadarIcon(true,{userId:id,avatarId,profileImage}));});message.textContent="Your marker is updated!";setTimeout(()=>{modal.hidden=true;},650);}catch(e){message.textContent=e.message||"Could not save your marker.";}finally{b.disabled=false;b.textContent="Save marker";}});
+})();
