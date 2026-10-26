@@ -200,7 +200,7 @@ exports.askMap = async (req, res) => {
           // identify the requested campus/place from the user's GPS point.
           const nearby = await findNearbyPlaces(targetLocation.latitude, targetLocation.longitude, 1500);
           const normalizedCandidate = candidatePlace.toLocaleLowerCase("en-IN").replace(/[^a-z0-9]+/g, " ").trim();
-          const candidateTokens = normalizedCandidate.split(/\\s+/).filter(token => token.length > 1);
+          const candidateTokens = normalizedCandidate.split(/\s+/).filter(token => token.length > 1);
           matchingLandmark = nearby
             .map(item => {
               const normalizedName = item.name.toLocaleLowerCase("en-IN").replace(/[^a-z0-9]+/g, " ").trim();
