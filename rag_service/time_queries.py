@@ -65,36 +65,69 @@ def answer_time_question(question, authorized_user_ids, context, database, extra
             return "I can't answer from your personal history because location history is unavailable or disabled."
         return None
 
-    # "When were we closest today/yesterday?" compares contemporaneous GPS samples.
-    if (intent == "closest_people"
-            or (re.search(r"\b(?:closer|closest|nearest)\b", question, re.I)
-                and re.search(r"\b(?:today|yesterday)\b", question, re.I))):
-        date_text = str(extracted_intent.get("date_text") or question).lower()
-        day = datetime.now(LOCAL_TZ).date()
-        if "day before yesterday" in date_text:
-            day -= timedelta(days=2)
-        elif "yesterday" in date_text or "last night" in date_text:
-            day -= timedelta(days=1)
-        start, end = _bounds(day)
+    # "When was X closest to me?" compares contemporaneous samples. If no period
+    # was explicitly requested, search the full recorded history (not just today).
+    closest_question = (
+        intent == "closest_people"
+        or (re.search(r"\b(?:closer|closest|nearest)\b", question, re.I)
+            and re.search(r"\b(?:when|was|were|closest to me|nearest to me)\b", question, re.I))
+    )
+    if closest_question:
+        date_text = str(extracted_intent.get("date_text") or "").strip().lower()
+        period_text = (date_text + " " + question.lower()).strip()
+        now_local = datetime.now(LOCAL_TZ)
+        start = end = None
+        day = None
+        if re.search(r"\bday before yesterday\b", period_text):
+            day = now_local.date() - timedelta(days=2)
+        elif re.search(r"\byesterday\b|\blast night\b", period_text):
+            day = now_local.date() - timedelta(days=1)
+        elif re.search(r"\btoday\b|\btonight\b", period_text):
+            day = now_local.date()
+        if day is not None:
+            start, end = _bounds(day)
+            time_filter = {"$gte": start, "$lt": end}
+            period_label = f" on {day:%d %b %Y}"
+        else:
+            time_filter = None
+            period_label = " across all available recorded history"
         points = database["locationpoints"]
-        mine = list(points.find({"userId": _oid(current_id), "recordedAt": {"$gte": start, "$lt": end}},
-                                {"recordedAt": 1, "latitude": 1, "longitude": 1}).sort("recordedAt", 1).limit(2500))
+        mine_query = {"userId": _oid(current_id)}
+        if time_filter:
+            mine_query["recordedAt"] = time_filter
+        mine = list(points.find(mine_query, {
+            "recordedAt": 1, "latitude": 1, "longitude": 1, "username": 1
+        }).sort("recordedAt", 1))
+        mine = [p for p in mine if _valid_gps_point(p)]
         if not mine:
-            return f"I don't have your recorded GPS history for {day:%d %b %Y}, so I can't calculate when you were closest to a friend."
+            if day is not None:
+                return f"I don't have your recorded GPS history for {day:%d %b %Y}, so I can't calculate when you were closest to a friend."
+            return "I couldn't find any valid recorded GPS points for you, so I can't compare your historical distance to a friend."
         best = None
-        named_friend = next((person for person in context.get("authorizedPeople", [])
+        people = context.get("authorizedPeople", [])
+        named_friend = next((person for person in people
                              if person.get("username") not in ("", "you")
                              and re.search(r"\b" + re.escape(str(person.get("username"))) + r"\b", question, re.I)), None)
+        # If a name was explicitly supplied but cannot be resolved to an authorized
+        # friend, do not silently answer using a different friend.
+        mentioned_name = re.search(r"\b(?:when|was|were)\s+(?:was\s+)?([A-Za-z][A-Za-z0-9_-]{1,40})\b", question, re.I)
         if named_friend:
             named_id = str(named_friend.get("id") or "")
             if named_id not in ids or named_id == current_id:
                 return "I can't compare against that person's history because it isn't available to you."
             candidate_ids = [named_id]
+        elif mentioned_name and mentioned_name.group(1).lower() not in {"i", "we", "you", "my", "me"}:
+            return f"I couldn't identify {mentioned_name.group(1)} as an authorized friend, so I can't compare their history."
         else:
             candidate_ids = [friend_id for friend_id in ids if friend_id != current_id]
         for friend_id in candidate_ids:
-            friend_points = list(points.find({"userId": _oid(friend_id), "recordedAt": {"$gte": start, "$lt": end}},
-                                             {"username": 1, "recordedAt": 1, "latitude": 1, "longitude": 1}).sort("recordedAt", 1).limit(2500))
+            friend_query = {"userId": _oid(friend_id)}
+            if time_filter:
+                friend_query["recordedAt"] = time_filter
+            friend_points = list(points.find(friend_query, {
+                "username": 1, "recordedAt": 1, "latitude": 1, "longitude": 1
+            }).sort("recordedAt", 1))
+            friend_points = [p for p in friend_points if _valid_gps_point(p)]
             stamps = [_as_utc(p["recordedAt"]).timestamp() for p in friend_points]
             for mine_point in mine:
                 mine_time = _as_utc(mine_point["recordedAt"])
@@ -106,14 +139,20 @@ def answer_time_question(question, authorized_user_ids, context, database, extra
                     friend_time = _as_utc(friend_point["recordedAt"])
                     if abs((friend_time - mine_time).total_seconds()) > 300:
                         continue
-                    distance = _distance_m(mine_point["latitude"], mine_point["longitude"], friend_point["latitude"], friend_point["longitude"])
+                    distance = _distance_m(
+                        float(mine_point["latitude"]), float(mine_point["longitude"]),
+                        float(friend_point["latitude"]), float(friend_point["longitude"])
+                    )
                     if best is None or distance < best["distance"]:
                         best = {"distance": distance, "time": mine_time, "friend": friend_point}
         if best is None:
-            return f"I couldn't compare your locations on {day:%d %b %Y}: no saved GPS samples were recorded within 5 minutes of each other."
+            if day is not None:
+                return f"I couldn't compare your locations on {day:%d %b %Y}: no saved GPS samples were recorded within 5 minutes of each other."
+            return "I couldn't compare your historical locations: no saved GPS samples for you and the friend were recorded within 5 minutes of each other."
         local_time = best["time"].astimezone(LOCAL_TZ).strftime("%I:%M:%S %p").lstrip("0")
+        local_date = best["time"].astimezone(LOCAL_TZ).strftime("%d %b %Y")
         name = best["friend"].get("username", "your friend")
-        return f"You were closest to {name} at about {local_time} on {day:%d %b %Y}. The nearest contemporaneous GPS samples were {best['distance'] / 1000:.2f} km apart in a straight line; the samples were no more than 5 minutes apart."
+        return f"You were closest to {name} at about {local_time} on {local_date}{period_label}. The nearest contemporaneous GPS samples were {best['distance'] / 1000:.2f} km apart in a straight line; the samples were no more than 5 minutes apart."
 
     # "Where was I at 1 AM?" and similar explicit clock-time questions.
     location_intent = intent == "location_at_time"
@@ -166,6 +205,22 @@ def answer_time_question(question, authorized_user_ids, context, database, extra
     if place:
         return f"Saved visit history indicates {label} was at {place} around {requested} on {clock:%d %b %Y}. No nearby raw GPS point was available to verify the exact position."
     return f"I couldn't find a saved GPS point or visit covering {requested} on {clock:%d %b %Y}. This answer requires location history to have been enabled and recorded at that time."
+
+
+def _valid_gps_point(point):
+    """Return true only for timestamped points with finite, valid GPS coordinates."""
+    from math import isfinite
+    try:
+        latitude = float(point.get("latitude"))
+        longitude = float(point.get("longitude"))
+        recorded_at = point.get("recordedAt")
+        return (
+            isinstance(recorded_at, datetime)
+            and isfinite(latitude) and isfinite(longitude)
+            and -90 <= latitude <= 90 and -180 <= longitude <= 180
+        )
+    except (TypeError, ValueError):
+        return False
 
 
 def _oid(value):
