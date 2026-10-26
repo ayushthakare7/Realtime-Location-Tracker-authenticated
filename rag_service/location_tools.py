@@ -22,7 +22,7 @@ _MEMORY_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 _MEMORY_LOCK = threading.Lock()
 
 
-def _http_json(url: str, headers: dict[str, str] | None = None) -> dict[str, Any]:
+def _http_json(url: str, headers: dict[str, str] | None = None) -> Any:
     request = urllib.request.Request(
         url,
         headers={"User-Agent": USER_AGENT, "Accept": "application/json", **(headers or {})},
@@ -31,8 +31,8 @@ def _http_json(url: str, headers: dict[str, str] | None = None) -> dict[str, Any
         if response.status < 200 or response.status >= 300:
             raise RuntimeError("geocoder returned HTTP " + str(response.status))
         payload = json.loads(response.read(1_000_000).decode("utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError("geocoder returned a non-object response")
+    if not isinstance(payload, (dict, list)):
+        raise ValueError("geocoder returned an unsupported response")
     return payload
 
 
