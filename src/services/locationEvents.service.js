@@ -104,6 +104,54 @@ async function reverseGeocode(latitude, longitude) {
       console.warn("[Geocoding] Reverse lookup failed at zoom " + zoom + ":", error.message);
     }
   }
+  // Provider fallback: BigDataCloud's client reverse-geocoder often resolves
+  // locality/municipality even when Nominatim is throttled or has no detailed POI.
+  // This is still a best-effort label, not proof of a specific building.
+  try {
+    const url = new URL("https://api.bigdatacloud.net/data/reverse-geocode-client");
+    url.searchParams.set("latitude", String(lat));
+    url.searchParams.set("longitude", String(lon));
+    url.searchParams.set("localityLanguage", "en");
+    const response = await fetch(url, {
+      headers: { "User-Agent": "RevaLocationAssistant/1.0 (location labels)" },
+      signal: AbortSignal.timeout(5000)
+    });
+    if (response.ok) {
+      const data = await response.json();
+      const city = data.city || data.locality || data.localityInfo?.administrative?.find(
+        item => /city|town|municipality|district/i.test(String(item.description || item.name || ""))
+      )?.name || null;
+      const state = data.principalSubdivision || data.principalSubdivisionCode || null;
+      const country = data.countryName || null;
+      const feature = data.locality || data.city || null;
+      if (feature || city || state || country) {
+        const result = {
+          placeName: String(feature || city || state || country).slice(0, 160),
+          city: city ? String(city) : null,
+          state: state ? String(state) : null,
+          country: country ? String(country) : null,
+          countryCode: data.countryCode ? String(data.countryCode).toUpperCase() : null
+        };
+        geocodeCache.set(cacheKey, result);
+        if (geocodeCache.size > 1000) geocodeCache.delete(geocodeCache.keys().next().value);
+        try {
+          await ReverseGeocodeCache.updateOne(
+            { cacheKey },
+            { $set: { cacheKey, latitude: lat, longitude: lon, ...result, fetchedAt: new Date() } },
+            { upsert: true }
+          );
+        } catch (error) {
+          console.warn("[Geocoding] Persistent fallback cache write failed:", error.message);
+        }
+        return result;
+      }
+    } else {
+      console.warn("[Geocoding] BigDataCloud fallback HTTP", response.status);
+    }
+  } catch (error) {
+    console.warn("[Geocoding] BigDataCloud fallback failed:", error.message);
+  }
+
   // Do not memoize failure: a later request may succeed after provider recovery.
   return fallback;
 }
