@@ -111,7 +111,9 @@ async function geocodePlace(input) {
   if (cached) {
     const cachedName = normalizeQuery(cached.name);
     const requestedName = normalizeQuery(placeQuery);
-    const nameMatches = requestedName && requestedName.split(/\s+/).every(token => cachedName.includes(token));
+    const nameMatches = expandPlaceAliases(placeQuery).some(alias =>
+      normalizeQuery(alias).split(/\s+/).every(token => cachedName.includes(token))
+    );
     const countryMatches = !countryMatch || normalizeQuery(cached.country) === countryMatch.country;
     if (nameMatches && countryMatches) return asPlace(cached);
   }
