@@ -86,13 +86,22 @@ function distanceMeters(aLat, aLon, bLat, bLon) {
   return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 function createRadarIcon(isMe, data = {}) {
-  const profile = { ...(profileByUser.get(String(data.userId || data.username)) || {}), ...data };
-  const image = typeof profile.profileImage === "string" && profile.profileImage.startsWith("data:image/jpeg;base64,") ? profile.profileImage : "";
+  const key = String(data.userId || data.username || (isMe ? "me" : ""));
+  const profile = { ...(profileByUser.get(key) || {}), ...data };
+  const image = typeof profile.profileImage === "string" && /^data:image\/(?:jpeg|jpg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(profile.profileImage) ? profile.profileImage : "";
   const emoji = avatarEmoji[profile.avatarId] || (isMe ? "🧑‍🎓" : "🧑");
-  const html = image
-    ? '<span class="reva-avatar-marker"><img alt="" src="' + image + '"></span>'
-    : '<span class="reva-avatar-marker"><span>' + emoji + '</span></span>';
-  return L.divIcon({ className: "reva-marker-shell", html, iconSize: [42, 42], iconAnchor: [21, 21] });
+  const root = document.createElement("span");
+  root.className = "reva-avatar-marker";
+  if (image) {
+    const photo = document.createElement("img");
+    photo.alt = (profile.username || data.username || (isMe ? "Your" : "Friend")) + " profile photo";
+    photo.src = image;
+    photo.onerror = () => { photo.remove(); const fallback = document.createElement("span"); fallback.textContent = emoji; root.append(fallback); };
+    root.append(photo);
+  } else {
+    const fallback = document.createElement("span"); fallback.textContent = emoji; root.append(fallback);
+  }
+  return L.divIcon({ className: "reva-marker-shell", html: root, iconSize: [42, 42], iconAnchor: [21, 21] });
 }
 
 function upsertMarker(data, accuracy) {
@@ -336,7 +345,10 @@ async function loadOwnProfileMarker() {
     const profile = { avatarId: data.profile.avatarId || "college-boy", profileImage: data.profile.profileImage || "" };
     profileByUser.set("me", profile);
     const marker = markers.get("me");
-    if (marker) marker.setIcon(createRadarIcon(true, { userId: "me", ...profile }));
+    if (marker) marker.setIcon(createRadarIcon(true, { userId: "me", username: "You", ...profile }));
+    for (const [id, existingMarker] of markers) {
+      if (id !== "me" && profileByUser.has(id)) existingMarker.setIcon(createRadarIcon(false, { userId: id, ...profileByUser.get(id) }));
+    }
   } catch (error) {
     console.warn("Could not load own map avatar:", error.message);
   }
@@ -397,8 +409,10 @@ async function loadFriends({ quiet = false } = {}) {
         }
       };
       item.append(title, detail, remove); friendRoot.append(item);
-      profileByUser.set(String(friend.id), { avatarId: friend.avatarId || "college-boy", profileImage: friend.profileImage || "" });
+      profileByUser.set(String(friend.id), { avatarId: friend.avatarId || "college-boy", profileImage: friend.profileImage || "", username: friend.username });
       if (friend.location) upsertMarker({ ...friend.location, userId: friend.id, username: friend.username, avatarId: friend.avatarId || "college-boy", profileImage: friend.profileImage || "" }); else removeMarker(friend.id);
+      const friendMarker = markers.get(String(friend.id));
+      if (friendMarker) friendMarker.setIcon(createRadarIcon(false, { userId: String(friend.id), username: friend.username, avatarId: friend.avatarId || "college-boy", profileImage: friend.profileImage || "" }));
     });
     const requestRoot = document.getElementById("requests"); requestRoot.replaceChildren();
     if (data.requests.length) {
