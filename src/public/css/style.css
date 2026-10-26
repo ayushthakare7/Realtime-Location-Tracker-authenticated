@@ -72,6 +72,9 @@ textarea { margin: 0; }
 #deleteHistory { margin-top: 5px; font-size: 12px; }
 .map-stack { min-width: 0; }
 .map-heading { display: flex; justify-content: space-between; align-items: end; gap: 12px; margin: 0 2px 13px; }
+.main-recenter-button { position:absolute; z-index:500; right:14px; bottom:52px; display:inline-flex; align-items:center; gap:7px; padding:10px 13px; border:1px solid #dce6dc; border-radius:999px; background:#fffefa; color:#294d40; box-shadow:0 5px 18px rgba(32,56,44,.18); font-size:12px; font-weight:700; }
+.main-recenter-button:hover { background:#edf3eb; border-color:#b8cfba; }
+.main-recenter-button:disabled { opacity:.65; cursor:wait; }
 #map { height: min(62vh, 640px); min-height: 390px; width: 100%; border: 5px solid var(--surface); border-radius: 22px; overflow: hidden; box-shadow: var(--shadow); z-index: 0; }
 .leaflet-container { font-family: 'DM Sans', sans-serif; background: #e9eee8; }
 .leaflet-control-attribution { font-size: 9px !important; }
