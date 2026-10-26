@@ -374,8 +374,18 @@ def evidence_node(state: GraphState) -> GraphState:
 
 def generate_node(state: GraphState) -> GraphState:
     context = state.get("context", {})
+    # Keep raw GPS inside the tool/runtime boundary. The LLM receives only
+    # coarse labels and freshness metadata, not the underlying coordinates.
     safe_context = {
-        "currentLocations": context.get("currentLocations", []),
+        "currentLocations": [
+            {
+                "username": str(person.get("username") or "user")[:60],
+                "placeName": str(person.get("placeName") or "")[:160] or None,
+                "lastSeen": str(person.get("lastSeen") or "")[:40],
+            }
+            for person in (context.get("currentLocations") or [])
+            if isinstance(person, dict)
+        ],
         "calculatedDistances": context.get("calculatedDistances", []),
         "locationTools": state.get("location_tools", {"route": "none", "results": []}),
     }
