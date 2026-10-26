@@ -23,7 +23,9 @@ async function reverseGeocode(latitude, longitude) {
     country: null,
     countryCode: null
   };
-  if (process.env.GEOCODING_ENABLED !== "true") return fallback;
+  // Reverse geocoding is enabled by default so fresh GPS points get human-readable labels.
+  // Set GEOCODING_ENABLED=false only when deliberately disabling external map lookups.
+  if (process.env.GEOCODING_ENABLED === "false") return fallback;
   const cacheKey = `${latitude.toFixed(3)},${longitude.toFixed(3)}`;
   if (geocodeCache.has(cacheKey)) return geocodeCache.get(cacheKey);
   try {
