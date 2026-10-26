@@ -30,7 +30,7 @@ async function start() {
   if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET is required.");
   await mongoose.connect(process.env.MONGODB_URI);
   const port = Number(process.env.PORT) || 3101;
-  const server = app.listen(port, () => {
+  const server = app.listen(port, "127.0.0.1", () => {
     console.log("[MobilityService] Listening on port " + port);
     startMobilityWorker();
   });
