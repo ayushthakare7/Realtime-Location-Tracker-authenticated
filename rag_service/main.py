@@ -181,6 +181,10 @@ def extract_question_intent(question: str) -> dict[str, Any]:
         "For 'last night around one' use date_text='last night', time_text='1 AM'. "
         "For 'when was my friend closest to me today' use intent='closest_people', date_text='today', "
         "subject='friend' unless a name is given, comparison='minimum_distance'. "
+        "For 'When was Siddhanth closest to me?' or any closest/nearest question with no date, use "
+        "intent='closest_people', preserve the named friend in subject, leave date_text empty, and set "
+        "comparison='minimum_distance'; no date means search ALL available recorded history, not today. "
+        "Only set date_text when the user explicitly specifies a period. "
         "For 'where was I at 1am' use intent='location_at_time', subject='self', time_text='1 AM'. "
         "needs_history must be true for questions that require saved location records. "
         "Do not answer the question; only extract its meaning.\nQuestion: " + question
@@ -223,7 +227,11 @@ def classify_node(state: GraphState) -> GraphState:
     question = state["question"].lower()
     if any(term in question for term in ("where was i", "what place was i", "where was my friend")) and any(term in question for term in ("am", "pm", " o'clock")):
         return {"intent": "location_at_time"}
-    if any(term in question for term in ("closest", "nearest")) and any(term in question for term in ("today", "yesterday", "last night")):
+    if (any(term in question for term in ("closest", "nearest", "closer"))
+            and any(term in question for term in ("when", "was", "were", "am i", "are we", "to me", "with me"))):
+        return {"intent": "closest_people"}
+    # Also recognize common concise variants even when they omit "when".
+    if any(term in question for term in ("closest to me", "nearest to me", "closest together", "nearest together")):
         return {"intent": "closest_people"}
     if any(term in question for term in ("summarize", "summary", "most visited", "usual", "frequently")):
         return {"intent": "history_summary"}
