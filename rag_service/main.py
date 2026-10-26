@@ -201,7 +201,9 @@ def extract_question_intent(question: str) -> dict[str, Any]:
         return result
     except Exception as exc:
         print(f"[Reva RAG] intent extraction unavailable ({type(exc).__name__}); using fallback intent rules", flush=True)
-        return {"intent": "other"}
+        # Do not lock the workflow into "other" when the LLM emits malformed JSON.
+        # classify_node will apply deterministic fallback rules to the original question.
+        return {"intent": "fallback"}
 
 
 def classify_node(state: GraphState) -> GraphState:
@@ -214,12 +216,16 @@ def classify_node(state: GraphState) -> GraphState:
     if extracted_intent in allowed_intents:
         return {"intent": extracted_intent}
     question = state["question"].lower()
+    if any(term in question for term in ("where was i", "what place was i", "where was my friend")) and any(term in question for term in ("am", "pm", " o'clock")):
+        return {"intent": "location_at_time"}
+    if any(term in question for term in ("closest", "nearest")) and any(term in question for term in ("today", "yesterday", "last night")):
+        return {"intent": "closest_people"}
     if any(term in question for term in ("summarize", "summary", "most visited", "usual", "frequently")):
-        return {"intent": "summary"}
+        return {"intent": "history_summary"}
     if any(term in question for term in ("right now", "currently", "current location", "where is")):
-        return {"intent": "shared_presence"}
+        return {"intent": "current_presence"}
     if any(term in question for term in ("yesterday", "today", "last week", "this week", "visited", "visit", "where did", "how long", "when did", "history", "spent")):
-        return {"intent": "history"}
+        return {"intent": "history_summary"}
     return {"intent": "other"}
 
 def retrieve_node(state: GraphState) -> GraphState:
