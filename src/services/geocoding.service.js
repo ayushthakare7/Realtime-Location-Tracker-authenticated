@@ -139,7 +139,10 @@ async function geocodePlace(input) {
       }
       const results = await response.json();
       if (!Array.isArray(results) || results.length === 0) continue;
-      const matching = results.filter(item => placeMatches(item, searchQuery, countryMatch));
+      const matching = results.filter(item =>
+        placeMatches(item, searchQuery, countryMatch) ||
+        expandPlaceAliases(placeQuery).some(alias => placeMatches(item, alias, countryMatch))
+      );
       result = matching.find(item => {
         const address = item.address || {};
         const settlement = address.city || address.town || address.village ||
