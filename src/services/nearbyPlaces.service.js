@@ -137,9 +137,20 @@ async function findNearbyPlaces(latitude, longitude, radiusMeters = 500) {
       distanceKm: Number(distanceKm(lat, lon, pointLat, pointLon).toFixed(3)),
       source: "OpenStreetMap"
     };
-  }).filter(Boolean).sort((a, b) => a.distanceKm - b.distanceKm).slice(0, 25);
+  }).filter(Boolean).sort((a, b) => a.distanceKm - b.distanceKm);
 
-  cache.set(key, { savedAt: Date.now(), places });
+  // Preserve nearby institutions in addition to the nearest generic POIs. In a
+  // dense city, a strict nearest-25 cutoff can otherwise drop the campus being asked about.
+  const priorityLandmarks = places
+    .filter(place => ["university", "college", "school", "hospital", "station"].includes(place.category))
+    .slice(0, 15);
+  const selected = new Map();
+  for (const place of [...priorityLandmarks, ...places.slice(0, 25)]) {
+    selected.set(place.name.toLocaleLowerCase("en-IN") + ":" + place.latitude.toFixed(5) + ":" + place.longitude.toFixed(5), place);
+  }
+  const results = [...selected.values()].sort((a, b) => a.distanceKm - b.distanceKm).slice(0, 35);
+
+  cache.set(key, { savedAt: Date.now(), places: results });
   try {
     await NearbyPlaceCache.updateOne(
       { cacheKey: key },
@@ -149,7 +160,7 @@ async function findNearbyPlaces(latitude, longitude, radiusMeters = 500) {
           latitude: lat,
           longitude: lon,
           radiusMeters: radius,
-          places: places.map(place => ({
+          places: results.map(place => ({
             name: place.name,
             normalizedName: place.name.toLocaleLowerCase("en-IN").replace(/\s+/g, " ").trim(),
             category: place.category,
@@ -169,7 +180,7 @@ async function findNearbyPlaces(latitude, longitude, radiusMeters = 500) {
     const oldestKey = cache.keys().next().value;
     cache.delete(oldestKey);
   }
-  return places;
+  return results;
 }
 
 module.exports = { findNearbyPlaces };
