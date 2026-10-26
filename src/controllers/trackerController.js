@@ -191,19 +191,45 @@ exports.askMap = async (req, res) => {
             const km = distanceKm(targetLocation.latitude, targetLocation.longitude, place.latitude, place.longitude);
             const ageMinutes = Math.max(0, Math.round((Date.now() - new Date(targetLocation.lastSeen).getTime()) / 60000));
             const proximityKm = Math.max(0.1, Number(process.env.PLACE_PROXIMITY_KM) || 1.5);
-            const placeLabel = [place.name, place.state, place.country].filter(Boolean).join(", ");
+            let placeLabel = [place.name, place.state, place.country].filter(Boolean).join(", ");
+            let distanceToPlaceKm = km;
+            let matchEvidence = "geocoded place point";
+            // Always search nearby mapped features for a named-place question. A campus
+            // may have a large boundary/centroid or a generic road label at the GPS point.
+            try {
+              const nearby = await findNearbyPlaces(targetLocation.latitude, targetLocation.longitude, 1500);
+              const normalizedCandidate = candidatePlace.toLocaleLowerCase("en-IN").replace(/[^a-z0-9]+/g, " ").trim();
+              const candidateTokens = normalizedCandidate.split(/\s+/).filter(token => token.length > 1);
+              const matchingLandmark = nearby
+                .map(item => {
+                  const normalizedName = item.name.toLocaleLowerCase("en-IN").replace(/[^a-z0-9]+/g, " ").trim();
+                  const allTokensMatch = candidateTokens.length > 0 && candidateTokens.every(token => normalizedName.includes(token));
+                  const meaningfulNameMatch = normalizedName === normalizedCandidate ||
+                    (allTokensMatch && candidateTokens.length >= 2);
+                  return { ...item, meaningfulNameMatch };
+                })
+                .filter(item => item.meaningfulNameMatch)
+                .sort((a, b) => a.distanceKm - b.distanceKm)[0];
+              if (matchingLandmark) {
+                placeLabel = matchingLandmark.name;
+                distanceToPlaceKm = matchingLandmark.distanceKm;
+                matchEvidence = "nearby mapped landmark";
+              }
+            } catch (error) {
+              console.warn("[Reva] Named landmark comparison failed:", error.message);
+            }
             const freshness = " The shared GPS point was updated " + ageMinutes + " minute(s) ago.";
             const staleAfterMinutes = Math.max(1, Number(process.env.LOCATION_STALE_MINUTES) || 15);
             if (ageMinutes > staleAfterMinutes) {
               return res.json({
                 success: true,
-                answer: "I cannot reliably confirm where " + targetName.toLowerCase() + " is right now because their latest shared GPS point is " + ageMinutes + " minute(s) old. At that recorded point, they were about " + km.toFixed(2) + " km from " + placeLabel + " in a straight line."
+                answer: "I cannot reliably confirm where " + targetName.toLowerCase() + " is right now because their latest shared GPS point is " + ageMinutes + " minute(s) old. At that recorded point, it was about " + distanceToPlaceKm.toFixed(2) + " km from " + placeLabel + " (" + matchEvidence + ", straight-line distance)."
               });
             }
-            if (km <= proximityKm) {
-              return res.json({ success: true, answer: targetName + " appears to be near " + placeLabel + " (about " + km.toFixed(2) + " km from the mapped place point). GPS proximity cannot prove they are inside the exact campus/building boundary." + freshness });
+            if (distanceToPlaceKm <= proximityKm) {
+              return res.json({ success: true, answer: targetName + " appears to be near " + placeLabel + " (about " + distanceToPlaceKm.toFixed(2) + " km away, based on the " + matchEvidence + "). This indicates proximity, not confirmed entry inside the exact campus/building boundary." + freshness });
             }
-            return res.json({ success: true, answer: targetName + " does not appear to be near " + placeLabel + ". Their latest shared GPS point is about " + km.toFixed(2) + " km away in a straight line." + freshness });
+            return res.json({ success: true, answer: targetName + " does not appear to be near " + placeLabel + ". Their latest shared GPS point is about " + distanceToPlaceKm.toFixed(2) + " km away in a straight line." + freshness });
           }
           return res.json({ success: true, answer: "I can access the latest shared coordinates for " + targetName.toLowerCase() + ", but I could not resolve \"" + candidatePlace + "\" to a reliable mapped place. Try adding its city or state." });
         } catch (error) {
