@@ -13,4 +13,5 @@ router.patch('/history', controller.setHistory);
 router.get('/history', controller.history);
 router.delete('/history', controller.deleteHistory);
 router.post('/ask', locationQueryController.ask);
+router.get('/ask-status/:taskId', controller.askRagTaskStatus);
 module.exports = router;
