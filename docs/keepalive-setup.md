@@ -1,26 +1,26 @@
 # Reva service keep-alive setup
 
-The GitHub Actions workflow `.github/workflows/reva-keepalive.yml` sends lightweight HTTP GET requests to all three deployed services every 8 minutes. It runs outside the Reva app, so it does not require a user to keep the UI open and does not change the frontend.
+The GitHub Actions workflow `.github/workflows/reva-keepalive.yml` sends lightweight HTTP GET requests to the deployed Reva services on a best-effort schedule. It runs outside the Reva app, so the UI does not need to stay open.
 
 ## Configure the URLs
 
-After this workflow is merged into the repository default branch:
+Open the GitHub repository and go to **Settings → Secrets and variables → Actions → Variables**. Keep the existing variables and verify their values:
 
-1. Open the GitHub repository.
-2. Go to **Settings → Secrets and variables → Actions → Variables**.
-3. Create these **repository variables** (not secrets; they are endpoint URLs):
-   - `REVA_NODE_HEALTH_URL` — full Node service health URL, e.g. `https://YOUR-NODE-SERVICE.onrender.com/health`
-   - `REVA_RAG_HEALTH_URL` — full Python RAG health URL, e.g. `https://YOUR-RAG-SERVICE.onrender.com/health`
-   - `REVA_MOBILITY_HEALTH_URL` — full Mobility service health URL, e.g. `https://YOUR-MOBILITY-SERVICE.onrender.com/health`
-4. Confirm each service really exposes the specified health endpoint. If a service uses a different path, set that exact working URL instead.
-5. Open **Actions → Reva service keep-alive → Run workflow** to test it immediately. Inspect the run logs and make sure all three endpoints return a successful HTTP status.
+- `REVA_NODE_HEALTH_URL` — main Reva app health endpoint, currently `https://realtime-location-tracker-authenticated.onrender.com/health`
+- `REVA_RAG_HEALTH_URL` — Python RAG health endpoint, currently `https://reva-rag-new.onrender.com/health`
+- `REVA_MOBILITY_HEALTH_URL` — Mobility service health endpoint, currently `https://realtime-location-tracker-authenticated-1.onrender.com/health`
 
-Use the exact deployed URLs from the Render dashboards; the example URLs above are placeholders. Do not put API keys, service tokens, or other credentials in these variables or in the workflow. Health endpoints should return a minimal status response and must not trigger expensive RAG work, database reindexing, or location processing.
+Add this new repository variable for the separate Node API service:
 
-## Important limitations
+- `REVA_NODE_API_HEALTH_URL` — `https://reva-node-api.onrender.com/health`
 
-- Scheduled GitHub Actions runs can be delayed and are not a real-time scheduler. The workflow needs to be on the repository default branch to run on schedule.
-- This can reduce idle spin-down when requests arrive often enough, but it does **not** guarantee permanent uptime or prevent Render restarts, crashes, platform limits, or application-level hangs.
-- Render free-tier services should normally wake automatically on a request. If RAG still requires redeployment after a successful health check, investigate its `/ask` request handling, model initialization, MongoDB connectivity, memory usage, and logs; a keep-alive ping cannot repair a broken request handler.
-- This workflow only pings health endpoints. It does not send requests to users, access user data, or change the Reva UI.
-- The workflow may consume GitHub Actions minutes depending on repository plan and usage.
+Use the exact service URLs shown in Render if they differ. Confirm each URL returns a successful HTTP status. The current main app and Node API are separate Render services, so both are checked.
+
+Then open **Actions → Reva service keep-alive → Run workflow** and inspect the run logs. All four checks should say `OK`.
+
+## Limitations
+
+- The workflow is configured to run every 5 minutes, but GitHub scheduled workflows can be delayed or skipped; it is not a guaranteed real-time scheduler.
+- This may reduce free-tier spin-down when the pings arrive often enough, but it cannot guarantee permanent uptime or prevent crashes, platform limits, restarts, or application-level hangs.
+- If a health check takes a long time on a cold start, inspect that service's Render logs. A health ping cannot repair a broken request handler or missing configuration.
+- This workflow only pings health endpoints; it does not access user location data or change the Reva UI.
