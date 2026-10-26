@@ -137,11 +137,10 @@ async function findNearbyPlaces(latitude, longitude, radiusMeters = 500) {
       distanceKm: Number(distanceKm(lat, lon, pointLat, pointLon).toFixed(3)),
       source: "OpenStreetMap"
     };
-  }).filter(Boolean).sort((a, b) => a.distanceKm - b.distanceKm).slice(0, 8);
+  }).filter(Boolean).sort((a, b) => a.distanceKm - b.distanceKm).slice(0, 25);
 
   cache.set(key, { savedAt: Date.now(), places });
   try {
-    const expiresAt = new Date(Date.now() + CACHE_TTL_MS);
     await NearbyPlaceCache.updateOne(
       { cacheKey: key },
       {
@@ -152,14 +151,13 @@ async function findNearbyPlaces(latitude, longitude, radiusMeters = 500) {
           radiusMeters: radius,
           places: places.map(place => ({
             name: place.name,
-            normalizedName: place.name.toLocaleLowerCase("en-IN").replace(/\\s+/g, " ").trim(),
+            normalizedName: place.name.toLocaleLowerCase("en-IN").replace(/\s+/g, " ").trim(),
             category: place.category,
             latitude: place.latitude,
             longitude: place.longitude,
             source: place.source
           })),
-          fetchedAt: new Date(),
-          expiresAt
+          fetchedAt: new Date()
         }
       },
       { upsert: true, runValidators: true }
