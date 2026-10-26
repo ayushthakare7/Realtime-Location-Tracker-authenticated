@@ -17,50 +17,65 @@ function distanceMeters(aLat, aLon, bLat, bLon) {
 
 async function reverseGeocode(latitude, longitude) {
   const fallback = {
-    placeName: `Location near ${latitude.toFixed(3)}, ${longitude.toFixed(3)}`,
+    placeName: `Location near ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
     city: null,
     state: null,
     country: null,
     countryCode: null
   };
-  // Reverse geocoding is enabled by default so fresh GPS points get human-readable labels.
-  // Set GEOCODING_ENABLED=false only when deliberately disabling external map lookups.
+  // Reverse geocoding is on by default. Disable explicitly only if required.
   if (process.env.GEOCODING_ENABLED === "false") return fallback;
   const cacheKey = `${latitude.toFixed(3)},${longitude.toFixed(3)}`;
   if (geocodeCache.has(cacheKey)) return geocodeCache.get(cacheKey);
-  try {
-    const wait = Math.max(0, 1100 - (Date.now() - lastGeocodeAt));
-    if (wait) await new Promise(resolve => setTimeout(resolve, wait));
-    lastGeocodeAt = Date.now();
-    const url = new URL("https://nominatim.openstreetmap.org/reverse");
-    url.searchParams.set("format", "jsonv2");
-    url.searchParams.set("lat", String(latitude));
-    url.searchParams.set("lon", String(longitude));
-    url.searchParams.set("zoom", "18");
-    url.searchParams.set("addressdetails", "1");
-    const response = await fetch(url, {
-      headers: { "User-Agent": "PrivacyAwareLocationTracker/1.0" },
-      signal: AbortSignal.timeout(4000)
-    });
-    if (!response.ok) {
-      console.error("Nominatim reverse geocoding failed:", response.status, response.statusText);
-      return fallback;
+
+  // Try detailed features first, then broader administrative levels. A coordinate
+  // can sit on an unnamed road/building even when its town or district is resolvable.
+  for (const zoom of [18, 14, 10]) {
+    try {
+      const wait = Math.max(0, 1100 - (Date.now() - lastGeocodeAt));
+      if (wait) await new Promise(resolve => setTimeout(resolve, wait));
+      lastGeocodeAt = Date.now();
+      const url = new URL("https://nominatim.openstreetmap.org/reverse");
+      url.searchParams.set("format", "jsonv2");
+      url.searchParams.set("lat", String(latitude));
+      url.searchParams.set("lon", String(longitude));
+      url.searchParams.set("zoom", String(zoom));
+      url.searchParams.set("addressdetails", "1");
+      const response = await fetch(url, {
+        headers: { "User-Agent": "PrivacyAwareLocationTracker/1.0 (location labels)" },
+        signal: AbortSignal.timeout(5000)
+      });
+      if (!response.ok) {
+        console.error("Nominatim reverse geocoding failed:", response.status, response.statusText);
+        continue;
+      }
+      const data = await response.json();
+      const address = data.address || {};
+      const city = address.city || address.town || address.municipality || address.village ||
+        address.city_district || address.suburb || address.neighbourhood || null;
+      const state = address.state || address.state_district || address.county || null;
+      const country = address.country || null;
+      const countryCode = address.country_code || null;
+      const feature = data.name || address.amenity || address.university || address.college ||
+        address.school || address.hospital || address.building || address.road ||
+        address.neighbourhood || address.suburb || null;
+      const placeName = feature || city || state || country || null;
+      if (!placeName && !city && !state && !country) continue;
+      const result = {
+        placeName: String(placeName || fallback.placeName).slice(0, 160),
+        city: city ? String(city) : null,
+        state: state ? String(state) : null,
+        country: country ? String(country) : null,
+        countryCode: countryCode ? String(countryCode).toUpperCase() : null
+      };
+      geocodeCache.set(cacheKey, result);
+      if (geocodeCache.size > 1000) geocodeCache.delete(geocodeCache.keys().next().value);
+      return result;
+    } catch (error) {
+      console.error("Reverse geocoding error at zoom " + zoom + ":", error.message);
     }
-    const data = await response.json();
-    const address = data.address || {};
-    const city = address.city || address.town || address.municipality || address.village || address.city_district || null;
-    const state = address.state || address.state_district || null;
-    const country = address.country || null;
-    const countryCode = address.country_code || null;
-    const placeName = data.name || address.amenity || address.hostel || address.building || address.university || address.hospital || address.college || address.school || address.road || address.neighbourhood || address.suburb || city || fallback.placeName;
-    const result = { placeName: String(placeName).slice(0, 160), city: city ? String(city) : null, state: state ? String(state) : null, country: country ? String(country) : null, countryCode: countryCode ? String(countryCode).toUpperCase() : null };
-    geocodeCache.set(cacheKey, result);
-    if (geocodeCache.size > 1000) geocodeCache.delete(geocodeCache.keys().next().value);
-    return result;
-  } catch (error) {
-    console.error("Reverse geocoding error:", error.message);
-    return fallback;
   }
+  return fallback;
 }
 
 async function placeLabel(latitude, longitude) {
