@@ -6,6 +6,7 @@ const LocationVisit = require("../models/LocationVisit");
 const { processLocationEvent } = require("../services/locationEvents.service");
 const Friendship = require("../models/Friendship");
 const SafetyJourney = require("../models/SafetyJourney");
+const LocationDevice = require("../models/LocationDevice");
 
 module.exports = (io) => {
   io.use((socket, next) => {
@@ -20,7 +21,20 @@ module.exports = (io) => {
   io.on("connection", async (socket) => {
     const userId = socket.user.userId;
     const username = socket.user.username;
+    const deviceId = String(socket.handshake.auth && socket.handshake.auth.deviceId || "");
+    socket.deviceId = /^[A-Za-z0-9_-]{16,80}$/.test(deviceId) ? deviceId : "";
     socket.join("user:" + userId);
+    if (socket.deviceId) {
+      try {
+        const label = String(socket.handshake.auth && socket.handshake.auth.deviceLabel || "This device").trim().slice(0, 60) || "This device";
+        await LocationDevice.findOneAndUpdate(
+          { userId, deviceId: socket.deviceId },
+          { $set: { label, lastSeen: new Date() }, $setOnInsert: { userId, deviceId: socket.deviceId } },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+        await User.updateOne({ _id: userId, $or: [{ activeLocationDeviceId: { $exists: false } }, { activeLocationDeviceId: "" }, { activeLocationDeviceId: null }] }, { $set: { activeLocationDeviceId: socket.deviceId } });
+      } catch (error) { console.error("Location device registration failed:", error.message); }
+    }
 
     try {
       const activeJourneys = await SafetyJourney.find({ travellerId: userId, status: { $in: ["ACTIVE", "OVERDUE_UNCONFIRMED", "ALERT_SENT", "EMERGENCY_ALERTED", "EMERGENCY_ALERTED"] }, sharingEnabled: true });
@@ -45,7 +59,8 @@ module.exports = (io) => {
         const loc = await Location.findOne({ userId: friend._id }).lean();
         if (loc) socket.emit("receive-location", { userId: String(friend._id), username: friend.username, latitude: loc.latitude, longitude: loc.longitude, lastSeen: loc.lastSeen });
       }
-      socket.emit("sharing-status", { enabled: Boolean(user && user.sharingEnabled), historyEnabled: user?.historyEnabled !== false });
+      const sourceUser = await User.findById(userId).select("activeLocationDeviceId").lean();
+      socket.emit("sharing-status", { enabled: Boolean(user && user.sharingEnabled), historyEnabled: user?.historyEnabled !== false, activeDeviceId: sourceUser?.activeLocationDeviceId || "" });
     } catch (e) { console.error("Socket initialization failed:", e.message); }
 
     socket.on("send-location", async (data) => {
@@ -55,9 +70,12 @@ module.exports = (io) => {
         const rawAccuracy = Number(data && (data.accuracyMeters ?? data.accuracy));
         const accuracyMeters = Number.isFinite(rawAccuracy) && rawAccuracy >= 0 && rawAccuracy <= 10000 ? rawAccuracy : null;
         if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) return;
-        const user = await User.findById(userId).select("sharingEnabled historyEnabled username");
+        const user = await User.findById(userId).select("sharingEnabled historyEnabled username activeLocationDeviceId");
         if (!user || !user.sharingEnabled) return;
+        // Ignore GPS updates from devices that are not the account's active source.
+        if (!socket.deviceId || user.activeLocationDeviceId !== socket.deviceId) return;
         const now = new Date();
+        await LocationDevice.updateOne({ userId, deviceId: socket.deviceId }, { $set: { lastSeen: now } });
         await Location.findOneAndUpdate({ userId }, { userId, username: user.username || username, latitude, longitude, accuracyMeters, lastSeen: now }, { upsert: true, new: true });
         if (user.historyEnabled !== false) {
           await LocationPoint.create({ userId, username: user.username || username, latitude, longitude, recordedAt: now });
