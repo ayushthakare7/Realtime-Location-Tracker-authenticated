@@ -242,7 +242,7 @@ def location_tool_route(question: str, context: dict[str, Any]) -> str:
         if str(person.get("username")).casefold() not in {"you", "me", "self"}
         and re.search(r"\b" + re.escape(str(person.get("username")).casefold()) + r"\b", text)
     ]
-    asks_self = bool(re.search(r"\b(where am i|where was i|my current location|what city am i|what state am i|what country am i)\b", text))
+    asks_self = bool(re.search(r"\b(where am i|where was i|my current location|what city am i|what state am i|what country am i|what road am i near|which road am i near|what street am i on|which street am i on)\b", text))
     reverse_language = any(term in text for term in (
         "where am i", "where is", "where are", "what city", "which city",
         "what town", "what locality", "what state", "what country", "what road", "which road", "what street", "which street", "current location",
