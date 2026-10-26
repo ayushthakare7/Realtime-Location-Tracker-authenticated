@@ -7,6 +7,8 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true },
   password: { type: String, required: true },
   sharingEnabled: { type: Boolean, default: false },
+  // Only this device may publish the account's shared live location.
+  activeLocationDeviceId: { type: String, default: "" },
   historyEnabled: { type: Boolean, default: true },
   avatarId: { type: String, enum: AVATAR_IDS, default: "college-boy" },
   // Small, client-compressed JPEG data URL (max 120 KB). No external image-hosting account required.
