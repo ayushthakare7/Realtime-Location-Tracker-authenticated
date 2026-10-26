@@ -94,15 +94,15 @@ exports.deleteHistory = async (req, res) => {
 exports.listFriends = async (req, res) => {
   try {
     const uid = req.user.userId;
-    const links = await Friendship.find({ status: "accepted", $or: [{ requester: uid }, { recipient: uid }] }).populate("requester", "username sharingEnabled").populate("recipient", "username sharingEnabled");
+    const links = await Friendship.find({ status: "accepted", $or: [{ requester: uid }, { recipient: uid }] }).populate("requester", "username sharingEnabled avatarId profileImage").populate("recipient", "username sharingEnabled avatarId profileImage");
     const friends = await Promise.all(links.map(async f => {
       const u = String(f.requester._id) === String(uid) ? f.recipient : f.requester;
       const [loc, visit] = u.sharingEnabled ? await Promise.all([Location.findOne({ userId: u._id }).lean(), LocationVisit.findOne({ userId: u._id }).lean()]) : [null, null];
-      return { id: String(u._id), username: u.username, sharingEnabled: Boolean(u.sharingEnabled), location: loc ? { latitude: loc.latitude, longitude: loc.longitude, lastSeen: loc.lastSeen, placeName: visit?.placeName || null } : null };
+      return { id: String(u._id), username: u.username, avatarId: u.avatarId || "college-boy", profileImage: u.profileImage || "", sharingEnabled: Boolean(u.sharingEnabled), location: loc ? { latitude: loc.latitude, longitude: loc.longitude, lastSeen: loc.lastSeen, placeName: visit?.placeName || null } : null };
     }));
     const requests = await Friendship.find({ recipient: uid, status: "pending" }).populate("requester", "username");
-    const me = await User.findById(uid).select("sharingEnabled historyEnabled");
-    res.json({ success: true, friends, requests: requests.map(f => ({ id: String(f._id), username: f.requester.username })), sharingEnabled: Boolean(me && me.sharingEnabled), historyEnabled: me?.historyEnabled !== false });
+    const me = await User.findById(uid).select("sharingEnabled historyEnabled avatarId profileImage");
+    res.json({ success: true, friends, requests: requests.map(f => ({ id: String(f._id), username: f.requester.username })), sharingEnabled: Boolean(me && me.sharingEnabled), historyEnabled: me?.historyEnabled !== false, profile: { avatarId: me?.avatarId || "college-boy", profileImage: me?.profileImage || "" } });
   } catch { res.status(500).json({ success: false, message: "Could not load friends." }); }
 };
 
