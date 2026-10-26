@@ -142,8 +142,11 @@ async function geocodePlace(input) {
   const record = {
     normalizedQuery,
     query,
-    name: address.city || address.town || address.village ||
-      address.municipality || address.hamlet || result.name || placeQuery,
+    // Preserve a matched feature name (such as a campus) instead of replacing it
+    // with the enclosing city when the result coordinates point to the institution.
+    name: result.name || address.amenity || address.university || address.college ||
+      address.school || address.city || address.town || address.village ||
+      address.municipality || address.hamlet || placeQuery,
     state: address.state || null,
     country: address.country ? normalizeQuery(address.country) : null,
     latitude,
