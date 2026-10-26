@@ -152,7 +152,7 @@ def reverse_geocode(latitude: Any, longitude: Any, cache_collection: Any = None)
             data = _nominatim_get("https://nominatim.openstreetmap.org/reverse?" + query)
             result = _clean_address(data.get("address") or {}, data.get("name"))
             if result.get("label"):
-                result.update({"ok": True, "source": "nominatim", "cached": False})
+                result.update({"ok": True, "source": "nominatim", "attribution": "© OpenStreetMap contributors", "cached": False})
                 _cache_put(cache_collection, key, result)
                 return result
         except Exception as exc:
@@ -173,7 +173,7 @@ def reverse_geocode(latitude: Any, longitude: Any, cache_collection: Any = None)
             "country": data.get("countryName"),
         })
         if result.get("label"):
-            result.update({"ok": True, "source": "bigdatacloud", "cached": False})
+            result.update({"ok": True, "source": "bigdatacloud", "attribution": "BigDataCloud", "cached": False})
             _cache_put(cache_collection, key, result)
             return result
     except Exception as exc:
@@ -199,7 +199,7 @@ def forward_geocode(place_query: str, cache_collection: Any = None) -> dict[str,
         if isinstance(data, list) and data:
             item = data[0]
             result = _clean_address(item.get("address") or {}, item.get("name"))
-            result.update({"ok": bool(result.get("label")), "source": "nominatim", "cached": False})
+            result.update({"ok": bool(result.get("label")), "source": "nominatim", "attribution": "© OpenStreetMap contributors", "cached": False})
             if result["ok"]:
                 _cache_put(cache_collection, key, result)
                 return result
@@ -213,7 +213,7 @@ def forward_geocode(place_query: str, cache_collection: Any = None) -> dict[str,
         if features:
             properties = features[0].get("properties") or {}
             result = _photon_address(properties)
-            result.update({"ok": bool(result.get("label")), "source": "photon", "cached": False})
+            result.update({"ok": bool(result.get("label")), "source": "photon", "attribution": "© OpenStreetMap contributors", "cached": False})
             if result["ok"]:
                 _cache_put(cache_collection, key, result)
                 return result
@@ -288,7 +288,7 @@ def resolve_location_tools(question: str, context: dict[str, Any], cache_collect
                 "person": str(person.get("username") or "user")[:60],
                 "label": geo.get("label"), "locality": geo.get("locality"), "city": geo.get("city"),
                 "state": geo.get("state"), "country": geo.get("country"),
-                "source": geo.get("source"), "ok": geo.get("ok"),
+                "source": geo.get("source"), "attribution": geo.get("attribution"), "ok": geo.get("ok"),
                 "lastSeen": person.get("lastSeen"),
                 "sharingEnabled": person.get("sharingEnabled"),
             })
