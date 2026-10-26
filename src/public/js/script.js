@@ -88,7 +88,7 @@ function distanceMeters(aLat, aLon, bLat, bLon) {
 function createRadarIcon(isMe, data = {}) {
   const key = String(data.userId || data.username || (isMe ? "me" : ""));
   const profile = { ...(profileByUser.get(key) || {}), ...data };
-  const image = typeof profile.profileImage === "string" && /^data:image\\/(?:jpeg|jpg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(profile.profileImage) ? profile.profileImage : "";
+  const image = typeof profile.profileImage === "string" && /^data:image\/(?:jpeg|jpg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(profile.profileImage) ? profile.profileImage : "";
   const emoji = avatarEmoji[profile.avatarId] || (isMe ? "🧑‍🎓" : "🧑");
   const root = document.createElement("span");
   root.className = "reva-avatar-marker";
