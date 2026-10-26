@@ -153,8 +153,11 @@ function describeNearbyLocation(geo = {}, nearby = [], fallbackPlace = null) {
   const closestPoi = named.find(item => item.category !== "road" && item.distanceKm <= 0.3);
   const landmark = institution || closestPoi || null;
   const road = geo.road || named.find(item => item.category === "road" && item.distanceKm <= 0.2)?.name || null;
-  const fallback = !isFallbackPlace(fallbackPlace) ? fallbackPlace : null;
-  const landmarkName = landmark?.name || (fallback && ![geo.city, geo.state, geo.country].includes(fallback) ? fallback : null);
+  const fallback = !isFallbackPlace(fallbackPlace) ? String(fallbackPlace).trim() : null;
+  const knownRegions = [geo.road, geo.locality, geo.city, geo.state, geo.country].filter(Boolean).map(value => String(value).trim().toLocaleLowerCase("en-IN"));
+  const fallbackParts = fallback ? fallback.split(",").map(value => value.trim().toLocaleLowerCase("en-IN")).filter(Boolean) : [];
+  const fallbackIsRegion = fallbackParts.length > 0 && fallbackParts.every(value => knownRegions.includes(value));
+  const landmarkName = landmark?.name || (fallback && !fallbackIsRegion && !knownRegions.includes(fallback.toLocaleLowerCase("en-IN")) ? fallback : null);
   const hierarchy = [];
   for (const value of [geo.locality, geo.city, geo.state, geo.country]) {
     if (value && !hierarchy.some(existing => existing.toLocaleLowerCase("en-IN") === String(value).toLocaleLowerCase("en-IN"))) {
