@@ -21,7 +21,8 @@
     .auth-card { backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); }
 
     }
-\n  </style>
+\n.avatar-picker{display:grid;gap:9px;padding:12px;border:1px solid #e0e5dc;border-radius:14px;background:#fafbf7}.avatar-picker legend{padding:0 4px;color:#52635a;font-size:12px;font-weight:700}.avatar-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.avatar-option{display:grid;justify-items:center;gap:4px;padding:8px 3px;border:1px solid #e0e5dc;border-radius:12px;background:#fff;color:#52635a;font-size:10px;cursor:pointer}.avatar-option:has(input:checked){border-color:#527765;box-shadow:0 0 0 2px #dce9dd;background:#f2f7f1}.avatar-option input{position:absolute;opacity:0;width:1px;height:1px}.avatar-face{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;font-size:29px;background:#e9efe7}.avatar-preview{width:64px;height:64px;border-radius:50%;object-fit:cover;border:3px solid #dce9dd;background:#f4f5ef}.photo-row{display:flex;align-items:center;gap:12px}.photo-row label{flex:1}.photo-help{font-size:10px;color:#78847d;font-weight:400}
+  </style>
 </head>
 <body>
 <main class="auth-page">
@@ -32,6 +33,7 @@
         <label for="username">Your username<input type="text" id="username" placeholder="How friends will find you" autocomplete="username" required></label>
         <label for="email">Email address<input type="email" id="email" placeholder="you@example.com" autocomplete="email" required></label>
         <label for="password">Create a password<input type="password" id="password" placeholder="Choose a secure password" autocomplete="new-password" required></label>
+        <fieldset class="avatar-picker"><legend>Choose your Reva marker</legend><div class="photo-row"><img id="avatarPreview" class="avatar-preview" alt="Avatar preview"><label for="profilePhoto">Your photo <span class="photo-help">Optional · resized on your phone</span><input type="file" id="profilePhoto" accept="image/*"></label></div><div class="avatar-options"><label class="avatar-option"><input type="radio" name="avatarId" value="child-boy" ><span class="avatar-face">🧒</span><span>Child boy</span></label><label class="avatar-option"><input type="radio" name="avatarId" value="child-girl" ><span class="avatar-face">👧</span><span>Child girl</span></label><label class="avatar-option"><input type="radio" name="avatarId" value="college-boy" checked><span class="avatar-face">🧑‍🎓</span><span>College boy</span></label><label class="avatar-option"><input type="radio" name="avatarId" value="college-girl" ><span class="avatar-face">👩‍🎓</span><span>College girl</span></label><label class="avatar-option"><input type="radio" name="avatarId" value="adult-man" ><span class="avatar-face">👨</span><span>Adult man</span></label><label class="avatar-option"><input type="radio" name="avatarId" value="adult-woman" ><span class="avatar-face">👩</span><span>Adult woman</span></label></div><p class="photo-help">You can change your marker later.</p></fieldset>
         <button type="submit">Create my space →</button>
       </form>
       <p id="authMessage" class="auth-message" role="status"></p>
@@ -52,7 +54,9 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
       body: JSON.stringify({
         username: document.getElementById("username").value,
         email: document.getElementById("email").value,
-        password: document.getElementById("password").value
+        password: document.getElementById("password").value,
+        avatarId: document.querySelector('input[name="avatarId"]:checked')?.value || "college-boy",
+        profileImage: window.revaProfileImage || ""
       })
     });
     const data = await response.json();
@@ -64,6 +68,17 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
     button.disabled = false; button.textContent = "Create my space →";
   }
 });
+</script>
+<script>
+(() => {
+  let profileImage = "";
+  const input = document.getElementById("profilePhoto"), preview = document.getElementById("avatarPreview");
+  const emojis = {"child-boy":"🧒","child-girl":"👧","college-boy":"🧑‍🎓","college-girl":"👩‍🎓","adult-man":"👨","adult-woman":"👩"};
+  const drawAvatar = () => { if (!profileImage) { const id=document.querySelector('input[name="avatarId"]:checked')?.value||"college-boy"; preview.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect width="80" height="80" rx="40" fill="#e9efe7"/><text x="40" y="56" font-size="44" text-anchor="middle">'+emojis[id]+'</text></svg>'); } };
+  document.querySelectorAll('input[name="avatarId"]').forEach(el=>el.addEventListener("change",drawAvatar));
+  input.addEventListener("change",()=>{const file=input.files?.[0]; if(!file){profileImage="";window.revaProfileImage="";drawAvatar();return;} if(!file.type.startsWith("image/")){alert("Choose an image file.");input.value="";return;} const reader=new FileReader();reader.onerror=()=>alert("Could not read this image.");reader.onload=()=>{const img=new Image();img.onerror=()=>alert("Could not open this image.");img.onload=()=>{const c=document.createElement("canvas"),s=Math.min(1,320/Math.max(img.width,img.height));c.width=Math.max(1,Math.round(img.width*s));c.height=Math.max(1,Math.round(img.height*s));c.getContext("2d").drawImage(img,0,0,c.width,c.height);let q=.78,d=c.toDataURL("image/jpeg",q);while(d.length>112000&&q>.35){q-=.1;d=c.toDataURL("image/jpeg",q);}if(d.length>112000){alert("Photo is too large after compression. Choose another.");input.value="";return;}profileImage=d;window.revaProfileImage=d;preview.src=d;};img.src=reader.result;};reader.readAsDataURL(file);});
+  drawAvatar();
+})();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script>
