@@ -51,6 +51,8 @@ _embeddings = None
 _llm = None
 _embeddings_lock = threading.Lock()
 _llm_lock = threading.Lock()
+_embedding_warmup_state = {"complete": RAG_DISABLE_EMBEDDINGS, "ok": RAG_DISABLE_EMBEDDINGS, "error": None}
+_embedding_warmup_state_lock = threading.Lock()
 
 class GraphState(TypedDict, total=False):
     question: str
@@ -416,6 +418,8 @@ class RevaRAGHandler(BaseHTTPRequestHandler):
             except Exception as exc:
                 mongo_error = type(exc).__name__
             healthy = configured and mongo_ok
+            with _embedding_warmup_state_lock:
+                warmup_state = dict(_embedding_warmup_state)
             self.send_json(200 if healthy else 503, {
                 "success": healthy,
                 "service": "reva-rag",
@@ -424,6 +428,9 @@ class RevaRAGHandler(BaseHTTPRequestHandler):
                 "mongoError": mongo_error,
                 "vectorIndex": VECTOR_INDEX,
                 "embeddingModel": EMBEDDING_MODEL,
+                "embeddingsReady": warmup_state["complete"],
+                "embeddingWarmupOk": warmup_state["ok"],
+                "embeddingWarmupError": warmup_state["error"],
                 "answerModelConfigured": bool(GROQ_API_KEY),
             })
             return
@@ -534,6 +541,32 @@ class RevaRAGHandler(BaseHTTPRequestHandler):
         print(f"[Reva RAG] {self.address_string()} - {fmt % args}", flush=True)
 
 
+def warm_embeddings_in_background():
+    """Warm the ONNX model after the HTTP server starts so Render health checks can pass.
+
+    Embeddings are optional because retrieve_node has an authorized MongoDB fallback.
+    A failed warmup is recorded, but does not prevent the service from serving requests.
+    """
+    if RAG_DISABLE_EMBEDDINGS:
+        print("[Reva RAG] embedding warmup skipped: RAG_DISABLE_EMBEDDINGS is enabled", flush=True)
+        return
+    started = datetime.now(timezone.utc)
+    try:
+        embeddings()
+        with _embedding_warmup_state_lock:
+            _embedding_warmup_state.update({"complete": True, "ok": True, "error": None})
+        elapsed = (datetime.now(timezone.utc) - started).total_seconds()
+        print(f"[Reva RAG] background embedding warmup completed in {elapsed:.1f}s", flush=True)
+    except Exception as exc:
+        with _embedding_warmup_state_lock:
+            _embedding_warmup_state.update({
+                "complete": True,
+                "ok": False,
+                "error": f"{type(exc).__name__}: {str(exc)[:240]}",
+            })
+        print(f"[Reva RAG] background embedding warmup failed; MongoDB fallback remains available: {type(exc).__name__}: {exc}", flush=True)
+
+
 if __name__ == "__main__":
     host = os.getenv("HOST", "0.0.0.0")
     # Render injects PORT at runtime. Locally, ignore PORT from the shared
@@ -542,6 +575,8 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT") or "8001") if is_render else 8001
     server = ThreadingHTTPServer((host, port), RevaRAGHandler)
     print(f"Reva RAG service listening on {host}:{port}", flush=True)
+    if not RAG_DISABLE_EMBEDDINGS:
+        threading.Thread(target=warm_embeddings_in_background, name="reva-embedding-warmup", daemon=True).start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
