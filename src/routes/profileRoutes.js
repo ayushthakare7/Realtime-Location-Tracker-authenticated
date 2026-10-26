@@ -2,6 +2,7 @@ const express = require("express");
 const auth = require("../middleware/authMiddleware");
 const User = require("../models/User");
 const router = express.Router();
+router.use(auth);
 const AVATARS = new Set(User.AVATAR_IDS || ["child-boy", "child-girl", "college-boy", "college-girl", "adult-man", "adult-woman"]);
 const MAX_IMAGE_LENGTH = 120000;
 
