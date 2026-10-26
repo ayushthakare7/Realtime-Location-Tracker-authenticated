@@ -88,18 +88,25 @@ function distanceMeters(aLat, aLon, bLat, bLon) {
 function createRadarIcon(isMe, data = {}) {
   const key = String(data.userId || data.username || (isMe ? "me" : ""));
   const profile = { ...(profileByUser.get(key) || {}), ...data };
-  const image = typeof profile.profileImage === "string" && /^data:image\/(?:jpeg|jpg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(profile.profileImage) ? profile.profileImage : "";
+  const image = typeof profile.profileImage === "string" && /^data:image\\/(?:jpeg|jpg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(profile.profileImage) ? profile.profileImage : "";
   const emoji = avatarEmoji[profile.avatarId] || (isMe ? "🧑‍🎓" : "🧑");
   const root = document.createElement("span");
   root.className = "reva-avatar-marker";
+  root.style.cssText = "display:flex;width:42px;height:42px;box-sizing:border-box;align-items:center;justify-content:center;overflow:hidden;border-radius:50%;background:#e8efe7;border:3px solid #fff;box-shadow:0 3px 12px rgba(33,52,42,.3);font-size:25px;line-height:1;";
   if (image) {
     const photo = document.createElement("img");
     photo.alt = (profile.username || data.username || (isMe ? "Your" : "Friend")) + " profile photo";
     photo.src = image;
-    photo.onerror = () => { photo.remove(); const fallback = document.createElement("span"); fallback.textContent = emoji; root.append(fallback); };
+    photo.style.cssText = "display:block;width:100%;height:100%;max-width:none;max-height:none;object-fit:cover;border-radius:50%;";
+    photo.onerror = () => {
+      photo.remove();
+      root.textContent = emoji;
+      root.setAttribute("aria-label", "Avatar photo unavailable");
+    };
     root.append(photo);
   } else {
-    const fallback = document.createElement("span"); fallback.textContent = emoji; root.append(fallback);
+    root.textContent = emoji;
+    root.setAttribute("aria-label", (profile.username || data.username || (isMe ? "Your" : "Friend")) + " avatar");
   }
   return L.divIcon({ className: "reva-marker-shell", html: root, iconSize: [42, 42], iconAnchor: [21, 21] });
 }
@@ -513,5 +520,5 @@ loadOwnProfileMarker();
   document.getElementById("profileClose").onclick=()=>{modal.hidden=true;};
   modal.addEventListener("click",e=>{if(e.target===modal)modal.hidden=true;});
   document.getElementById("profilePhotoEdit").addEventListener("change",async e=>{const f=e.target.files?.[0];if(!f)return;try{if(!f.type.startsWith("image/"))throw new Error("Choose an image file.");pendingImage=await compress(f);profileImage=pendingImage;render();message.textContent="Personal photo selected. Save marker to replace the preset with your photo.";}catch(err){message.textContent=err.message||"Could not process photo.";e.target.value="";}});
-  document.getElementById("profileSave").addEventListener("click",async()=>{const b=document.getElementById("profileSave");b.disabled=true;b.textContent="Saving…";try{const payload={avatarId};if(pendingImage!==null)payload.profileImage=pendingImage;const r=await fetch("/api/profile",{method:"PATCH",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify(payload)}),d=await r.json();if(!r.ok)throw new Error(d.message);avatarId=d.profile.avatarId||avatarId;profileImage=d.profile.profileImage||"";pendingImage=null;profileByUser.set("me",{avatarId,profileImage,username:"You"});const ownMarker=markers.get("me");if(ownMarker)ownMarker.setIcon(createRadarIcon(true,{userId:"me",username:"You",avatarId,profileImage}));if(latestPosition)upsertMarker({userId:"me",username:"You",latitude:latestPosition.latitude,longitude:latestPosition.longitude,avatarId,profileImage});message.textContent=profileImage?"Your personal photo is saved in MongoDB and applied to your map marker.":"Your avatar is saved in MongoDB and applied to your map marker.";setTimeout(()=>{modal.hidden=true;},650);}catch(e){message.textContent=e.message||"Could not save your marker.";}finally{b.disabled=false;b.textContent="Save marker";}});
+  document.getElementById("profileSave").addEventListener("click",async()=>{const b=document.getElementById("profileSave");b.disabled=true;b.textContent="Saving…";try{const payload={avatarId};if(pendingImage!==null)payload.profileImage=pendingImage;const r=await fetch("/api/profile",{method:"PATCH",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify(payload)}),d=await r.json();if(!r.ok)throw new Error(d.message);avatarId=d.profile.avatarId||avatarId;profileImage=d.profile.profileImage||"";pendingImage=null;profileByUser.set("me",{avatarId,profileImage,username:"You"});const ownMarker=markers.get("me");if(ownMarker)ownMarker.setIcon(createRadarIcon(true,{userId:"me",username:"You",avatarId,profileImage}));if(latestPosition)upsertMarker({userId:"me",username:"You",latitude:latestPosition.latitude,longitude:latestPosition.longitude,avatarId,profileImage});message.textContent=profileImage?"Your personal photo is saved in MongoDB and applied to your map marker.":"Your avatar is saved in MongoDB and applied to your map marker.";await loadOwnProfileMarker();setTimeout(()=>{modal.hidden=true;},650);}catch(e){message.textContent=e.message||"Could not save your marker.";}finally{b.disabled=false;b.textContent="Save marker";}});
 })();
