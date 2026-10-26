@@ -206,9 +206,15 @@ exports.askMap = async (req, res) => {
       if (!targetLocation) return res.json({ success: true, answer: "I can't access a shared location for that person right now." });
       const geo = await reverseGeocode(targetLocation.latitude, targetLocation.longitude);
       const targetName = targetId === String(uid) ? "You" : (targetUser?.username || "That user");
-      const parts = [geo.city, geo.state, geo.country].filter(Boolean);
-      if (!parts.length) return res.json({ success: true, answer: `${targetName}'s coordinates are available, but the city/state/country could not be resolved yet.` });
-      return res.json({ success: true, answer: `${targetName} is in ${geo.city || "an unknown city"}, ${geo.state || "an unknown state"}, ${geo.country || "an unknown country"}.` });
+      let locationDetails = describeNearbyLocation(geo, [], geo.placeName);
+      try {
+        const nearby = await findNearbyPlaces(targetLocation.latitude, targetLocation.longitude, 1000);
+        locationDetails = describeNearbyLocation(geo, nearby, geo.placeName);
+      } catch (error) {
+        console.warn("[Reva] Nearby landmark/road lookup failed:", error.message);
+      }
+      if (!locationDetails.label) return res.json({ success: true, answer: `${targetName}'s coordinates are available, but a nearby road, named place, or region could not be resolved yet.` });
+      return res.json({ success: true, answer: `${targetName}'s location appears to be: ${locationDetails.label}. Nearby place names are best-effort map matches.` });
     }
 
     // Handle "Is <friend> at/in <named place>?" as a geographic comparison.
