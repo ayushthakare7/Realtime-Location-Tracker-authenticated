@@ -61,10 +61,10 @@ function removeCountry(query, countryMatch) {
 function expandPlaceAliases(query) {
   const value = String(query || "").trim();
   const patterns = [
-    { regex: /^iit\\s+(.+)$/i, expand: match => "Indian Institute of Technology " + match[1] },
-    { regex: /^nit\\s+(.+)$/i, expand: match => "National Institute of Technology " + match[1] },
-    { regex: /^aiims\\s+(.+)$/i, expand: match => "All India Institute of Medical Sciences " + match[1] },
-    { regex: /^iim\\s+(.+)$/i, expand: match => "Indian Institute of Management " + match[1] }
+    { regex: /^iit\s+(.+)$/i, expand: match => "Indian Institute of Technology " + match[1] },
+    { regex: /^nit\s+(.+)$/i, expand: match => "National Institute of Technology " + match[1] },
+    { regex: /^aiims\s+(.+)$/i, expand: match => "All India Institute of Medical Sciences " + match[1] },
+    { regex: /^iim\s+(.+)$/i, expand: match => "Indian Institute of Management " + match[1] }
   ];
   const aliases = [value];
   for (const pattern of patterns) {
@@ -83,7 +83,7 @@ function placeMatches(item, placeQuery, countryMatch) {
   const searchable = normalizeQuery([
     settlement, item.name, item.display_name, address.state, address.country
   ].filter(Boolean).join(" "));
-  const tokens = normalizeQuery(placeQuery).split(/\\s+/).filter(Boolean);
+  const tokens = normalizeQuery(placeQuery).split(/\s+/).filter(Boolean);
   if (!tokens.length || !tokens.every(token => searchable.includes(token))) return false;
   if (countryMatch && normalizeQuery(address.country) !== countryMatch.country) return false;
   return true;
