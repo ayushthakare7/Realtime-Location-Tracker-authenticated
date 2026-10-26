@@ -252,7 +252,7 @@ exports.askMap = async (req, res) => {
         const region = [geo.city, geo.state, geo.country].filter(Boolean).join(", ");
         let resolved = place && !isFallbackPlace(place) ? place : region;
         let nearbyNote = "";
-        if (!place || isFallbackPlace(place) || !geo.city) {
+        { // Always enrich the GPS point with nearby landmarks; do not depend on reverse-geocoder failure.
           try {
             const nearby = await findNearbyPlaces(mine.latitude, mine.longitude, 1000);
             const educational = nearby.find(item => ["university", "college", "school"].includes(item.category) && item.distanceKm <= 1.5);
@@ -284,7 +284,7 @@ exports.askMap = async (req, res) => {
       let nearbyNote = "";
       // If reverse geocoding gives only coordinates or a broad region, look for
       // actual named landmarks around the GPS point (campuses, hospitals, stations, etc.).
-      if (!place || isFallbackPlace(place) || !geo.city) {
+      { // Always enrich the GPS point with nearby landmarks; do not depend on reverse-geocoder failure.
         try {
           const nearby = await findNearbyPlaces(target.latitude, target.longitude, 1000);
           const educational = nearby.find(item => ["university", "college", "school"].includes(item.category) && item.distanceKm <= 1.5);
