@@ -236,9 +236,9 @@ def location_tool_route(question: str, context: dict[str, Any]) -> str:
     named_people = [
         person for person in people
         if str(person.get("username")).casefold() not in {"you", "me", "self"}
-        and re.search(r"\\b" + re.escape(str(person.get("username")).casefold()) + r"\\b", text)
+        and re.search(r"\b" + re.escape(str(person.get("username")).casefold()) + r"\b", text)
     ]
-    asks_self = bool(re.search(r"\\b(where am i|where was i|my current location|what city am i|what state am i|what country am i)\\b", text))
+    asks_self = bool(re.search(r"\b(where am i|where was i|my current location|what city am i|what state am i|what country am i)\b", text))
     reverse_language = any(term in text for term in (
         "where am i", "where is", "where are", "what city", "which city",
         "what town", "what locality", "what state", "what country", "current location",
@@ -271,8 +271,8 @@ def resolve_location_tools(question: str, context: dict[str, Any], cache_collect
         text = str(question or "").casefold()
         people = [p for p in (context.get("currentLocations") or []) if isinstance(p, dict)]
         named = [p for p in people if p.get("username") and str(p.get("username")).casefold() not in {"you", "me", "self"}
-                 and re.search(r"\\b" + re.escape(str(p.get("username")).casefold()) + r"\\b", text)]
-        asks_self = bool(re.search(r"\\b(where am i|where was i|my current location|what city am i|what state am i|what country am i)\\b", text))
+                 and re.search(r"\b" + re.escape(str(p.get("username")).casefold()) + r"\b", text)]
+        asks_self = bool(re.search(r"\b(where am i|where was i|my current location|what city am i|what state am i|what country am i)\b", text))
         targets = ([p for p in people if str(p.get("username") or "").casefold() in {"you", "me", "self"}]
                    if asks_self else named if named else people[:20])
         for person in targets[:20]:
