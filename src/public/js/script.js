@@ -328,6 +328,20 @@ async function loadMobilityNotifications() {
   } catch (_) {}
 }
 
+async function loadOwnProfileMarker() {
+  try {
+    const response = await fetch("/api/profile", { headers: { Authorization: "Bearer " + token } });
+    const data = await response.json();
+    if (!response.ok || !data.profile) return;
+    const profile = { avatarId: data.profile.avatarId || "college-boy", profileImage: data.profile.profileImage || "" };
+    profileByUser.set("me", profile);
+    const marker = markers.get("me");
+    if (marker) marker.setIcon(createRadarIcon(true, { userId: "me", ...profile }));
+  } catch (error) {
+    console.warn("Could not load own map avatar:", error.message);
+  }
+}
+
 function connectSocket() {
   socket = io({ auth: { token } });
   socket.on("connect", () => {
@@ -336,7 +350,13 @@ function connectSocket() {
   });
   socket.on("connect_error", error => setStatus("Socket connection: " + error.message));
   socket.on("sharing-status", data => { if (data) historyEnabled = data.historyEnabled !== false; if (!sharing) setStatus(data.enabled ? "Your sharing is enabled on this account." : "Sharing is off until you opt in."); });
-  socket.on("receive-location", data => upsertMarker(data));
+  socket.on("receive-location", data => {
+    if (!data) return;
+    const id = String(data.userId || data.username || "");
+    // Preserve cached avatar details when a live GPS update arrives without profile fields.
+    const profile = profileByUser.get(id);
+    upsertMarker(profile ? { ...data, ...profile } : data);
+  });
   socket.on("sharing-stopped", data => { if (data && data.userId) removeMarker(data.userId); });
   socket.on("friend-removed", data => { if (data && data.userId) { removeMarker(data.userId); loadFriends({ quiet: true }); } });
   socket.on("friend-request-received", data => { if (data && data.username) setStatus("New friend request from " + data.username + "."); loadFriends(); });
@@ -465,6 +485,7 @@ document.getElementById("currentLocationPrompt").addEventListener("click", () =>
 });
 
 loadFriends();
+loadOwnProfileMarker();
 
 /* Free, client-side profile photo compression and avatar editor. */
 (() => {
