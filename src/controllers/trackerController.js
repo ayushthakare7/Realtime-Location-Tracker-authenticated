@@ -142,6 +142,43 @@ function isGeoAddressQuestion(question) { return /\b(which city|what city|which 
 function requestedUsername(question, usernames) { const lower = question.toLowerCase(); return usernames.find(name => lower.includes(String(name).toLowerCase())); }
 function isFallbackPlace(place) { return !place || /^Location near -?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/i.test(String(place).trim()); }
 
+function describeNearbyLocation(geo = {}, nearby = [], fallbackPlace = null) {
+  const named = nearby.filter(item => item && item.name && Number.isFinite(Number(item.distanceKm)));
+  const institutions = named.filter(item => ["university", "college", "hospital", "station", "school"].includes(item.category));
+  // Prefer a meaningful institution only when it is genuinely close; otherwise
+  // choose a close named POI. Never state that someone is inside a campus based
+  // only on a distant map centroid.
+  const institution = institutions.find(item => item.distanceKm <= 0.4)
+    || institutions.find(item => item.distanceKm <= 1.2);
+  const closestPoi = named.find(item => item.category !== "road" && item.distanceKm <= 0.3);
+  const landmark = institution || closestPoi || null;
+  const road = geo.road || named.find(item => item.category === "road" && item.distanceKm <= 0.2)?.name || null;
+  const fallback = !isFallbackPlace(fallbackPlace) ? fallbackPlace : null;
+  const landmarkName = landmark?.name || (fallback && ![geo.city, geo.state, geo.country].includes(fallback) ? fallback : null);
+  const hierarchy = [];
+  for (const value of [geo.locality, geo.city, geo.state, geo.country]) {
+    if (value && !hierarchy.some(existing => existing.toLocaleLowerCase("en-IN") === String(value).toLocaleLowerCase("en-IN"))) {
+      hierarchy.push(String(value));
+    }
+  }
+  const parts = [];
+  if (road) parts.push("Road: " + road);
+  if (landmarkName) {
+    const distance = Number(landmark?.distanceKm);
+    const status = Number.isFinite(distance) && distance <= 0.25 ? "At or very near " : "Near ";
+    parts.push(status + landmarkName + (Number.isFinite(distance) ? " (" + (distance * 1000 < 1000 ? Math.round(distance * 1000) + " m" : distance.toFixed(2) + " km") + " away" + ")" : ""));
+  }
+  parts.push(...hierarchy);
+  if (!parts.length && fallback) parts.push(fallback);
+  return {
+    label: parts.join(", "),
+    landmark: landmarkName,
+    road,
+    distanceKm: landmark && Number.isFinite(Number(landmark.distanceKm)) ? Number(landmark.distanceKm) : null,
+    source: landmark?.source || (road ? "reverse-geocoder/map data" : null)
+  };
+}
+
 exports.askMap = async (req, res) => {
   try {
     const question = String(req.body.question || "").trim();
@@ -267,23 +304,15 @@ exports.askMap = async (req, res) => {
           const visitDriftKm = distanceKm(mine.latitude, mine.longitude, previousVisit.latitude, previousVisit.longitude);
           if (visitAge <= 15 && visitDriftKm <= 0.25) resolved = previousVisit.placeName;
         }
-        let nearbyNote = "";
-        { // Always enrich the GPS point with nearby landmarks; do not depend on reverse-geocoder failure.
-          try {
-            const nearby = await findNearbyPlaces(mine.latitude, mine.longitude, 1000);
-            const educational = nearby.find(item => ["university", "college"].includes(item.category) && item.distanceKm <= 1.5) || nearby.find(item => item.category === "school" && item.distanceKm <= 0.35);
-            const closest = nearby.find(item => item.distanceKm <= 0.75);
-            const landmark = educational || closest;
-            if (landmark) {
-              resolved = landmark.name;
-              nearbyNote = " (nearest mapped " + landmark.category + ", about " + landmark.distanceKm.toFixed(2) + " km from the GPS point)";
-            }
-          } catch (error) {
-            console.warn("[Reva] Nearby landmark lookup failed:", error.message);
-          }
+        let locationDetails = describeNearbyLocation(geo, [], resolved);
+        try {
+          const nearby = await findNearbyPlaces(mine.latitude, mine.longitude, 1000);
+          locationDetails = describeNearbyLocation(geo, nearby, resolved);
+        } catch (error) {
+          console.warn("[Reva] Nearby landmark/road lookup failed:", error.message);
         }
         const coordinates = Number.isFinite(Number(mine.latitude)) && Number.isFinite(Number(mine.longitude)) ? " (GPS " + Number(mine.latitude).toFixed(5) + ", " + Number(mine.longitude).toFixed(5) + ")" : "";
-        return res.json({ success: true, answer: resolved ? `Your latest shared location appears to be near ${resolved}${nearbyNote}${coordinates}. Updated ${ageMinutes} minute(s) ago.` : `I have your latest GPS coordinates${coordinates}, but no named nearby place could be resolved. Updated ${ageMinutes} minute(s) ago.` });
+        return res.json({ success: true, answer: locationDetails.label ? `Your latest shared location appears to be: ${locationDetails.label}${coordinates}. Updated ${ageMinutes} minute(s) ago. Nearby place names are best-effort map matches.` : `I have your latest GPS coordinates${coordinates}, but could not resolve a named road or place. Updated ${ageMinutes} minute(s) ago.` });
       }
       const target = targetUser && String(targetUser._id) !== String(uid) ? others.find(p => String(p.userId) === String(targetUser._id)) : null;
       if (!target) return res.json({ success: true, answer: "I can't access a current location for that person. They may not be sharing right now, or their latest location is unavailable." });
@@ -302,30 +331,20 @@ exports.askMap = async (req, res) => {
         const visitDriftKm = distanceKm(target.latitude, target.longitude, visit.latitude, visit.longitude);
         if (visitAge <= 15 && visitDriftKm <= 0.25) resolved = visit.placeName;
       }
-      let nearbyNote = "";
-      // If reverse geocoding gives only coordinates or a broad region, look for
-      // actual named landmarks around the GPS point (campuses, hospitals, stations, etc.).
-      { // Always enrich the GPS point with nearby landmarks; do not depend on reverse-geocoder failure.
-        try {
-          const nearby = await findNearbyPlaces(target.latitude, target.longitude, 1000);
-          const educational = nearby.find(item => ["university", "college"].includes(item.category) && item.distanceKm <= 1.5) || nearby.find(item => item.category === "school" && item.distanceKm <= 0.35);
-          const closest = nearby.find(item => item.distanceKm <= 0.75);
-          const landmark = educational || closest;
-          if (landmark) {
-            resolved = landmark.name;
-            nearbyNote = " (nearest mapped " + landmark.category + ", about " + landmark.distanceKm.toFixed(2) + " km from the GPS point)";
-          }
-        } catch (error) {
-          console.warn("[Reva] Nearby landmark lookup failed:", error.message);
-        }
+      let locationDetails = describeNearbyLocation(geo, [], resolved);
+      try {
+        const nearby = await findNearbyPlaces(target.latitude, target.longitude, 1000);
+        locationDetails = describeNearbyLocation(geo, nearby, resolved);
+      } catch (error) {
+        console.warn("[Reva] Nearby landmark/road lookup failed:", error.message);
       }
       const coordinates = Number.isFinite(Number(target.latitude)) && Number.isFinite(Number(target.longitude)) ? " (GPS " + Number(target.latitude).toFixed(5) + ", " + Number(target.longitude).toFixed(5) + ")" : "";
       const staleAfterMinutes = Math.max(1, Number(process.env.LOCATION_STALE_MINUTES) || 15);
       if (ageMinutes > staleAfterMinutes) {
-        return res.json({ success: true, answer: `${target.username}'s last shared GPS point is ${ageMinutes} minute(s) old. The recorded location was near ${resolved || "an unnamed map location"}${nearbyNote}${coordinates}; I cannot confirm that this is where they are right now.` });
+        return res.json({ success: true, answer: `${target.username}'s last shared GPS point is ${ageMinutes} minute(s) old. The recorded location was: ${locationDetails.label || resolved || "an unnamed map location"}${coordinates}. I cannot confirm this is where they are right now.` });
       }
-      if (resolved) return res.json({ success: true, answer: `${target.username}'s latest shared location appears to be near ${resolved}${nearbyNote}${coordinates}. Updated ${ageMinutes} minute(s) ago.` });
-      return res.json({ success: true, answer: `${target.username} is sharing a current location, but no named nearby place could be resolved. Their GPS coordinates are ${Number(target.latitude).toFixed(5)}, ${Number(target.longitude).toFixed(5)}; updated ${ageMinutes} minute(s) ago.` });
+      if (locationDetails.label || resolved) return res.json({ success: true, answer: `${target.username}'s latest shared location appears to be: ${locationDetails.label || resolved}${coordinates}. Updated ${ageMinutes} minute(s) ago. Nearby place names are best-effort map matches.` });
+      return res.json({ success: true, answer: `${target.username} is sharing a current location, but no named nearby road or place could be resolved. Their GPS coordinates are ${Number(target.latitude).toFixed(5)}, ${Number(target.longitude).toFixed(5)}; updated ${ageMinutes} minute(s) ago.` });
     }
 
     const distances = [];
