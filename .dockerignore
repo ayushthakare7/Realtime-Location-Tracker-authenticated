@@ -1,0 +1,11 @@
+.git
+node_modules
+**/node_modules
+.env
+**/.env
+.venv
+__pycache__
+.pytest_cache
+*.pyc
+android/.gradle
+android/build
