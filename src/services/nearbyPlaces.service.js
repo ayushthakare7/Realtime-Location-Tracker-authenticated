@@ -13,6 +13,7 @@ function distanceKm(lat1, lon1, lat2, lon2) {
 }
 
 function classify(tags = {}) {
+  if (tags.highway) return "road";
   if (tags.university || tags.amenity === "university") return "university";
   if (tags.college || tags.amenity === "college") return "college";
   if (tags.amenity === "hospital" || tags.healthcare === "hospital") return "hospital";
@@ -62,6 +63,7 @@ async function findNearbyPlaces(latitude, longitude, radiusMeters = 500) {
       const places = stored.places.map(place => ({
         name: place.name,
         category: place.category || "landmark",
+        roadType: place.roadType || null,
         latitude: Number(place.latitude),
         longitude: Number(place.longitude),
         distanceKm: Number(distanceKm(lat, lon, Number(place.latitude), Number(place.longitude)).toFixed(3)),
@@ -85,7 +87,7 @@ async function findNearbyPlaces(latitude, longitude, radiusMeters = 500) {
     '["amenity"]', '["shop"]', '["office"]', '["tourism"]', '["leisure"]',
     '["railway"="station"]', '["public_transport"="station"]',
     '["university"]', '["college"]', '["school"]', '["healthcare"]',
-    '["historic"]', '["place_of_worship"]', '["building"="university"]'
+    '["historic"]', '["place_of_worship"]', '["building"="university"]', '["highway"]'
   ];
   const clauses = filters.map(filter =>
     'nwr(around:' + radius + ',' + lat + ',' + lon + ')["name"]' + filter + ';'
@@ -132,6 +134,7 @@ async function findNearbyPlaces(latitude, longitude, radiusMeters = 500) {
     return {
       name: String(name),
       category: classify(tags),
+      roadType: tags.highway ? String(tags.highway) : null,
       latitude: pointLat,
       longitude: pointLon,
       distanceKm: Number(distanceKm(lat, lon, pointLat, pointLon).toFixed(3)),
@@ -164,6 +167,7 @@ async function findNearbyPlaces(latitude, longitude, radiusMeters = 500) {
             name: place.name,
             normalizedName: place.name.toLocaleLowerCase("en-IN").replace(/\s+/g, " ").trim(),
             category: place.category,
+            roadType: place.roadType || null,
             latitude: place.latitude,
             longitude: place.longitude,
             source: place.source
