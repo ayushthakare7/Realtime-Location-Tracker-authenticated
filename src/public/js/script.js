@@ -577,12 +577,15 @@ document.getElementById("askForm").addEventListener("submit", async event => {
     const startedAt = Date.now();
     let pollDelay = 1500;
     const thinkingLines = [
-      "Let me follow the little breadcrumbs your locations left behind…",
-      "Reading between the coordinates. There may be a clue hiding in the timeline…",
-      "Cross-checking the location trail so I don't tell you a made-up story…",
-      "The map is whispering clues. I'm checking that they agree…",
-      "Connecting the dots, checking the timestamps, and untangling the story…",
-      "One last look through the trail before I give you an answer…"
+      "Analysing your question…",
+      "Checking the location timeline…",
+      "Cross-checking coordinates…",
+      "Reviewing recent location updates…",
+      "Finding patterns in the journey…",
+      "Connecting the location data…",
+      "Verifying the timestamps…",
+      "Putting the clues together…",
+      "Almost there — checking the details…"
     ];
     while (Date.now() - startedAt < 5 * 60 * 1000) {
       const elapsed = Date.now() - startedAt;
