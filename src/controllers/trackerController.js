@@ -170,7 +170,7 @@ exports.askMap = async (req, res) => {
     // Handle "Is <friend> at/in <named place>?" as a geographic comparison.
     // Run this before the generic current-location response, which otherwise
     // ignores the place named in the question.
-    if (isCurrentQuestion(question) && targetUser) {
+    if (targetUser && (isCurrentQuestion(question) || /\b(?:is|does)\b.*\b(?:in|at|near|inside|within)\b/i.test(question)) && !/\b(yesterday|last night|last week|last month|days? ago|weeks? ago|last year)\b/i.test(question)) {
       const placeMatch = question.match(/\b(?:inside|within|in|at|near)\s+(.+?)(?:[?.!]|$)/i);
       const candidatePlace = placeMatch
         ? placeMatch[1].replace(/\b(?:right now|currently|at present|today|please|exactly)\b/ig, " ").replace(/\s+/g, " ").trim()
