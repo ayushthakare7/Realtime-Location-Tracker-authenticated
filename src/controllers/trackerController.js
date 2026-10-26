@@ -346,11 +346,21 @@ exports.askMap = async (req, res) => {
         username: user.username
       })),
       currentLocations: [
-        ...(mine ? [{ username: "you", placeName: visitByUser.get(String(uid))?.placeName || null, lastSeen: mine.lastSeen }] : []),
+        ...(mine ? [{
+          username: "you",
+          placeName: visitByUser.get(String(uid))?.placeName || null,
+          latitude: mine.latitude,
+          longitude: mine.longitude,
+          lastSeen: mine.lastSeen,
+          sharingEnabled: true
+        }] : []),
         ...others.map(p => ({
           username: names.get(String(p.userId)) || p.username,
           placeName: visitByUser.get(String(p.userId))?.placeName || null,
-          lastSeen: p.lastSeen
+          latitude: p.latitude,
+          longitude: p.longitude,
+          lastSeen: p.lastSeen,
+          sharingEnabled: true
         }))
       ],
       calculatedDistances: distances
