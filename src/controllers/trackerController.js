@@ -8,6 +8,7 @@ const SafetyJourney = require("../models/SafetyJourney");
 const { askRagService } = require("../services/ragClient.service");
 const ragTasks = require("../services/ragTask.service");
 const { placeLabel, reverseGeocode } = require("../services/locationEvents.service");
+const { geocodePlace } = require("../services/geocoding.service");
 
 exports.setSharing = async (req, res) => {
   try {
@@ -164,6 +165,44 @@ exports.askMap = async (req, res) => {
       const parts = [geo.city, geo.state, geo.country].filter(Boolean);
       if (!parts.length) return res.json({ success: true, answer: `${targetName}'s coordinates are available, but the city/state/country could not be resolved yet.` });
       return res.json({ success: true, answer: `${targetName} is in ${geo.city || "an unknown city"}, ${geo.state || "an unknown state"}, ${geo.country || "an unknown country"}.` });
+    }
+
+    // Handle "Is <friend> at/in <named place>?" as a geographic comparison.
+    // Run this before the generic current-location response, which otherwise
+    // ignores the place named in the question.
+    if (isCurrentQuestion(question) && targetUser) {
+      const placeMatch = question.match(/\b(?:inside|within|in|at|near)\s+(.+?)(?:[?.!]|$)/i);
+      const candidatePlace = placeMatch
+        ? placeMatch[1].replace(/\b(?:right now|currently|at present|today|please|exactly)\b/ig, " ").replace(/\s+/g, " ").trim()
+        : "";
+      const isPlaceQuestion = candidatePlace.length >= 3 &&
+        !/^(?:the location|your location|my location|here|there|home|school|college)$/i.test(candidatePlace);
+      if (isPlaceQuestion) {
+        const targetId = String(targetUser._id);
+        const targetLocation = targetId === String(uid) ? mine : others.find(point => String(point.userId) === targetId);
+        const targetName = targetId === String(uid) ? "You" : targetUser.username;
+        if (!targetLocation) {
+          return res.json({ success: true, answer: "I cannot access a current shared location for " + targetName.toLowerCase() + " right now." });
+        }
+        try {
+          const place = await geocodePlace(candidatePlace);
+          if (place) {
+            const km = distanceKm(targetLocation.latitude, targetLocation.longitude, place.latitude, place.longitude);
+            const ageMinutes = Math.max(0, Math.round((Date.now() - new Date(targetLocation.lastSeen).getTime()) / 60000));
+            const proximityKm = Math.max(0.1, Number(process.env.PLACE_PROXIMITY_KM) || 1.5);
+            const placeLabel = [place.name, place.state, place.country].filter(Boolean).join(", ");
+            const freshness = " The shared GPS point was updated " + ageMinutes + " minute(s) ago.";
+            if (km <= proximityKm) {
+              return res.json({ success: true, answer: targetName + " appears to be near " + placeLabel + " (about " + km.toFixed(2) + " km from the mapped place point). GPS proximity cannot prove they are inside the exact campus/building boundary." + freshness });
+            }
+            return res.json({ success: true, answer: targetName + " does not appear to be near " + placeLabel + ". Their latest shared GPS point is about " + km.toFixed(2) + " km away in a straight line." + freshness });
+          }
+          return res.json({ success: true, answer: "I can access the latest shared coordinates for " + targetName.toLowerCase() + ", but I could not resolve \"" + candidatePlace + "\" to a reliable mapped place. Try adding its city or state." });
+        } catch (error) {
+          console.error("[Reva RAG] named-place presence check failed:", error.message);
+          return res.json({ success: true, answer: "I can access the latest shared coordinates for " + targetName.toLowerCase() + ", but the map lookup for \"" + candidatePlace + "\" failed. Please try again shortly." });
+        }
+      }
     }
 
     if (isCurrentQuestion(question) || ownCurrentQuestion) {
