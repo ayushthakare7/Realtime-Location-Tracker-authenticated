@@ -570,24 +570,30 @@ document.getElementById("askForm").addEventListener("submit", async event => {
   const submit = document.querySelector("#askForm button[type='submit']");
   const question = document.getElementById("question").value;
   if (submit) submit.disabled = true;
-  answer.textContent = "Reva is connecting the dots in your shared location story…";
+  answer.textContent = "Let me follow the little breadcrumbs your locations left behind…";
   try {
     const data = await api("/ask", { method: "POST", body: JSON.stringify({ question, aiConsent: document.getElementById("aiConsent").checked }) });
     if (!data.pending || !data.taskId) { answer.textContent = data.answer || "Reva couldn't find an answer."; return; }
     const startedAt = Date.now();
     let pollDelay = 1500;
+    const thinkingLines = [
+      "Let me follow the little breadcrumbs your locations left behind…",
+      "Reading between the coordinates. There may be a clue hiding in the timeline…",
+      "Cross-checking the location trail so I don't tell you a made-up story…",
+      "The map is whispering clues. I'm checking that they agree…",
+      "Connecting the dots, checking the timestamps, and untangling the story…",
+      "One last look through the trail before I give you an answer…"
+    ];
     while (Date.now() - startedAt < 5 * 60 * 1000) {
       const elapsed = Date.now() - startedAt;
-      answer.textContent = elapsed < 30000
-        ? "Waking up Reva AI on Render… This can take a few minutes after inactivity."
-        : "Reva AI is still waking up. Keep this page open; your question is saved and will continue automatically.";
+      answer.textContent = thinkingLines[Math.floor(elapsed / 7000) % thinkingLines.length];
       await new Promise(resolve => setTimeout(resolve, pollDelay));
       const status = await api("/ask-status/" + encodeURIComponent(data.taskId), { method: "GET" });
       if (status.status === "completed") { answer.textContent = status.answer; return; }
-      if (status.status === "failed") { answer.textContent = status.message || "Reva couldn't answer right now. Please try again."; return; }
+      if (status.status === "failed") { answer.textContent = status.message || "I couldn't untangle that trail just now. Try me again in a moment."; return; }
       pollDelay = Math.min(3000, pollDelay + 500);
     }
-    answer.textContent = "Reva is taking longer than expected to wake up. Your request may still be processing; please try again shortly.";
+    answer.textContent = "That trail is taking longer than expected to untangle. Your question may still be processing—please try again shortly.";
   } catch (e) { answer.textContent = e.message; }
   finally { if (submit) submit.disabled = false; }
 });
