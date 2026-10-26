@@ -75,6 +75,23 @@ class LocationToolTests(unittest.TestCase):
         self.assertEqual(location_tools.location_tool_route("Where is Siddhant right now?", context), "reverse_geocode")
         self.assertEqual(location_tools.location_tool_route("Where am I currently?", context), "reverse_geocode")
 
+
+    def test_resolver_returns_only_the_named_friend(self):
+        context = {
+            "currentLocations": [
+                {"username": "you", "latitude": 21.2, "longitude": 81.3, "lastSeen": "now"},
+                {"username": "Siddhant", "latitude": 21.3, "longitude": 81.4, "lastSeen": "now"},
+            ]
+        }
+        with patch.object(location_tools, "reverse_geocode", return_value={
+            "ok": True, "label": "Nagpur, Maharashtra, India", "locality": "Nagpur",
+            "city": "Nagpur", "state": "Maharashtra", "country": "India", "source": "nominatim",
+        }) as provider:
+            result = location_tools.resolve_location_tools("What city is Siddhant in?", context)
+        self.assertEqual(result["route"], "reverse_geocode")
+        self.assertEqual([row["person"] for row in result["results"]], ["Siddhant"])
+        provider.assert_called_once()
+
     def test_missing_friend_coordinates_are_not_forward_geocoded_as_a_place(self):
         context = {"currentLocations": [{"username": "Siddhant", "latitude": None, "longitude": None}]}
         self.assertEqual(location_tools.location_tool_route("Where is Siddhant right now?", context), "none")
