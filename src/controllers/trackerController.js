@@ -6,6 +6,7 @@ const LocationEvent = require("../models/LocationEvent");
 const Friendship = require("../models/Friendship");
 const SafetyJourney = require("../models/SafetyJourney");
 const { askRagService } = require("../services/ragClient.service");
+const ragTasks = require("../services/ragTask.service");
 const { placeLabel, reverseGeocode } = require("../services/locationEvents.service");
 
 exports.setSharing = async (req, res) => {
@@ -220,14 +221,17 @@ exports.askMap = async (req, res) => {
       ...(me?.historyEnabled !== false ? [uid] : []),
       ...users.filter(user => user.historyEnabled !== false).map(user => user._id)
     ];
-    const result = await askRagService({
-      question,
-      userIds: authorizedHistoryIds,
-      context
+    // Render may take several minutes to wake the Python RAG service. Return
+    // immediately and let the browser poll this authenticated task for its answer.
+    const task = ragTasks.start(req.user.userId, async () => {
+      const result = await askRagService({ question, userIds: authorizedHistoryIds, context });
+      return result.answer || "I couldn't find enough information in the shared location history to answer that yet.";
     });
-    res.json({
+    return res.status(202).json({
       success: true,
-      answer: result.answer || "I couldn't find enough information in the shared location history to answer that yet."
+      pending: true,
+      taskId: task.id,
+      message: "Reva AI is waking up. This can take a few minutes after inactivity."
     });
   } catch (e) {
     console.error("Reva assistant error:", e);
@@ -235,4 +239,11 @@ exports.askMap = async (req, res) => {
     const message = status === 400 ? e.message : "Reva couldn't answer right now. Please try again.";
     res.status(status).json({ success: false, message });
   }
+};
+
+
+exports.askRagTaskStatus = (req, res) => {
+  const task = ragTasks.getForUser(req.user.userId, req.params.taskId);
+  if (!task) return res.status(404).json({ success: false, message: "Reva request not found or expired." });
+  return res.json({ success: true, ...task });
 };
