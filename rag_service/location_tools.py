@@ -303,6 +303,6 @@ def resolve_location_tools(question: str, context: dict[str, Any], cache_collect
             results.append({
                 "query": query_text, "label": geo.get("label"), "locality": geo.get("locality"),
                 "city": geo.get("city"), "state": geo.get("state"), "country": geo.get("country"),
-                "source": geo.get("source"), "ok": geo.get("ok"),
+                "source": geo.get("source"), "attribution": geo.get("attribution"), "ok": geo.get("ok"),
             })
     return {"route": route, "results": results}
