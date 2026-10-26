@@ -110,7 +110,6 @@ async function geocodePlace(input) {
   const cached = await GeocodedPlace.findOne({ normalizedQuery }).lean();
   if (cached) {
     const cachedName = normalizeQuery(cached.name);
-    const requestedName = normalizeQuery(placeQuery);
     const nameMatches = expandPlaceAliases(placeQuery).some(alias =>
       normalizeQuery(alias).split(/\s+/).every(token => cachedName.includes(token))
     );
