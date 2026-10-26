@@ -1,5 +1,6 @@
 const LocationVisit = require("../models/LocationVisit");
 const LocationEvent = require("../models/LocationEvent");
+const ReverseGeocodeCache = require("../models/ReverseGeocodeCache");
 const { indexLocationEvent } = require("./ragClient.service");
 
 const VISIT_RADIUS_METERS = Number(process.env.VISIT_RADIUS_METERS) || 150;
@@ -16,20 +17,39 @@ function distanceMeters(aLat, aLon, bLat, bLon) {
 }
 
 async function reverseGeocode(latitude, longitude) {
+  const lat = Number(latitude);
+  const lon = Number(longitude);
   const fallback = {
-    placeName: `Location near ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
-    city: null,
-    state: null,
-    country: null,
-    countryCode: null
+    placeName: `Location near ${lat.toFixed(5)}, ${lon.toFixed(5)}`,
+    city: null, state: null, country: null, countryCode: null
   };
-  // Reverse geocoding is on by default. Disable explicitly only if required.
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90 ||
+      !Number.isFinite(lon) || lon < -180 || lon > 180) return fallback;
   if (process.env.GEOCODING_ENABLED === "false") return fallback;
-  const cacheKey = `${latitude.toFixed(3)},${longitude.toFixed(3)}`;
-  if (geocodeCache.has(cacheKey)) return geocodeCache.get(cacheKey);
 
-  // Try detailed features first, then broader administrative levels. A coordinate
-  // can sit on an unnamed road/building even when its town or district is resolvable.
+  // Round to roughly city-block scale and persist successful lookups across
+  // process restarts. Never cache a coordinate-only failure as a named place.
+  const cacheKey = lat.toFixed(3) + "," + lon.toFixed(3);
+  if (geocodeCache.has(cacheKey)) return geocodeCache.get(cacheKey);
+  try {
+    const cached = await ReverseGeocodeCache.findOne({
+      cacheKey, fetchedAt: { $gt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+    }).lean();
+    if (cached) {
+      const result = {
+        placeName: cached.placeName, city: cached.city || null,
+        state: cached.state || null, country: cached.country || null,
+        countryCode: cached.countryCode || null
+      };
+      geocodeCache.set(cacheKey, result);
+      return result;
+    }
+  } catch (error) {
+    console.warn("[Geocoding] Persistent cache read failed:", error.message);
+  }
+
+  // Nominatim's public endpoint is rate-limited; request it once per lookup,
+  // then fall back to broader zoom levels only if the response has no usable label.
   for (const zoom of [18, 14, 10]) {
     try {
       const wait = Math.max(0, 1100 - (Date.now() - lastGeocodeAt));
@@ -37,16 +57,16 @@ async function reverseGeocode(latitude, longitude) {
       lastGeocodeAt = Date.now();
       const url = new URL("https://nominatim.openstreetmap.org/reverse");
       url.searchParams.set("format", "jsonv2");
-      url.searchParams.set("lat", String(latitude));
-      url.searchParams.set("lon", String(longitude));
+      url.searchParams.set("lat", String(lat));
+      url.searchParams.set("lon", String(lon));
       url.searchParams.set("zoom", String(zoom));
       url.searchParams.set("addressdetails", "1");
       const response = await fetch(url, {
-        headers: { "User-Agent": "PrivacyAwareLocationTracker/1.0 (location labels)" },
+        headers: { "User-Agent": "RevaLocationAssistant/1.0 (location labels)" },
         signal: AbortSignal.timeout(5000)
       });
       if (!response.ok) {
-        console.error("Nominatim reverse geocoding failed:", response.status, response.statusText);
+        console.warn("[Geocoding] Nominatim HTTP", response.status, "at zoom", zoom);
         continue;
       }
       const data = await response.json();
@@ -59,7 +79,7 @@ async function reverseGeocode(latitude, longitude) {
       const feature = data.name || address.amenity || address.university || address.college ||
         address.school || address.hospital || address.building || address.road ||
         address.neighbourhood || address.suburb || null;
-      const placeName = feature || city || state || country || null;
+      const placeName = feature || city || state || country;
       if (!placeName && !city && !state && !country) continue;
       const result = {
         placeName: String(placeName || fallback.placeName).slice(0, 160),
@@ -70,11 +90,21 @@ async function reverseGeocode(latitude, longitude) {
       };
       geocodeCache.set(cacheKey, result);
       if (geocodeCache.size > 1000) geocodeCache.delete(geocodeCache.keys().next().value);
+      try {
+        await ReverseGeocodeCache.updateOne(
+          { cacheKey },
+          { $set: { cacheKey, latitude: lat, longitude: lon, ...result, fetchedAt: new Date() } },
+          { upsert: true }
+        );
+      } catch (error) {
+        console.warn("[Geocoding] Persistent cache write failed:", error.message);
+      }
       return result;
     } catch (error) {
-      console.error("Reverse geocoding error at zoom " + zoom + ":", error.message);
+      console.warn("[Geocoding] Reverse lookup failed at zoom " + zoom + ":", error.message);
     }
   }
+  // Do not memoize failure: a later request may succeed after provider recovery.
   return fallback;
 }
 
