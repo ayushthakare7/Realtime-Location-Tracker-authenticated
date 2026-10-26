@@ -48,8 +48,10 @@ def _nominatim_get(url: str) -> dict[str, Any]:
 
 
 def _clean_address(address: dict[str, Any], feature_name: str | None = None) -> dict[str, Any]:
+    road = address.get("road") or address.get("pedestrian") or address.get("footway") or address.get("residential")
     locality = (
-        address.get("city") or address.get("town") or address.get("municipality")
+        address.get("neighbourhood") or address.get("suburb") or address.get("quarter") or address.get("hamlet")
+        or address.get("city") or address.get("town") or address.get("municipality")
         or address.get("village") or address.get("locality") or address.get("city_district")
         or address.get("suburb") or address.get("neighbourhood") or address.get("county")
     )
@@ -57,6 +59,7 @@ def _clean_address(address: dict[str, Any], feature_name: str | None = None) -> 
     state = address.get("state") or address.get("state_district") or address.get("region") or address.get("county")
     country = address.get("country")
     result = {
+        "road": str(road)[:160] if road else None,
         "locality": str(locality)[:120] if locality else None,
         "city": str(city)[:120] if city else None,
         "state": str(state)[:120] if state else None,
@@ -70,6 +73,7 @@ def _clean_address(address: dict[str, Any], feature_name: str | None = None) -> 
 
 def _photon_address(properties: dict[str, Any]) -> dict[str, Any]:
     return _clean_address({
+        "road": properties.get("street"),
         "city": properties.get("city") or properties.get("town"),
         "municipality": properties.get("municipality"),
         "village": properties.get("village"),
@@ -241,7 +245,7 @@ def location_tool_route(question: str, context: dict[str, Any]) -> str:
     asks_self = bool(re.search(r"\b(where am i|where was i|my current location|what city am i|what state am i|what country am i)\b", text))
     reverse_language = any(term in text for term in (
         "where am i", "where is", "where are", "what city", "which city",
-        "what town", "what locality", "what state", "what country", "current location",
+        "what town", "what locality", "what state", "what country", "what road", "which road", "what street", "which street", "current location",
         "located", "location right now", "currently at", "where was",
     ))
     if reverse_language and (asks_self or named_people):
@@ -286,7 +290,7 @@ def resolve_location_tools(question: str, context: dict[str, Any], cache_collect
             geo = reverse_geocode(coords[0], coords[1], cache_collection)
             results.append({
                 "person": str(person.get("username") or "user")[:60],
-                "label": geo.get("label"), "locality": geo.get("locality"), "city": geo.get("city"),
+                "label": geo.get("label"), "road": geo.get("road"), "locality": geo.get("locality"), "city": geo.get("city"),
                 "state": geo.get("state"), "country": geo.get("country"),
                 "source": geo.get("source"), "attribution": geo.get("attribution"), "ok": geo.get("ok"),
                 "lastSeen": person.get("lastSeen"),
@@ -301,7 +305,7 @@ def resolve_location_tools(question: str, context: dict[str, Any], cache_collect
         if query_text:
             geo = forward_geocode(query_text, cache_collection)
             results.append({
-                "query": query_text, "label": geo.get("label"), "locality": geo.get("locality"),
+                "query": query_text, "label": geo.get("label"), "road": geo.get("road"), "locality": geo.get("locality"),
                 "city": geo.get("city"), "state": geo.get("state"), "country": geo.get("country"),
                 "source": geo.get("source"), "attribution": geo.get("attribution"), "ok": geo.get("ok"),
             })
