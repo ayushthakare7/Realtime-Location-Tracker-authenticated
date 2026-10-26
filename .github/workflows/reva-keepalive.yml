@@ -2,8 +2,8 @@ name: Reva service keep-alive
 
 on:
   schedule:
-    # Runs every 8 minutes (GitHub may delay scheduled runs).
-    - cron: "*/8 * * * *"
+    # GitHub may delay scheduled runs; this is best-effort only.
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 concurrency:
@@ -13,11 +13,12 @@ concurrency:
 jobs:
   ping-services:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
       - name: Ping all configured Reva services
         env:
-          NODE_HEALTH_URL: ${{ vars.REVA_NODE_HEALTH_URL }}
+          MAIN_APP_HEALTH_URL: ${{ vars.REVA_MAIN_APP_HEALTH_URL }}
+          NODE_API_HEALTH_URL: ${{ vars.REVA_NODE_API_HEALTH_URL }}
           RAG_HEALTH_URL: ${{ vars.REVA_RAG_HEALTH_URL }}
           MOBILITY_HEALTH_URL: ${{ vars.REVA_MOBILITY_HEALTH_URL }}
         shell: bash
@@ -31,7 +32,7 @@ jobs:
             local url="$2"
 
             if [[ -z "$url" ]]; then
-              echo "::warning::$name health URL is not configured. Add the matching GitHub Actions repository variable."
+              echo "::error::$name health URL is not configured. Add the matching GitHub Actions repository variable."
               failures=$((failures + 1))
               return
             fi
@@ -43,12 +44,13 @@ jobs:
               --retry 2 --retry-delay 2 "$url" >/dev/null; then
               echo "OK: $name responded successfully."
             else
-              echo "::warning::$name health check failed. Check its URL and service logs."
+              echo "::error::$name health check failed. Check its URL and service logs."
               failures=$((failures + 1))
             fi
           }
 
-          ping_service "Node.js" "$NODE_HEALTH_URL"
+          ping_service "Main Reva app" "$MAIN_APP_HEALTH_URL"
+          ping_service "Reva Node API" "$NODE_API_HEALTH_URL"
           ping_service "Python RAG" "$RAG_HEALTH_URL"
           ping_service "Mobility" "$MOBILITY_HEALTH_URL"
 
@@ -58,6 +60,7 @@ jobs:
           fi
 
           if [[ "$failures" -gt 0 ]]; then
-            echo "::warning::$failures health check(s) failed or are unconfigured."
+            echo "::error::$failures health check(s) failed or are unconfigured."
+            exit 1
           fi
-          echo "Keep-alive checks completed."
+          echo "All configured Reva health checks completed successfully."
