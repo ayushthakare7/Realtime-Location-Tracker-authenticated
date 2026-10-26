@@ -133,7 +133,10 @@ function distanceKm(aLat, aLon, bLat, bLon) {
   return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function isCurrentQuestion(question) { return /\b(right now|currently|current location|current place|where is .* now|where .* now|where .* currently)\b/i.test(question); }
+function isCurrentQuestion(question) {
+  return /\b(right now|currently|current location|current place|where is\s+[^?!.]+|where's\s+[^?!.]+|where\s+[^?!.]+\s+(?:is|are)\b)/i.test(question)
+    && !/\b(where was|where were|used to be|last seen|yesterday|last night|last week|last month|days? ago|weeks? ago|last year)\b/i.test(question);
+}
 function isOwnCurrentQuestion(question) { return /\b(where am i|where i'm|where i am|my current location|my current place|where is my location|where is me)\b/i.test(question); }
 function isGeoAddressQuestion(question) { return /\b(which city|what city|which state|what state|which country|what country|city.*state.*country|state.*country|country.*city|city and state|city and country|state and country|in which city|in what city)\b/i.test(question); }
 function requestedUsername(question, usernames) { const lower = question.toLowerCase(); return usernames.find(name => lower.includes(String(name).toLowerCase())); }
@@ -258,6 +261,12 @@ exports.askMap = async (req, res) => {
         const ageMinutes = Math.max(0, Math.round((Date.now() - new Date(mine.lastSeen).getTime()) / 60000));
         const region = [geo.city, geo.state, geo.country].filter(Boolean).join(", ");
         let resolved = place && !isFallbackPlace(place) ? place : region;
+        const previousVisit = visitByUser.get(String(uid));
+        if (!resolved && previousVisit && previousVisit.placeName && !isFallbackPlace(previousVisit.placeName)) {
+          const visitAge = Math.max(0, (Date.now() - new Date(previousVisit.lastSeen).getTime()) / 60000);
+          const visitDriftKm = distanceKm(mine.latitude, mine.longitude, previousVisit.latitude, previousVisit.longitude);
+          if (visitAge <= 15 && visitDriftKm <= 0.25) resolved = previousVisit.placeName;
+        }
         let nearbyNote = "";
         { // Always enrich the GPS point with nearby landmarks; do not depend on reverse-geocoder failure.
           try {
@@ -288,6 +297,11 @@ exports.askMap = async (req, res) => {
       const ageMinutes = Math.max(0, Math.round((Date.now() - new Date(target.lastSeen).getTime()) / 60000));
       const region = [geo.city, geo.state, geo.country].filter(Boolean).join(", ");
       let resolved = place && !isFallbackPlace(place) ? place : region;
+      if (!resolved && visit && visit.placeName && !isFallbackPlace(visit.placeName)) {
+        const visitAge = Math.max(0, (Date.now() - new Date(visit.lastSeen).getTime()) / 60000);
+        const visitDriftKm = distanceKm(target.latitude, target.longitude, visit.latitude, visit.longitude);
+        if (visitAge <= 15 && visitDriftKm <= 0.25) resolved = visit.placeName;
+      }
       let nearbyNote = "";
       // If reverse geocoding gives only coordinates or a broad region, look for
       // actual named landmarks around the GPS point (campuses, hospitals, stations, etc.).
