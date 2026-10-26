@@ -118,9 +118,9 @@ def answer_time_question(question, authorized_user_ids, context, database, extra
     # "Where was I at 1 AM?" and similar explicit clock-time questions.
     location_intent = intent == "location_at_time"
     has_explicit_time = bool(extracted_intent.get("time_text")) or bool(
-        re.search(r"(?:at|around|about)\s+\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)", question, re.I)
+        re.search(r"\b(?:at|around|about)\s+\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)\b", question, re.I)
     )
-    if not location_intent and not (re.search(r"(?:where|what place|which place)", question, re.I) and has_explicit_time):
+    if not location_intent and not (re.search(r"\b(?:where|what place|which place)\b", question, re.I) and has_explicit_time):
         return None
     clock = _requested_clock(question, datetime.now(LOCAL_TZ), extracted_intent)
     if clock is None:
