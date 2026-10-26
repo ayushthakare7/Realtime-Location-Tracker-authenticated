@@ -96,6 +96,24 @@ class LocationToolTests(unittest.TestCase):
         context = {"currentLocations": [{"username": "Siddhant", "latitude": None, "longitude": None}]}
         self.assertEqual(location_tools.location_tool_route("Where is Siddhant right now?", context), "none")
 
+    def test_reverse_geocode_extracts_road_and_locality(self):
+        result = location_tools._clean_address({
+            "road": "Knowledge Park Road",
+            "neighbourhood": "Knowledge Park",
+            "city": "Bhilai",
+            "state": "Chhattisgarh",
+            "country": "India",
+        })
+        self.assertEqual(result["road"], "Knowledge Park Road")
+        self.assertEqual(result["locality"], "Knowledge Park")
+        self.assertEqual(result["city"], "Bhilai")
+        self.assertEqual(result["state"], "Chhattisgarh")
+        self.assertEqual(result["country"], "India")
+
+    def test_self_road_question_routes_to_reverse_geocoder(self):
+        context = {"currentLocations": [{"username": "you", "latitude": 21.2, "longitude": 81.3}]}
+        self.assertEqual(location_tools.location_tool_route("What road am I near?", context), "reverse_geocode")
+
     def test_public_place_question_uses_forward_geocoder(self):
         context = {"currentLocations": [{"username": "you", "latitude": 21.2, "longitude": 81.3}]}
         self.assertEqual(location_tools.location_tool_route("Where is Nagpur?", context), "forward_geocode")
