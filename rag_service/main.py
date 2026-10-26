@@ -144,8 +144,13 @@ def ensure_vector_index() -> str:
     })
     return "created"
 
+def embeddings_unavailable() -> bool:
+    with _embedding_warmup_state_lock:
+        return bool(_embedding_warmup_state["complete"] and not _embedding_warmup_state["ok"])
+
+
 def index_event(event_id: str) -> bool:
-    if RAG_DISABLE_EMBEDDINGS:
+    if RAG_DISABLE_EMBEDDINGS or embeddings_unavailable():
         print("[Reva RAG] embedding writes disabled by RAG_DISABLE_EMBEDDINGS; skipping event indexing", flush=True)
         return False
     if not ObjectId.is_valid(event_id):
@@ -191,7 +196,7 @@ def extract_question_intent(question: str) -> dict[str, Any]:
         allowed = {"location_at_time", "closest_people", "visit_duration", "movement_between_places",
                    "location_timeline", "history_summary", "current_presence", "other"}
         if not isinstance(parsed, dict) or parsed.get("intent") not in allowed:
-            return {"intent": "other"}
+            return {"intent": "fallback"}
         keys = ("subject", "date_text", "time_text", "start_time_text", "end_time_text",
                 "place", "second_place", "comparison")
         result = {"intent": parsed["intent"], "needs_history": bool(parsed.get("needs_history", True))}
@@ -272,8 +277,9 @@ def retrieve_node(state: GraphState) -> GraphState:
 
     # Semantic retrieval is optional: on constrained hosts, bypass model loading
     # and use the authorized MongoDB query instead of hanging on first download.
-    if RAG_DISABLE_EMBEDDINGS:
-        print("[Reva RAG] embeddings disabled; using MongoDB history fallback", flush=True)
+    if RAG_DISABLE_EMBEDDINGS or embeddings_unavailable():
+        reason = "disabled by configuration" if RAG_DISABLE_EMBEDDINGS else "startup warmup failed"
+        print(f"[Reva RAG] embeddings unavailable ({reason}); using MongoDB history fallback", flush=True)
     else:
         try:
             print("[Reva RAG] retrieve: embedding query started", flush=True)
