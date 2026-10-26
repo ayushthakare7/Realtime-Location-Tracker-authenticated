@@ -111,6 +111,7 @@ def answer_time_question(question, authorized_user_ids, context, database, extra
         # If a name was explicitly supplied but cannot be resolved to an authorized
         # friend, do not silently answer using a different friend.
         mentioned_name = re.search(r"\b(?:when|was|were)\s+(?:was\s+)?([A-Za-z][A-Za-z0-9_-]{1,40})\b", question, re.I)
+        display_friend_name = str(named_friend.get("username") or "your friend") if named_friend else None
         if named_friend:
             named_id = str(named_friend.get("id") or "")
             if named_id not in ids or named_id == current_id:
@@ -151,7 +152,7 @@ def answer_time_question(question, authorized_user_ids, context, database, extra
             return "I couldn't compare your historical locations: no saved GPS samples for you and the friend were recorded within 5 minutes of each other."
         local_time = best["time"].astimezone(LOCAL_TZ).strftime("%I:%M:%S %p").lstrip("0")
         local_date = best["time"].astimezone(LOCAL_TZ).strftime("%d %b %Y")
-        name = best["friend"].get("username", "your friend")
+        name = display_friend_name or best["friend"].get("username") or "your friend"
         if day is not None:
             return f"You were closest to {name} at about {local_time} on {local_date}. The nearest contemporaneous GPS samples were {best['distance'] / 1000:.2f} km apart in a straight line; the samples were no more than 5 minutes apart."
         return f"Across all available recorded history, you were closest to {name} at about {local_time} on {local_date}. The nearest contemporaneous GPS samples were {best['distance'] / 1000:.2f} km apart in a straight line; the samples were no more than 5 minutes apart."
