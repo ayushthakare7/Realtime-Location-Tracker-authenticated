@@ -262,7 +262,7 @@ exports.askMap = async (req, res) => {
         { // Always enrich the GPS point with nearby landmarks; do not depend on reverse-geocoder failure.
           try {
             const nearby = await findNearbyPlaces(mine.latitude, mine.longitude, 1000);
-            const educational = nearby.find(item => ["university", "college", "school"].includes(item.category) && item.distanceKm <= 1.5);
+            const educational = nearby.find(item => ["university", "college"].includes(item.category) && item.distanceKm <= 1.5) || nearby.find(item => item.category === "school" && item.distanceKm <= 0.35);
             const closest = nearby.find(item => item.distanceKm <= 0.75);
             const landmark = educational || closest;
             if (landmark) {
@@ -294,7 +294,7 @@ exports.askMap = async (req, res) => {
       { // Always enrich the GPS point with nearby landmarks; do not depend on reverse-geocoder failure.
         try {
           const nearby = await findNearbyPlaces(target.latitude, target.longitude, 1000);
-          const educational = nearby.find(item => ["university", "college", "school"].includes(item.category) && item.distanceKm <= 1.5);
+          const educational = nearby.find(item => ["university", "college"].includes(item.category) && item.distanceKm <= 1.5) || nearby.find(item => item.category === "school" && item.distanceKm <= 0.35);
           const closest = nearby.find(item => item.distanceKm <= 0.75);
           const landmark = educational || closest;
           if (landmark) {
