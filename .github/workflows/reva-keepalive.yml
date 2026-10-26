@@ -17,7 +17,7 @@ jobs:
     steps:
       - name: Ping all configured Reva services
         env:
-          MAIN_APP_HEALTH_URL: ${{ vars.REVA_MAIN_APP_HEALTH_URL }}
+          MAIN_APP_HEALTH_URL: ${{ vars.REVA_NODE_HEALTH_URL }}
           NODE_API_HEALTH_URL: ${{ vars.REVA_NODE_API_HEALTH_URL }}
           RAG_HEALTH_URL: ${{ vars.REVA_RAG_HEALTH_URL }}
           MOBILITY_HEALTH_URL: ${{ vars.REVA_MOBILITY_HEALTH_URL }}
