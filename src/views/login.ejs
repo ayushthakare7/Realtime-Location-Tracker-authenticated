@@ -42,13 +42,13 @@
 (() => {
   const params = new URLSearchParams(window.location.search);
   const requestedPath = params.get("returnTo") || "/tracker";
-  const safeReturnPath = requestedPath.startsWith("/") && !requestedPath.startsWith("//") && !requestedPath.includes("\\\\") ? requestedPath : "/tracker";
+  const safeReturnPath = requestedPath.startsWith("/") && !requestedPath.startsWith("//") && !requestedPath.includes("\\") ? requestedPath : "/tracker";
   const existingToken = localStorage.getItem("token");
   if (existingToken) {
     fetch("/api/profile", { headers: { Authorization: "Bearer " + existingToken } })
       .then(response => {
         if (response.ok) window.location.replace(safeReturnPath);
-        else { localStorage.removeItem("token"); }
+        else if (response.status === 401 || response.status === 403) localStorage.removeItem("token");
       })
       .catch(() => { /* Keep the login form available when the network is offline. */ });
   }
