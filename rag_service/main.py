@@ -22,12 +22,22 @@ TOKEN = os.getenv("RAG_SERVICE_TOKEN", "")
 MONGO_URI = os.getenv("MONGO_URI", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+_configured_embedding_model = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2").strip()
+# FastEmbed accepts canonical model IDs, not the underlying Xenova ONNX repository ID.
+EMBEDDING_MODEL = (
+    "sentence-transformers/all-MiniLM-L6-v2"
+    if _configured_embedding_model.lower() in {
+        "xenova/all-minilm-l6-v2",
+        "xenova/all-minilm-l6-v2-quantized",
+        "qdrant/all-minilm-l6-v2-onnx",
+    }
+    else _configured_embedding_model
+)
 VECTOR_INDEX = os.getenv("RAG_VECTOR_INDEX", "location_event_vector_index_384")
 # Set RAG_DISABLE_EMBEDDINGS=true on small hosted instances to avoid model-download stalls.
 # Retrieval then uses the authorized MongoDB history fallback and skips embedding writes.
 RAG_DISABLE_EMBEDDINGS = os.getenv("RAG_DISABLE_EMBEDDINGS", "false").strip().lower() in {"1", "true", "yes", "on"}
-TOP_K = int(os.getenv("RAG_TOP_K", "10"))
+TOP_K = max(1, min(int(os.getenv("RAG_TOP_K", "6")), 8))
 DB_NAME = os.getenv("MONGO_DB_NAME", "location_tracker")
 if MONGO_URI and not os.getenv("MONGO_DB_NAME"):
     try:
@@ -291,7 +301,7 @@ def retrieve_node(state: GraphState) -> GraphState:
     events = list(
         collection().find(base_query, fields)
         .sort([("startAt", -1)])
-        .limit(max(100, TOP_K * 10))
+        .limit(min(max(TOP_K, 6), 8))
     )
     print(f"[Reva RAG] MongoDB fallback returned {len(events)} events", flush=True)
     return {"events": serialize(events)}
@@ -301,11 +311,19 @@ def evidence_node(state: GraphState) -> GraphState:
     if not events:
         return {"evidence": "No matching historical location events were retrieved."}
     lines = []
-    for e in events:
+    # Bound each record so even verbose user-generated summaries cannot overflow
+    # Groq's request token budget when several events are retrieved.
+    for e in events[:8]:
+        username = str(e.get("username") or "unknown")[:60]
+        event_type = str(e.get("eventType") or "unknown")[:40]
+        place = str(e.get("placeName") or "unknown")[:100]
+        summary = str(e.get("summary") or "")[:160]
+        start = str(e.get("startAt") or "")[:40]
+        end = str(e.get("endAt") or "")[:40]
+        duration = str(e.get("durationMinutes") or 0)[:12]
         lines.append(
-            f"Person={e.get('username')}; event={e.get('eventType')}; place={e.get('placeName')}; "
-            f"start={e.get('startAt')}; end={e.get('endAt')}; duration_minutes={e.get('durationMinutes')}; "
-            f"summary={e.get('summary')}; relevance={e.get('score')}"
+            f"Person={username}; event={event_type}; place={place}; "
+            f"start={start}; end={end}; duration_minutes={duration}; summary={summary}"
         )
     return {"evidence": "\n".join(lines)}
 
@@ -364,6 +382,15 @@ class RevaRAGHandler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
+
+    def do_HEAD(self):
+        # Render and other health probes may issue HEAD requests.
+        # Respond without a body; the regular GET /health endpoint remains authoritative.
+        path = urlparse(self.path).path.rstrip("/") or "/"
+        self.send_response(200 if path in {"/", "/health"} else 404)
+        self.send_header("Content-Length", "0")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
 
     def do_GET(self):
         path = urlparse(self.path).path.rstrip("/") or "/"
