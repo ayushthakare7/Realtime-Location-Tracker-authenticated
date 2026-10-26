@@ -1,36 +1,28 @@
 # Reva — Privacy-Aware Real-Time Location Tracker
 
-Reva is a location-sharing application with a Node.js web backend/frontend and a separate Python RAG microservice. The existing JavaScript application remains responsible for accounts, authentication, friendships, live GPS sharing, consent, and deterministic geospatial calculations. Python owns the RAG pipeline: embeddings, MongoDB Vector Search retrieval, LangGraph orchestration, and natural-language answer generation through LangChain.
+Reva is deployed as **one Render Docker web service**. A single container contains the existing Node.js application, the Python RAG engine, and the mobility/journey engine in clearly separated folders. Supervisor manages these processes inside the container. Only the Node.js app's port (`10000`) is exposed publicly; the Python RAG (`127.0.0.1:8001`) and mobility (`127.0.0.1:3101`) listeners are loopback-only internal processes, not separately deployed Render services.
 
-## Service architecture
+The Node.js application remains responsible for accounts, authentication, friendships, live GPS sharing, consent, and deterministic geospatial calculations. Python owns embeddings, MongoDB Vector Search retrieval, LangGraph orchestration, and natural-language answer generation. The mobility folder owns journey routing, ETA, and arrival monitoring. Keeping these responsibilities in separate folders does not require separate Render services.
+
+## Single-service architecture
 
 ```text
-Browser (EJS + JavaScript + Leaflet)
-          |
-          | HTTP / Socket.IO
-          v
-Node.js service (Express + MongoDB/Mongoose)
-  - Authentication and authorization
-  - Friends and sharing permissions
-  - Live location and location-event creation
-  - Deterministic distance/geocoding/routing
-  - Safety Travel journeys, route approval, progress/offline event sync, and overdue checks
-  - Persistent in-app safety notifications
-  - Consent check and authorized user ID selection
-          |
-          | HTTP POST + Bearer service token
-          v
-Python service (standard-library HTTP server + LangChain + LangGraph)
-  - Event embeddings (sentence-transformers)
-  - MongoDB Vector Search retrieval
-  - LangGraph intent -> retrieve -> evidence -> answer
-  - LangChain LLM and embedding integrations
-          |
-          v
-MongoDB locationevents collection + vector index
+One Render Docker web service / one container
+┌────────────────────────────────────────────────────────────┐
+│ Supervisor                                                  │
+│  ├── Node.js main app  (public port 10000)                  │
+│  │     ├── EJS frontend, auth, tracker, sockets              │
+│  │     ├── calls RAG at 127.0.0.1:8001                      │
+│  │     └── calls mobility at 127.0.0.1:3101                 │
+│  ├── Python RAG       (loopback-only port 8001)             │
+│  └── Node mobility    (loopback-only port 3101)             │
+└────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+                  MongoDB Atlas / external APIs
 ```
 
-Both services read the same MongoDB database. The Python service is private to the backend and should not be called directly by the browser. The local launch command binds it to `127.0.0.1:8001`. Safety Travel is implemented as a module in the existing Node service, not as an additional microservice. Safety Travel uses a public OpenStreetMap-based Valhalla router by default and does not require a Google Maps API key. The public endpoint has rate limits and no uptime guarantee; unsupported modes return an explicit error rather than a fabricated route.
+This is one deployment and one public port, while the internal processes use separate loopback ports because independent HTTP servers cannot bind the same port simultaneously. The browser only talks to the main app. The Docker image pre-downloads and validates the 384-dimensional FastEmbed model during build to avoid downloading it on the first RAG question after startup. Safety Travel uses the routing provider configured for the mobility engine; keep its API key in Render environment variables, never in source code.
 
 ## Request and response flow
 
