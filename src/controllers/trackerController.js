@@ -215,23 +215,37 @@ exports.askMap = async (req, res) => {
     if (isCurrentQuestion(question) || ownCurrentQuestion) {
       if (ownCurrentQuestion || (targetUser && String(targetUser._id) === String(uid))) {
         if (!mine) return res.json({ success: true, answer: "I don't have your latest location. Turn on location sharing and allow location access first." });
-        let visit = visitByUser.get(String(uid));
-        let place = visit?.placeName;
-        if (isFallbackPlace(place)) {
-          place = await placeLabel(mine.latitude, mine.longitude);
-          if (visit) await LocationVisit.updateOne({ _id: visit._id }, { $set: { placeName: place } });
+        // Resolve from the latest GPS point, not just the possibly stale visit label.
+        const geo = await reverseGeocode(mine.latitude, mine.longitude);
+        let place = geo.placeName;
+        if (visitByUser.get(String(uid)) && place && !isFallbackPlace(place)) {
+          await LocationVisit.updateOne({ _id: visitByUser.get(String(uid))._id }, { $set: { placeName: place, latitude: mine.latitude, longitude: mine.longitude, lastSeen: mine.lastSeen } });
         }
         const ageMinutes = Math.max(0, Math.round((Date.now() - new Date(mine.lastSeen).getTime()) / 60000));
-        return res.json({ success: true, answer: place && !isFallbackPlace(place) ? `You are currently at ${place}. Your location was updated ${ageMinutes} minute(s) ago.` : `I have your latest coordinates, but I don't have a resolved place name for them yet.` });
+        const region = [geo.city, geo.state, geo.country].filter(Boolean).join(", ");
+        const resolved = place && !isFallbackPlace(place) ? place : region;
+        const coordinates = Number.isFinite(Number(mine.latitude)) && Number.isFinite(Number(mine.longitude)) ? " (GPS " + Number(mine.latitude).toFixed(5) + ", " + Number(mine.longitude).toFixed(5) + ")" : "";
+        return res.json({ success: true, answer: resolved ? `Your latest shared location appears to be near ${resolved}${coordinates}. Updated ${ageMinutes} minute(s) ago.` : `I have your latest GPS coordinates${coordinates}, but the map provider could not identify a named nearby place. Updated ${ageMinutes} minute(s) ago.` });
       }
       const target = targetUser && String(targetUser._id) !== String(uid) ? others.find(p => String(p.userId) === String(targetUser._id)) : null;
       if (!target) return res.json({ success: true, answer: "I can't access a current location for that person. They may not be sharing right now, or their latest location is unavailable." });
-      let visit = visitByUser.get(String(target.userId));
-      let place = visit?.placeName;
-      if (isFallbackPlace(place)) { place = await placeLabel(target.latitude, target.longitude); if (visit) await LocationVisit.updateOne({ _id: visit._id }, { $set: { placeName: place } }); }
+      // Always reverse-geocode the freshest point; a visit label may describe an older stop.
+      const geo = await reverseGeocode(target.latitude, target.longitude);
+      const visit = visitByUser.get(String(target.userId));
+      const place = geo.placeName;
+      if (visit && place && !isFallbackPlace(place)) {
+        await LocationVisit.updateOne({ _id: visit._id }, { $set: { placeName: place, latitude: target.latitude, longitude: target.longitude, lastSeen: target.lastSeen } });
+      }
       const ageMinutes = Math.max(0, Math.round((Date.now() - new Date(target.lastSeen).getTime()) / 60000));
-      if (place && !isFallbackPlace(place)) return res.json({ success: true, answer: `${target.username} is currently at ${place}. Their latest location was updated ${ageMinutes} minute(s) ago.` });
-      return res.json({ success: true, answer: `${target.username} is sharing a current location, but I don't have a resolved place name for it yet.` });
+      const region = [geo.city, geo.state, geo.country].filter(Boolean).join(", ");
+      const resolved = place && !isFallbackPlace(place) ? place : region;
+      const coordinates = Number.isFinite(Number(target.latitude)) && Number.isFinite(Number(target.longitude)) ? " (GPS " + Number(target.latitude).toFixed(5) + ", " + Number(target.longitude).toFixed(5) + ")" : "";
+      const staleAfterMinutes = Math.max(1, Number(process.env.LOCATION_STALE_MINUTES) || 15);
+      if (ageMinutes > staleAfterMinutes) {
+        return res.json({ success: true, answer: `${target.username}'s last shared GPS point is ${ageMinutes} minute(s) old. The recorded location was near ${resolved || "an unnamed map location"}${coordinates}; I cannot confirm that this is where they are right now.` });
+      }
+      if (resolved) return res.json({ success: true, answer: `${target.username}'s latest shared location appears to be near ${resolved}${coordinates}. Updated ${ageMinutes} minute(s) ago.` });
+      return res.json({ success: true, answer: `${target.username} is sharing a current location, but the map provider could not identify a named nearby place. Their GPS coordinates are ${Number(target.latitude).toFixed(5)}, ${Number(target.longitude).toFixed(5)}; updated ${ageMinutes} minute(s) ago.` });
     }
 
     const distances = [];
