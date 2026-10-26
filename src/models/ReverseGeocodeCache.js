@@ -5,6 +5,8 @@ const reverseGeocodeCacheSchema = new mongoose.Schema({
   latitude: { type: Number, required: true, min: -90, max: 90 },
   longitude: { type: Number, required: true, min: -180, max: 180 },
   placeName: { type: String, required: true },
+  road: { type: String, default: null },
+  locality: { type: String, default: null },
   city: { type: String, default: null },
   state: { type: String, default: null },
   country: { type: String, default: null },
