@@ -226,21 +226,38 @@ def forward_geocode(place_query: str, cache_collection: Any = None) -> dict[str,
 
 
 def location_tool_route(question: str, context: dict[str, Any]) -> str:
-    """Select a tool from question semantics and the trusted context shape."""
+    """Select reverse geocoding for authorized people, forward geocoding for public places."""
+    import re
     text = str(question or "").casefold()
-    has_coords = any(
-        _valid_coordinates(person.get("latitude"), person.get("longitude"))
-        for person in (context.get("currentLocations") or []) if isinstance(person, dict)
-    )
-    if has_coords and any(term in text for term in (
+    people = [
+        person for person in (context.get("currentLocations") or [])
+        if isinstance(person, dict) and person.get("username")
+    ]
+    named_people = [
+        person for person in people
+        if str(person.get("username")).casefold() not in {"you", "me", "self"}
+        and re.search(r"\\b" + re.escape(str(person.get("username")).casefold()) + r"\\b", text)
+    ]
+    asks_self = bool(re.search(r"\\b(where am i|where was i|my current location|what city am i|what state am i|what country am i)\\b", text))
+    reverse_language = any(term in text for term in (
         "where am i", "where is", "where are", "what city", "which city",
         "what town", "what locality", "what state", "what country", "current location",
         "located", "location right now", "currently at", "where was",
-    )):
-        return "reverse_geocode"
-    # Only forward-geocode when the user asks to locate a named place/city,
-    # rather than for generic questions that merely contain a place slot.
-    if any(term in text for term in ("where is ", "where's ", "locate ", "which state is ", "what state is ", "what country is ", "what city is ")):
+    ))
+    if reverse_language and (asks_self or named_people):
+        targets = [person for person in people if (
+            str(person.get("username")).casefold() in {"you", "me", "self"}
+            if asks_self else person in named_people
+        )]
+        if any(_valid_coordinates(p.get("latitude"), p.get("longitude")) for p in targets):
+            return "reverse_geocode"
+        # A friend with no supplied GPS must not be looked up as a public place.
+        return "none"
+    public_place_language = any(term in text for term in (
+        "where is ", "where's ", "locate ", "which state is ", "what state is ",
+        "what country is ", "what city is ",
+    ))
+    if public_place_language and not named_people:
         return "forward_geocode"
     return "none"
 
@@ -250,9 +267,15 @@ def resolve_location_tools(question: str, context: dict[str, Any], cache_collect
     route = location_tool_route(question, context)
     results = []
     if route == "reverse_geocode":
-        for person in (context.get("currentLocations") or [])[:20]:
-            if not isinstance(person, dict):
-                continue
+        import re
+        text = str(question or "").casefold()
+        people = [p for p in (context.get("currentLocations") or []) if isinstance(p, dict)]
+        named = [p for p in people if p.get("username") and str(p.get("username")).casefold() not in {"you", "me", "self"}
+                 and re.search(r"\\b" + re.escape(str(p.get("username")).casefold()) + r"\\b", text)]
+        asks_self = bool(re.search(r"\\b(where am i|where was i|my current location|what city am i|what state am i|what country am i)\\b", text))
+        targets = ([p for p in people if str(p.get("username") or "").casefold() in {"you", "me", "self"}]
+                   if asks_self else named if named else people[:20])
+        for person in targets[:20]:
             coords = _valid_coordinates(person.get("latitude"), person.get("longitude"))
             if coords is None:
                 continue
