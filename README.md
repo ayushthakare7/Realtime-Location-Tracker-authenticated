@@ -279,3 +279,7 @@ The standalone Node.js service lives in `mobility-service/`. It owns the `mobili
 The authenticated main app exposes `/mobility` as the dedicated My Journey page and `/mobility/shared/:tripId` as a read-only road-route view for an authorized recipient. The main dashboard includes a My Journey entry link. The service sends authenticated internal callbacks to the main app for real-time trip notifications. Configure `MOBILITY_SERVICE_URL` and the same `MOBILITY_CALLBACK_SECRET` in both services, plus `ORS_API_KEY` and `MONGODB_URI` in `mobility-service/.env`. See `mobility-service/README.md` for the standalone setup and free-tier constraints.
 
 This is a separate, unmerged feature branch. It does not change `main`.
+
+## Unified Render deployment
+
+This repository runs the Node app, Mobility service, and Python RAG service inside one Docker web service. Configure secrets as Render environment variables; do not commit them. See the example env files for variable names.
