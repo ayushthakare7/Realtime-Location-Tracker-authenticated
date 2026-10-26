@@ -192,6 +192,13 @@ exports.askMap = async (req, res) => {
             const proximityKm = Math.max(0.1, Number(process.env.PLACE_PROXIMITY_KM) || 1.5);
             const placeLabel = [place.name, place.state, place.country].filter(Boolean).join(", ");
             const freshness = " The shared GPS point was updated " + ageMinutes + " minute(s) ago.";
+            const staleAfterMinutes = Math.max(1, Number(process.env.LOCATION_STALE_MINUTES) || 15);
+            if (ageMinutes > staleAfterMinutes) {
+              return res.json({
+                success: true,
+                answer: "I cannot reliably confirm where " + targetName.toLowerCase() + " is right now because their latest shared GPS point is " + ageMinutes + " minute(s) old. At that recorded point, they were about " + km.toFixed(2) + " km from " + placeLabel + " in a straight line."
+              });
+            }
             if (km <= proximityKm) {
               return res.json({ success: true, answer: targetName + " appears to be near " + placeLabel + " (about " + km.toFixed(2) + " km from the mapped place point). GPS proximity cannot prove they are inside the exact campus/building boundary." + freshness });
             }
