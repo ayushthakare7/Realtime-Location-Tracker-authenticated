@@ -37,8 +37,8 @@ async function reverseGeocode(latitude, longitude) {
     }).lean();
     if (cached) {
       const result = {
-        placeName: cached.placeName, city: cached.city || null,
-        state: cached.state || null, country: cached.country || null,
+        placeName: cached.placeName, road: cached.road || null, locality: cached.locality || null,
+        city: cached.city || null, state: cached.state || null, country: cached.country || null,
         countryCode: cached.countryCode || null
       };
       geocodeCache.set(cacheKey, result);
@@ -71,6 +71,8 @@ async function reverseGeocode(latitude, longitude) {
       }
       const data = await response.json();
       const address = data.address || {};
+      const road = address.road || address.pedestrian || address.footway || address.residential || null;
+      const locality = address.neighbourhood || address.suburb || address.quarter || address.hamlet || address.village || address.city_district || null;
       const city = address.city || address.town || address.municipality || address.village ||
         address.city_district || address.suburb || address.neighbourhood || null;
       const state = address.state || address.state_district || address.county || null;
@@ -83,6 +85,8 @@ async function reverseGeocode(latitude, longitude) {
       if (!placeName && !city && !state && !country) continue;
       const result = {
         placeName: String(placeName || fallback.placeName).slice(0, 160),
+        road: road ? String(road).slice(0, 160) : null,
+        locality: locality ? String(locality).slice(0, 160) : null,
         city: city ? String(city) : null,
         state: state ? String(state) : null,
         country: country ? String(country) : null,
@@ -127,6 +131,8 @@ async function reverseGeocode(latitude, longitude) {
       if (feature || city || state || country) {
         const result = {
           placeName: String(feature || city || state || country).slice(0, 160),
+          road: null,
+          locality: data.locality ? String(data.locality).slice(0, 160) : null,
           city: city ? String(city) : null,
           state: state ? String(state) : null,
           country: country ? String(country) : null,
