@@ -12,7 +12,7 @@ const { placeLabel, reverseGeocode } = require("../services/locationEvents.servi
 const { geocodePlace } = require("../services/geocoding.service");
 const { findNearbyPlaces } = require("../services/nearbyPlaces.service");
 
-const { isCurrentQuestion, isOwnCurrentQuestion, isGeoAddressQuestion, requestedUsername, isFallbackPlace, describeNearbyLocation } = require("../services/locationAnswerFormatting.service");
+const { distanceKm, isCurrentQuestion, isOwnCurrentQuestion, isGeoAddressQuestion, requestedUsername, isFallbackPlace, describeNearbyLocation } = require("../services/locationAnswerFormatting.service");
 
 exports.askMap = async (req, res) => {
   try {

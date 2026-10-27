@@ -56,4 +56,4 @@ function describeNearbyLocation(geo = {}, nearby = [], fallbackPlace = null) {
   };
 }
 
-module.exports = { isCurrentQuestion, isOwnCurrentQuestion, isGeoAddressQuestion, requestedUsername, isFallbackPlace, describeNearbyLocation };
+module.exports = { distanceKm, isCurrentQuestion, isOwnCurrentQuestion, isGeoAddressQuestion, requestedUsername, isFallbackPlace, describeNearbyLocation };
