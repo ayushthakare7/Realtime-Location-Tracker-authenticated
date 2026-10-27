@@ -59,39 +59,58 @@ MongoDB Atlas Vector Search is required for semantic retrieval. If an existing i
 
 ## Repository layout
 
+The repository keeps the deployed app as one Render Docker service while separating responsibilities by domain. HTTP routes stay thin; controllers translate HTTP requests, services implement business logic, models define persistence, and workers handle background processing.
+
 ```text
 .
-├── server.js                       # Starts Express, MongoDB and Socket.IO
-├── package.json                    # Node scripts/dependencies
+├── server.js                         # Main Node/Socket.IO process
+├── src/
+│   ├── app.js                         # Express middleware and route composition
+│   ├── config/db.js                   # Main MongoDB connection
+│   ├── routes/                        # HTTP route declarations by domain
+│   ├── controllers/
+│   │   ├── trackerController.js       # Backwards-compatible controller facade
+│   │   ├── friendshipController.js    # Friend requests and sharing controls
+│   │   ├── historyController.js       # Location-history settings and queries
+│   │   ├── mapAssistantController.js  # Authorized map context and RAG handoff
+│   │   ├── locationQueryController.js # Semantic query request orchestration
+│   │   └── safety*Controller.js       # Safety Travel and notification endpoints
+│   ├── services/                      # Routing, query planning, RAG, events, push
+│   ├── models/                        # Mongoose schemas and indexes
+│   ├── sockets/                       # Real-time Socket.IO event handlers
+│   ├── views/                         # EJS pages
+│   └── public/                        # Browser JavaScript, CSS, native entrypoints
+├── mobility-service/
+│   ├── server.js                      # Mobility process entry point
+│   ├── src/routes/                    # Thin mobility route map
+│   ├── src/controllers/               # Destination, trip and shared-trip handlers
+│   ├── src/services/                  # Road routing, notifications and trip worker
+│   ├── src/models/                    # Trip and routing-usage persistence
+│   ├── src/middleware/                # JWT auth and request throttling
+│   └── test/                          # Mobility unit tests
 ├── rag_service/
-│   ├── main.py                     # Python HTTP + LangChain + LangGraph service
-│   └── requirements.txt            # Python-only dependencies
-├── scripts/
-│   └── setup-rag.js                # Requests setup/reindex from Python
-└── src/
-    ├── app.js                      # Express configuration and web routes
-    ├── config/db.js                # MongoDB connection
-    ├── controllers/
-    │   ├── trackerController.js    # Sharing, history and Node-to-RAG handoff
-    │   └── locationQueryController.js # Deterministic location/distance tools
-    ├── models/
-    │   ├── LocationEvent.js        # Semantic location events and embeddings
-    │   ├── Location.js             # Latest shared coordinates
-    │   ├── LocationVisit.js        # Active/recent visit state
-    │   ├── LocationPoint.js        # Raw historical GPS points
-    │   ├── Friendship.js           # Friendship/access relationships
-    │   └── User.js                 # Account and privacy settings
-    ├── routes/trackerRoutes.js     # Authenticated tracker endpoints
-    ├── services/
-    │   ├── ragClient.service.js    # Authenticated HTTP client for Python
-    │   ├── locationEvents.service.js # Detects visits; asks Python to embed events
-    │   ├── locationQueryPlanner.service.js # Deterministic distance-query parsing
-    │   ├── geocoding.service.js    # Resolves place names to coordinates
-    │   └── gemini.service.js       # Existing hosted-model query parsing/answer helpers
-    ├── sockets/locationSocket.js   # Real-time location updates
-    ├── views/                      # EJS web pages
-    └── public/                     # Browser JavaScript and CSS
+│   ├── main.py                        # Python process entry point
+│   ├── api.py                         # HTTP API boundary
+│   ├── config.py / database.py        # Configuration and persistence
+│   ├── embeddings.py / indexing.py    # Model clients and event indexing
+│   ├── intent.py / retrieval.py       # Query intent and authorized retrieval
+│   ├── graph.py                       # LangGraph composition and generation
+│   ├── location_tools.py              # Public geocoding and location labels
+│   └── time_queries.py                # Deterministic temporal-history answers
+├── scripts/                           # Setup, migration and maintenance scripts
+├── tests/                             # Python RAG and temporal-query tests
+├── test/                              # Main Node/browser helper tests
+└── deploy/supervisord.conf             # Runs the three app processes in Docker
 ```
+
+### Modularity rules
+
+- Keep routes focused on URL, HTTP method, middleware and controller mapping.
+- Keep request/response shaping in controllers; put reusable business rules and external integrations in services.
+- Keep database access and persistence models out of browser code.
+- Keep background workers separate from HTTP request handlers and make their startup/shutdown explicit.
+- Add regression tests alongside each extracted pure helper or service.
+- Preserve existing route names, response shapes, environment variable names and the single-container deployment unless a migration is explicitly planned.
 
 ## Setup
 
@@ -264,13 +283,11 @@ Offline event batches are idempotent by `eventId`, accept up to 100 events per r
 - **Road distance vs. straight-line distance:** deterministic routing remains in the JavaScript location-query layer; semantic RAG should not estimate route distances.
 
 
-## Reva Mobility Context (new feature branch)
+## Reva Mobility Context
 
 The standalone Node.js service lives in `mobility-service/`. It owns the `mobilitytrips` collection, calculates routes and ETA through the configured OpenRouteService free tier, and reads the main app's existing `users`, `friendships`, and `locations` collections. The existing GPS/socket pipeline remains the source of live positions; GPS accuracy is carried through the existing location updates for more cautious arrival detection.
 
 The authenticated main app exposes `/mobility` as the dedicated My Journey page and `/mobility/shared/:tripId` as a read-only road-route view for an authorized recipient. The main dashboard includes a My Journey entry link. The service sends authenticated internal callbacks to the main app for real-time trip notifications. Configure `MOBILITY_SERVICE_URL` and the same `MOBILITY_CALLBACK_SECRET` in both services, plus `ORS_API_KEY` and `MONGODB_URI` in `mobility-service/.env`. See `mobility-service/README.md` for the standalone setup and free-tier constraints.
-
-This is a separate, unmerged feature branch. It does not change `main`.
 
 ## Unified Render deployment
 
