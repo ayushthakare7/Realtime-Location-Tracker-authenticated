@@ -15,7 +15,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm install --no-audit --no-fund
       - run: npm test
       - name: Check modular backend JavaScript syntax
         run: |
