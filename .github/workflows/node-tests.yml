@@ -17,3 +17,18 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: Check modular backend JavaScript syntax
+        run: |
+          node --check src/controllers/friendshipController.js
+          node --check src/controllers/historyController.js
+          node --check src/controllers/mapAssistantController.js
+          node --check src/controllers/locationQueryController.js
+          node --check src/services/locationQueryExecution.service.js
+          node --check src/controllers/safetyNotificationController.js
+          node --check src/controllers/safetyJourneyLifecycleController.js
+          node --check src/routes/trackerRoutes.js
+          node --check src/routes/safetyJourneyRoutes.js
+          node --check mobility-service/src/controllers/destinationController.js
+          node --check mobility-service/src/controllers/tripsController.js
+          node --check mobility-service/src/controllers/sharedTripsController.js
+          node --check mobility-service/src/routes/trips.js
