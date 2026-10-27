@@ -2,7 +2,7 @@ name: Mobility service checks
 
 on:
   push:
-    branches: [feature/reva-mobility-context]
+    branches: [main]
     paths:
       - "mobility-service/**"
       - ".github/workflows/mobility-service-tests.yml"
@@ -26,6 +26,11 @@ jobs:
       - run: npm test
       - run: node --check server.js
       - run: node --check src/routes/trips.js
+      - run: node --check src/controllers/destinationController.js
+      - run: node --check src/controllers/tripsController.js
+      - run: node --check src/controllers/sharedTripsController.js
+      - run: node --check src/middleware/rateLimit.js
+      - run: node --check src/utils/trips.js
       - run: node --check src/services/worker.js
       - run: node --check src/services/routing.js
 
