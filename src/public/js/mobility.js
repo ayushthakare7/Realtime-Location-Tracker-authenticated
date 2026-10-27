@@ -4,15 +4,7 @@
 
   const $ = id => document.getElementById(id);
   const message = text => { $("mobilityMessage").textContent = text || ""; };
-  const api = async (path, options = {}) => {
-    const response = await fetch("/api/mobility" + path, {
-      ...options,
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + token, ...(options.headers || {}) }
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.message || "Mobility request failed.");
-    return data;
-  };
+  const api = window.RevaApi.createApiClient("/api/mobility", token, "Mobility request failed.");
 
   const map = L.map("journeyMap", { zoomControl: true, preferCanvas: true }).setView([20.5937, 78.9629], 13);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {

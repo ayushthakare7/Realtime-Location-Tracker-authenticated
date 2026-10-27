@@ -17,15 +17,7 @@ const locationDeviceLabel = (() => {
 let activeLocationDeviceId = "";
 if (!token) window.location.replace("/login?returnTo=" + encodeURIComponent(window.location.pathname + window.location.search));
 
-const api = async (path, options = {}) => {
-  const response = await fetch("/api/tracker" + path, {
-    ...options,
-    headers: { "Content-Type": "application/json", Authorization: "Bearer " + token, ...(options.headers || {}) }
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message || "Request failed");
-  return data;
-};
+const api = window.RevaApi.createApiClient("/api/tracker", token, "Request failed");
 
 const map = L.map("map").setView([20.5937, 78.9629], 5);
 const baseTiles = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap contributors" }).addTo(map);
