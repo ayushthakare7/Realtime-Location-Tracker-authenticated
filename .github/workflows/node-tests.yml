@@ -26,6 +26,9 @@ jobs:
           node --check src/services/locationQueryExecution.service.js
           node --check src/services/locationAnswerFormatting.service.js
           node --check src/services/reverseGeocoding.service.js
+          node --check src/public/js/reva-api.js
+          node --check src/public/js/script.js
+          node --check src/public/js/mobility.js
           node --check src/controllers/safetyNotificationController.js
           node --check src/controllers/safetyJourneyLifecycleController.js
           node --check src/routes/trackerRoutes.js
