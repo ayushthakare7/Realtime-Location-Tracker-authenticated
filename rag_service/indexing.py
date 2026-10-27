@@ -1,9 +1,10 @@
 """Location-event serialization and embedding writes."""
 from datetime import datetime, timezone
+from typing import Any
 from bson import ObjectId
 from config import EMBEDDING_MODEL, RAG_DISABLE_EMBEDDINGS
 from database import collection
-from embeddings import embeddings
+from embeddings import embeddings, embeddings_unavailable
 
 def event_text(event: dict[str, Any]) -> str:
     return (
