@@ -24,6 +24,7 @@ jobs:
           node --check src/controllers/mapAssistantController.js
           node --check src/controllers/locationQueryController.js
           node --check src/services/locationQueryExecution.service.js
+          node --check src/services/locationAnswerFormatting.service.js
           node --check src/controllers/safetyNotificationController.js
           node --check src/controllers/safetyJourneyLifecycleController.js
           node --check src/routes/trackerRoutes.js
