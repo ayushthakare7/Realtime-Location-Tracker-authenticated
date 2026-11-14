@@ -152,6 +152,24 @@ async function askRagService({ question, userIds, context }) {
   return requestRag("/ask", { question, authorizedUserIds: userIds.map(String), context });
 }
 
+async function openRagStream({ question, userIds, context }) {
+  const token = process.env.RAG_SERVICE_TOKEN;
+  if (!token) throw new Error("RAG_SERVICE_TOKEN is missing");
+  const deadline = Date.now() + ASK_RETRY_WINDOW_MS;
+  await waitForRagReady(deadline);
+  const remainingMs = Math.max(1000, deadline - Date.now());
+  return fetch(`${RAG_SERVICE_URL}/ask-stream`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      Accept: "text/event-stream"
+    },
+    body: JSON.stringify({ question, authorizedUserIds: userIds.map(String), context }),
+    signal: AbortSignal.timeout(remainingMs)
+  });
+}
+
 async function indexLocationEvent(eventId) {
   return requestRag("/index-event", { eventId: String(eventId) });
 }
@@ -160,4 +178,4 @@ async function reindexLocationEvents() {
   return requestRag("/reindex");
 }
 
-module.exports = { askRagService, indexLocationEvent, reindexLocationEvents };
+module.exports = { askRagService, openRagStream, indexLocationEvent, reindexLocationEvents };

@@ -1,12 +1,13 @@
 """LangGraph workflow composition and answer generation."""
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, START, StateGraph
+from langchain_core.runnables import RunnableConfig
 
 from embeddings import llm
 from intent import GraphState, classify_node
 from retrieval import location_tools_node, retrieve_node, evidence_node
 
-def generate_node(state: GraphState) -> GraphState:
+def generate_node(state: GraphState, config: RunnableConfig) -> GraphState:
     context = state.get("context", {})
     # Keep raw GPS inside the tool/runtime boundary. The LLM receives only
     # coarse labels and freshness metadata, not the underlying coordinates.
@@ -24,7 +25,7 @@ def generate_node(state: GraphState) -> GraphState:
         "locationTools": state.get("location_tools", {"route": "none", "results": []}),
     }
     print("[Reva RAG] generate: Groq invocation starting", flush=True)
-    response = llm().invoke([
+    messages = [
         SystemMessage(content=(
             "You are Reva, a capable, conversational assistant for a privacy-aware location tracker. "
             "First determine whether the question asks about private/personal location data or general knowledge. "
@@ -45,9 +46,19 @@ def generate_node(state: GraphState) -> GraphState:
             "uncertainty where GPS accuracy or evidence limits the conclusion."
         )),
         HumanMessage(content=f"Question: {state['question']}\nAuthorized current context: {safe_context}\nRetrieved history:\n{state.get('evidence', '')}"),
-    ])
-    print("[Reva RAG] generate: Groq invocation completed", flush=True)
-    return {"answer": str(response.content).strip()}
+    ]
+    answer_parts = []
+    for chunk in llm().stream(messages, config=config):
+        content = chunk.content
+        if isinstance(content, str):
+            answer_parts.append(content)
+        elif isinstance(content, list):
+            answer_parts.extend(
+                item["text"] for item in content
+                if isinstance(item, dict) and isinstance(item.get("text"), str)
+            )
+    print("[Reva RAG] generate: Groq streaming completed", flush=True)
+    return {"answer": "".join(answer_parts).strip()}
 
 def build_graph():
     graph = StateGraph(GraphState)

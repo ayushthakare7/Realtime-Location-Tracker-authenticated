@@ -584,37 +584,67 @@ document.getElementById("askForm").addEventListener("submit", async event => {
   event.preventDefault();
   const answer = document.getElementById("answer");
   const submit = document.querySelector("#askForm button[type='submit']");
-  const question = document.getElementById("question").value;
+  const question = document.getElementById("question").value.trim();
   if (submit) submit.disabled = true;
   answer.textContent = "Let me follow the little breadcrumbs your locations left behind…";
   try {
-    const data = await api("/ask", { method: "POST", body: JSON.stringify({ question, aiConsent: document.getElementById("aiConsent").checked }) });
-    if (!data.pending || !data.taskId) { answer.textContent = data.answer || "Reva couldn't find an answer."; return; }
-    const startedAt = Date.now();
-    let pollDelay = 1500;
-    const thinkingLines = [
-      "Analysing your question…",
-      "Checking the location timeline…",
-      "Cross-checking coordinates…",
-      "Reviewing recent location updates…",
-      "Finding patterns in the journey…",
-      "Connecting the location data…",
-      "Verifying the timestamps…",
-      "Putting the clues together…",
-      "Almost there — checking the details…"
-    ];
-    while (Date.now() - startedAt < 5 * 60 * 1000) {
-      const elapsed = Date.now() - startedAt;
-      answer.textContent = thinkingLines[Math.floor(elapsed / 7000) % thinkingLines.length];
-      await new Promise(resolve => setTimeout(resolve, pollDelay));
-      const status = await api("/ask-status/" + encodeURIComponent(data.taskId), { method: "GET" });
-      if (status.status === "completed") { answer.textContent = status.answer; return; }
-      if (status.status === "failed") { answer.textContent = status.message || "I couldn't untangle that trail just now. Try me again in a moment."; return; }
-      pollDelay = Math.min(3000, pollDelay + 500);
+    const response = await fetch("/api/tracker/ask-stream", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + token,
+        Accept: "text/event-stream, application/json"
+      },
+      body: JSON.stringify({ question, aiConsent: document.getElementById("aiConsent").checked })
+    });
+    const contentType = response.headers.get("content-type") || "";
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.message || "Reva couldn't answer right now. Please try again.");
     }
-    answer.textContent = "That trail is taking longer than expected to untangle. Your question may still be processing—please try again shortly.";
-  } catch (e) { answer.textContent = e.message; }
-  finally { if (submit) submit.disabled = false; }
+    if (!contentType.includes("text/event-stream") || !response.body) {
+      const payload = await response.json().catch(() => ({}));
+      answer.textContent = payload.answer || payload.message || "Reva couldn't find an answer.";
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let receivedToken = false;
+    let finished = false;
+    while (!finished) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+      const frames = buffer.split(/\r?\n\r?\n/);
+      buffer = frames.pop() || "";
+      for (const frame of frames) {
+        const dataLine = frame.split(/\r?\n/).find(line => line.startsWith("data:"));
+        if (!dataLine) continue;
+        let message;
+        try { message = JSON.parse(dataLine.slice(5).trim()); } catch { continue; }
+        if (message.type === "progress" && !receivedToken) {
+          answer.textContent = message.message || "Reva is thinking...";
+        } else if (message.type === "token") {
+          if (!receivedToken) { answer.textContent = ""; receivedToken = true; }
+          answer.textContent += message.content || "";
+        } else if (message.type === "error") {
+          throw new Error(message.message || "Reva couldn't complete this answer.");
+        } else if (message.type === "done") {
+          finished = true;
+          break;
+        }
+      }
+      if (done) finished = true;
+    }
+    if (!receivedToken && !answer.textContent.trim()) {
+      answer.textContent = "Reva couldn't find an answer in the available location history.";
+    }
+  } catch (e) {
+    answer.textContent = e.message || "Reva couldn't answer right now. Please try again.";
+  } finally {
+    if (submit) submit.disabled = false;
+  }
 });
 
 document.querySelectorAll("[data-question]").forEach(button => button.addEventListener("click", () => {

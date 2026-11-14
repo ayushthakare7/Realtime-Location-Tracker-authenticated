@@ -127,6 +127,66 @@ class RevaRAGHandler(BaseHTTPRequestHandler):
                 self.send_json(200, result)
                 return
 
+            if path == "/ask-stream":
+                question = payload.get("question")
+                user_ids = payload.get("authorizedUserIds")
+                context = payload.get("context", {})
+                if not isinstance(question, str) or not question.strip() or len(question) > 500:
+                    raise RequestError(400, "question must be a non-empty string of at most 500 characters")
+                if not isinstance(user_ids, list) or len(user_ids) > 100:
+                    raise RequestError(400, "authorizedUserIds must contain at most 100 IDs")
+                if not all(isinstance(value, str) for value in user_ids):
+                    raise RequestError(400, "authorizedUserIds must contain strings")
+                if not isinstance(context, dict):
+                    raise RequestError(400, "context must be an object")
+
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+                self.send_header("Cache-Control", "no-cache, no-transform")
+                self.send_header("Connection", "keep-alive")
+                self.send_header("X-Accel-Buffering", "no")
+                self.end_headers()
+
+                def emit(event_type: str, **data: Any):
+                    packet = json.dumps({"type": event_type, **data}, default=str)
+                    self.wfile.write(("data: " + packet + "\n\n").encode("utf-8"))
+                    self.wfile.flush()
+
+                try:
+                    emit("progress", message="Checking your location history and preparing Reva...")
+                    extracted_intent = extract_question_intent(question.strip())
+                    direct_answer = answer_time_question(
+                        question.strip(), user_ids, context, mongo[DB_NAME], extracted_intent
+                    )
+                    if direct_answer is not None:
+                        emit("token", content=direct_answer)
+                        emit("done")
+                        return
+
+                    emit("progress", message="I found the relevant context. Reva is composing an answer...")
+                    graph_input = {
+                        "question": question.strip(),
+                        "authorized_user_ids": user_ids,
+                        "context": context,
+                        "intent": extracted_intent.get("intent", "other"),
+                    }
+                    for message_chunk, metadata in workflow.stream(graph_input, stream_mode="messages"):
+                        if metadata.get("langgraph_node") != "generate_answer":
+                            continue
+                        content = getattr(message_chunk, "content", "")
+                        if isinstance(content, str) and content:
+                            emit("token", content=content)
+                        elif isinstance(content, list):
+                            for item in content:
+                                if isinstance(item, dict) and isinstance(item.get("text"), str) and item["text"]:
+                                    emit("token", content=item["text"])
+                    emit("done")
+                    print("[Reva RAG] /ask-stream completed", flush=True)
+                except Exception as exc:
+                    print(f"[Reva RAG] streaming request failed: {type(exc).__name__}: {exc}", flush=True)
+                    emit("error", message="Reva couldn't complete this answer. Please try again.")
+                return
+
             if path == "/ask":
                 print("[Reva RAG] /ask payload validated; starting RAG workflow", flush=True)
                 question = payload.get("question")

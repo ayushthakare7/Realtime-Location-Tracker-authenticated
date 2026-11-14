@@ -15,5 +15,6 @@ router.patch('/history', historyController.setHistory);
 router.get('/history', historyController.history);
 router.delete('/history', historyController.deleteHistory);
 router.post('/ask', locationQueryController.ask);
+router.post('/ask-stream', mapAssistantController.askMapStream);
 router.get('/ask-status/:taskId', mapAssistantController.askRagTaskStatus);
 module.exports = router;

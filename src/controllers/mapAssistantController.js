@@ -6,7 +6,7 @@ const LocationVisit = require("../models/LocationVisit");
 const LocationEvent = require("../models/LocationEvent");
 const Friendship = require("../models/Friendship");
 const SafetyJourney = require("../models/SafetyJourney");
-const { askRagService } = require("../services/ragClient.service");
+const { askRagService, openRagStream } = require("../services/ragClient.service");
 const ragTasks = require("../services/ragTask.service");
 const { placeLabel, reverseGeocode } = require("../services/locationEvents.service");
 const { geocodePlace } = require("../services/geocoding.service");
@@ -231,6 +231,38 @@ exports.askMap = async (req, res) => {
       ...(me?.historyEnabled !== false ? [uid] : []),
       ...users.filter(user => user.historyEnabled !== false).map(user => user._id)
     ];
+    if (req.revaStream === true) {
+      res.status(200);
+      res.set({
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no"
+      });
+      res.flushHeaders();
+      const sendEvent = event => res.write("data: " + JSON.stringify(event) + "\n\n");
+      sendEvent({ type: "progress", message: "Connecting to Reva and checking your location history..." });
+
+      try {
+        const upstream = await openRagStream({ question, userIds: authorizedHistoryIds, context });
+        if (!upstream.ok || !upstream.body) {
+          const detail = await upstream.text().catch(() => "");
+          throw new Error(detail || "The Reva RAG service is temporarily unavailable.");
+        }
+        const reader = upstream.body.getReader();
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (value && value.length) res.write(Buffer.from(value));
+        }
+        return res.end();
+      } catch (streamError) {
+        console.error("[Reva] Streaming response failed:", streamError);
+        sendEvent({ type: "error", message: "Reva couldn't answer right now. Please try again." });
+        return res.end();
+      }
+    }
+
     // Render may take several minutes to wake the Python RAG service. Return
     // immediately and let the browser poll this authenticated task for its answer.
     const task = ragTasks.start(req.user.userId, async () => {
@@ -245,12 +277,21 @@ exports.askMap = async (req, res) => {
     });
   } catch (e) {
     console.error("Reva assistant error:", e);
+    if (res.headersSent) {
+      res.write("data: " + JSON.stringify({ type: "error", message: "Reva couldn't answer right now. Please try again." }) + "\n\n");
+      return res.end();
+    }
     const status = [400, 401, 403, 429].includes(e.status) ? e.status : 502;
     const message = status === 400 ? e.message : "Reva couldn't answer right now. Please try again.";
     res.status(status).json({ success: false, message });
   }
 };
 
+
+exports.askMapStream = (req, res) => {
+  req.revaStream = true;
+  return exports.askMap(req, res);
+};
 
 exports.askRagTaskStatus = (req, res) => {
   const task = ragTasks.getForUser(req.user.userId, req.params.taskId);
