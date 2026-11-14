@@ -1,4 +1,4 @@
-const { askMap } = require("./mapAssistantController");
+const { askMap, askMapStream } = require("./mapAssistantController");
 const { answerDistanceQuestion, answerPlaceComparison, answerNearestPerson, fallbackParseDistanceQuestion } = require("../services/locationQueryExecution.service");
 const { understandLocationQuestion } = require("../services/gemini.service");
 
@@ -60,5 +60,10 @@ exports.ask = async (req, res) => {
   }
 
   // History, events, and ordinary conversational questions are delegated to Python RAG.
-  return askMap(req, res);
+  return req.revaStream === true ? askMapStream(req, res) : askMap(req, res);
+};
+
+exports.askStream = (req, res) => {
+  req.revaStream = true;
+  return exports.ask(req, res);
 };
